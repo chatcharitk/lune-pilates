@@ -1,0 +1,84 @@
+/* lune-deck.css — presentation styling for LUNE booking app deck */
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Schibsted+Grotesk:wght@400;500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap');
+
+:root {
+  --cream: #F1E9E0; --cream-2: #E7DCCE; --paper: #FBF6EF; --paper-2: #FFFCF7;
+  --ink: #2A2419; --ink-2: #6B5D4C; --muted: #9C8C77;
+  --taupe: #8C7A63; --taupe-deep: #6E5E49; --sage: #8C9A7E; --sage-deep: #6E7C60; --rose: #C49A86;
+  --dark: #211E18; --dark-2: #2E2A22;
+  --line: rgba(140,122,99,0.2); --line-2: rgba(140,122,99,0.34);
+  --serif: 'Cormorant Garamond', Georgia, serif;
+  --head: 'Schibsted Grotesk', 'IBM Plex Sans Thai', sans-serif;
+  --body: 'Hanken Grotesk', 'IBM Plex Sans Thai', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+deck-stage:not(:defined) { visibility: hidden; }
+body { background: #15130F; }
+
+/* slide canvas */
+.slide, deck-stage section { width: 1920px; height: 1080px; position: relative; overflow: hidden; background: var(--cream); color: var(--ink); font-family: var(--body); }
+.pad { position: absolute; inset: 0; padding: 96px 120px; display: flex; flex-direction: column; }
+
+/* shared atoms */
+.eyebrow { font-family: var(--head); font-size: 24px; font-weight: 600; letter-spacing: 4px; text-transform: uppercase; color: var(--taupe); }
+.eyebrow.on-dark { color: #C9B89E; }
+.kicker-line { width: 56px; height: 2px; background: var(--taupe); margin: 26px 0; }
+.h1 { font-family: var(--head); font-weight: 600; font-size: 84px; line-height: 1.02; letter-spacing: -1.5px; color: var(--ink); }
+.h2 { font-family: var(--head); font-weight: 600; font-size: 60px; line-height: 1.05; letter-spacing: -1px; color: var(--ink); }
+.lead { font-family: var(--serif); font-weight: 500; font-size: 46px; line-height: 1.28; color: var(--ink-2); letter-spacing: 0.2px; }
+.lead em { font-style: italic; color: var(--taupe-deep); }
+.body { font-family: var(--body); font-size: 26px; line-height: 1.62; color: var(--ink-2); }
+.small { font-family: var(--body); font-size: 21px; line-height: 1.6; color: var(--muted); }
+
+/* corner furniture */
+.wordmark { font-family: var(--serif); font-weight: 600; letter-spacing: 7px; color: var(--taupe-deep); }
+.wordmark .spk { position: relative; }
+.wordmark .spk svg { position: absolute; top: 0.08em; right: -0.34em; }
+.chrome { position: absolute; left: 120px; right: 120px; bottom: 56px; display: flex; align-items: center; justify-content: space-between; font-family: var(--head); font-size: 19px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+.chrome.on-dark { color: rgba(241,233,224,0.5); }
+.pagenum { font-variant-numeric: tabular-nums; }
+
+/* cover */
+.cover { background: var(--dark); color: var(--cream); }
+.cover .bg { position: absolute; inset: 0; background-size: cover; background-position: center 58%; }
+.cover .scrim { position: absolute; inset: 0; background: linear-gradient(105deg, rgba(20,17,13,0.9) 0%, rgba(20,17,13,0.6) 42%, rgba(20,17,13,0.25) 100%); }
+
+/* panels */
+.card { background: var(--paper-2); border: 1px solid var(--line); border-radius: 26px; box-shadow: 0 2px 4px rgba(60,48,32,0.04), 0 30px 60px rgba(60,48,32,0.08); }
+.soft { background: var(--paper); border: 1px solid var(--line); border-radius: 22px; }
+
+/* phone showcase mat */
+.phone-mat { background: radial-gradient(120% 90% at 50% 18%, #E4DBCF 0%, #D9CFC1 60%, #CFC4B4 100%); border-radius: 30px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.phone-mat img { display: block; height: 100%; width: auto; }
+.phone-mat.fit img { height: auto; width: 100%; }
+
+/* callout list */
+.callout { display: flex; gap: 22px; align-items: flex-start; }
+.callout .num { flex-shrink: 0; width: 46px; height: 46px; border-radius: 50%; border: 1.5px solid var(--line-2); display: flex; align-items: center; justify-content: center; font-family: var(--head); font-weight: 600; font-size: 22px; color: var(--taupe-deep); }
+.callout .ct h4 { font-family: var(--head); font-weight: 600; font-size: 28px; color: var(--ink); margin-bottom: 7px; letter-spacing: -0.3px; }
+.callout .ct p { font-family: var(--body); font-size: 21px; line-height: 1.5; color: var(--ink-2); }
+
+/* swatch */
+.sw { border-radius: 18px; height: 150px; border: 1px solid var(--line); display: flex; align-items: flex-end; padding: 16px; }
+.sw span { font-family: var(--head); font-size: 17px; letter-spacing: 1px; text-transform: uppercase; }
+
+/* feature grid */
+.feat { background: var(--paper-2); border: 1px solid var(--line); border-radius: 22px; padding: 34px 34px 36px; }
+.feat .ic { width: 58px; height: 58px; border-radius: 16px; background: var(--cream-2); color: var(--taupe-deep); display: flex; align-items: center; justify-content: center; margin-bottom: 22px; }
+.feat h4 { font-family: var(--head); font-weight: 600; font-size: 28px; color: var(--ink); margin-bottom: 10px; letter-spacing: -0.3px; }
+.feat p { font-family: var(--body); font-size: 20px; line-height: 1.5; color: var(--ink-2); }
+
+/* type specimen */
+.spec { border-top: 1px solid var(--line); padding: 26px 0; display: flex; align-items: baseline; gap: 36px; }
+.spec .role { font-family: var(--head); font-size: 18px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); width: 200px; flex-shrink: 0; }
+
+.tag { display: inline-flex; align-items: center; gap: 10px; padding: 11px 22px; border-radius: 999px; border: 1px solid var(--line-2); font-family: var(--body); font-size: 24px; font-weight: 600; color: var(--ink-2); white-space: nowrap; flex-shrink: 0; }
+.dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+
+/* entrance */
+@media (prefers-reduced-motion: no-preference) {
+  [data-deck-active] .anim { animation: rise 0.7s cubic-bezier(.2,.7,.2,1) both; }
+  [data-deck-active] .anim2 { animation: rise 0.7s cubic-bezier(.2,.7,.2,1) 0.12s both; }
+  [data-deck-active] .anim3 { animation: rise 0.7s cubic-bezier(.2,.7,.2,1) 0.22s both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(26px); } to { opacity: 1; transform: none; } }
+}

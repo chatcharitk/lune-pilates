@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LUNE Pilates — Business Analytics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Schibsted+Grotesk:wght@400;500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --cream: #F1E9E0; --cream-2: #E7DCCE; --surface: #FBF6EF; --surface-2: #FFFCF7;
+    --ink: #2E2820; --ink-soft: #6B5D4C; --muted: #9C8C77;
+    --line: rgba(140,122,99,0.16); --line-strong: rgba(140,122,99,0.30);
+    --taupe: #8C7A63; --taupe-deep: #6E5E49;
+    --sage: #8C9A7E; --sage-deep: #5F6E52; --rose: #B5765C; --amber: #B98C3E; --blue: #6E84A3;
+    --dark: #23201C;
+    --head: 'Schibsted Grotesk', 'IBM Plex Sans Thai', sans-serif;
+    --body: 'Hanken Grotesk', 'IBM Plex Sans Thai', system-ui, sans-serif;
+    --serif: 'Cormorant Garamond', Georgia, serif;
+    --shadow: 0 1px 2px rgba(72,58,40,0.04), 0 8px 24px rgba(72,58,40,0.06);
+    --sidebar: 230px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--cream); color: var(--ink); font-family: var(--body); -webkit-font-smoothing: antialiased; }
+  button { font-family: inherit; cursor: pointer; }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 99px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  a { color: inherit; text-decoration: none; }
+
+  .root { display: flex; min-height: 100vh; }
+
+  /* ── sidebar ── */
+  .sidebar { width: var(--sidebar); flex-shrink: 0; background: var(--dark); position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; padding: 26px 16px; }
+  .brand { padding: 4px 10px 22px; }
+  .brand .wm { font-family: var(--serif); font-weight: 600; font-size: 30px; letter-spacing: 4px; color: #F3ECE2; }
+  .brand .sub { font-family: var(--body); font-size: 9.5px; letter-spacing: 4px; text-transform: uppercase; color: rgba(243,236,226,0.5); margin-top: 3px; }
+  .nav { display: flex; flex-direction: column; gap: 3px; margin-top: 8px; }
+  .nav a { display: flex; align-items: center; gap: 12px; padding: 11px 13px; border-radius: 11px; font-size: 14px; font-weight: 500; color: rgba(243,236,226,0.62); }
+  .nav a svg { width: 19px; height: 19px; flex-shrink: 0; }
+  .nav a:hover { background: rgba(243,236,226,0.06); color: rgba(243,236,226,0.9); }
+  .nav a.on { background: rgba(243,236,226,0.12); color: #F6EFE6; }
+  .side-foot { margin-top: auto; padding: 12px 12px 2px; border-top: 1px solid rgba(243,236,226,0.1); }
+  .side-foot a { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: rgba(243,236,226,0.55); padding: 6px 0; }
+  .side-foot a:hover { color: rgba(243,236,226,0.85); }
+
+  /* ── main ── */
+  .main { flex: 1; min-width: 0; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 22px 34px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: rgba(241,233,224,0.86); backdrop-filter: blur(10px); z-index: 20; }
+  .topbar h1 { font-family: var(--head); font-weight: 600; font-size: 25px; letter-spacing: -0.4px; margin: 0; }
+  .topbar .date { font-size: 13.5px; color: var(--muted); margin-top: 2px; }
+  .seg { display: flex; background: var(--cream-2); border-radius: 11px; padding: 3px; }
+  .seg button { border: none; background: transparent; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+  .seg button.on { background: var(--surface-2); color: var(--ink); box-shadow: var(--shadow); }
+
+  .content { padding: 28px 34px 60px; max-width: 1360px; }
+  .sec-label { display: flex; align-items: center; gap: 11px; margin: 6px 2px 16px; }
+  .sec-label .n { font-family: var(--serif); font-style: italic; font-size: 21px; color: var(--taupe); }
+  .sec-label h2 { font-family: var(--head); font-weight: 600; font-size: 19px; margin: 0; letter-spacing: -0.2px; }
+  .sec-label .th { font-size: 13px; color: var(--muted); font-weight: 500; }
+  .sec-label.spaced { margin-top: 40px; }
+
+  .card { background: var(--surface-2); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); }
+  .eyebrow { font-family: var(--body); font-size: 10.5px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--muted); }
+
+  /* hero grid */
+  .hero-grid { display: grid; grid-template-columns: 1.55fr 1fr 1fr; grid-template-rows: auto auto; gap: 16px; }
+  .sales-card { grid-row: span 2; padding: 24px 26px; display: flex; flex-direction: column; }
+  .sales-top { display: flex; gap: 30px; }
+  .sales-fig { flex: 1; }
+  .sales-fig .v { font-family: var(--head); font-weight: 700; font-size: 38px; letter-spacing: -1px; line-height: 1.05; margin-top: 7px; }
+  .sales-fig .v.mtd { font-size: 33px; }
+  .delta { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 700; padding: 3px 9px; border-radius: 99px; margin-top: 9px; }
+  .delta.up { color: var(--sage-deep); background: rgba(140,154,126,0.16); }
+  .delta.down { color: var(--rose); background: rgba(181,118,92,0.14); }
+  .delta svg { width: 12px; height: 12px; }
+  .spark { margin-top: auto; padding-top: 20px; }
+  .spark-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 9px; }
+  .barchart { display: flex; align-items: flex-end; gap: 5px; height: 96px; margin-top: 10px; }
+  .barchart .bar { flex: 1; border-radius: 4px 4px 1px 1px; background: var(--taupe); opacity: 0.55; min-height: 4px; transition: opacity .15s; }
+  .barchart .bar:hover { opacity: 0.85; }
+  .barchart .bar.last { opacity: 1; background: var(--dark); }
+
+  .mini { padding: 20px 22px; display: flex; flex-direction: column; }
+  .mini .eyebrow { margin-bottom: 4px; }
+  .mini .big { font-family: var(--head); font-weight: 700; font-size: 27px; letter-spacing: -0.5px; }
+  .mini .note { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+
+  /* donut legend */
+  .mix { display: flex; align-items: center; gap: 18px; }
+  .legend { display: flex; flex-direction: column; gap: 9px; flex: 1; }
+  .legend .row { display: flex; align-items: center; gap: 9px; font-size: 13px; }
+  .legend .dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+  .legend .nm { flex: 1; color: var(--ink-soft); font-weight: 500; }
+  .legend .pct { font-family: var(--head); font-weight: 700; font-size: 13.5px; }
+  .legend .amt { color: var(--muted); font-size: 11.5px; width: 100%; }
+
+  /* two-col lower */
+  .lower { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .lower.ret { grid-template-columns: 1.1fr 1fr; }
+
+  .panel { padding: 22px 24px; }
+  .panel h3 { font-family: var(--head); font-weight: 600; font-size: 16.5px; margin: 0 0 3px; }
+  .panel .ph-sub { font-size: 12.5px; color: var(--muted); margin: 0 0 18px; }
+
+  /* fill rate bars */
+  .fillbig { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+  .fillbig .v { font-family: var(--head); font-weight: 700; font-size: 40px; letter-spacing: -1px; }
+  .barrow { margin-top: 14px; }
+  .barrow .top { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 6px; }
+  .barrow .top .k { color: var(--ink-soft); font-weight: 600; display: flex; align-items: center; gap: 7px; }
+  .barrow .top .val { font-family: var(--head); font-weight: 700; color: var(--ink); }
+  .track { height: 8px; border-radius: 99px; background: var(--cream-2); overflow: hidden; }
+  .track > span { display: block; height: 100%; border-radius: 99px; }
+  .cdot { width: 8px; height: 8px; border-radius: 99px; display: inline-block; }
+
+  /* alerts */
+  .alert { display: flex; align-items: center; gap: 14px; padding: 14px 15px; border-radius: 14px; border: 1px solid var(--line); margin-bottom: 10px; }
+  .alert:last-child { margin-bottom: 0; }
+  .alert .tag { width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .alert .tag svg { width: 21px; height: 21px; }
+  .alert.warn .tag { background: rgba(185,140,62,0.14); color: var(--amber); }
+  .alert.low .tag { background: rgba(110,132,163,0.14); color: var(--blue); }
+  .alert .body { flex: 1; min-width: 0; }
+  .alert .body .t { font-weight: 600; font-size: 14px; }
+  .alert .body .d { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .alert .act { display: flex; gap: 7px; flex-shrink: 0; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 10px; font-size: 12.5px; font-weight: 600; border: 1px solid var(--line-strong); background: transparent; color: var(--ink); white-space: nowrap; }
+  .btn:hover { background: var(--cream-2); }
+  .btn.solid { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .btn.solid:hover { background: #3a332a; }
+  .btn.ghost-rose { color: var(--rose); border-color: rgba(181,118,92,0.4); }
+  .btn svg { width: 14px; height: 14px; }
+
+  /* expiring list */
+  .exp { display: flex; align-items: center; gap: 13px; padding: 13px 4px; border-bottom: 1px solid var(--line); }
+  .exp:last-child { border-bottom: none; }
+  .av { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-family: var(--head); font-weight: 600; font-size: 15px; color: #fff; }
+  .exp .nm { flex: 1; min-width: 0; }
+  .exp .nm .n { font-weight: 600; font-size: 14px; }
+  .exp .nm .s { font-size: 12px; color: var(--muted); margin-top: 1px; }
+  .exp .hrs { text-align: right; flex-shrink: 0; margin-right: 4px; }
+  .exp .hrs .h { font-family: var(--head); font-weight: 700; font-size: 15px; }
+  .exp .hrs .e { font-size: 11px; color: var(--rose); font-weight: 600; }
+  .pill-line { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 13px; border-radius: 10px; font-size: 12.5px; font-weight: 600; border: none; background: #06C755; color: #fff; white-space: nowrap; }
+  .pill-line.sent { background: rgba(6,199,85,0.12); color: #0a8f43; }
+  .pill-line .l { width: 16px; height: 16px; border-radius: 4px; background: #fff; color: #06C755; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 800; }
+  .pill-line.sent .l { background: #06C755; color: #fff; }
+
+  /* house usage */
+  .house { padding: 14px 15px; border: 1px solid var(--line); border-radius: 14px; margin-bottom: 10px; }
+  .house:last-child { margin-bottom: 0; }
+  .house .hh { display: flex; align-items: center; justify-content: space-between; margin-bottom: 11px; }
+  .house .hn { font-family: var(--head); font-weight: 600; font-size: 14.5px; display: flex; align-items: center; gap: 8px; }
+  .house .members { display: flex; }
+  .house .members .a { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--surface-2); margin-left: -7px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 9.5px; font-weight: 700; font-family: var(--head); }
+  .house .members .a:first-child { margin-left: 0; }
+  .house .usewrap { display: flex; align-items: center; gap: 12px; }
+  .house .usewrap .track { flex: 1; }
+  .house .burn { font-size: 11.5px; color: var(--muted); margin-top: 8px; display: flex; align-items: center; gap: 6px; }
+  .house .burn b { color: var(--ink-soft); }
+
+  .footnote { margin-top: 22px; font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 9px; padding: 0 2px; }
+
+  /* revenue per instructor */
+  .instr-rev { display: flex; flex-direction: column; gap: 16px; }
+  .irow { display: flex; align-items: center; gap: 15px; }
+  .irow .iav { width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #fff; font-family: var(--head); font-weight: 600; font-size: 16px; }
+  .irow .ibody { flex: 1; min-width: 0; }
+  .irow .itop { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 7px; }
+  .irow .inm { font-weight: 600; font-size: 14.5px; }
+  .irow .inm .spec { font-weight: 500; font-size: 12px; color: var(--muted); margin-left: 8px; }
+  .irow .ifig { display: flex; align-items: baseline; gap: 9px; }
+  .irow .ifig .v { font-family: var(--head); font-weight: 700; font-size: 16px; }
+  .irow .ifig .h { font-size: 12px; color: var(--muted); }
+  .irow .itrack { height: 9px; border-radius: 99px; background: var(--cream-2); overflow: hidden; }
+  .irow .itrack > span { display: block; height: 100%; border-radius: 99px; }
+
+  @media (max-width: 1080px) {
+    .hero-grid { grid-template-columns: 1fr 1fr; }
+    .sales-card { grid-column: span 2; grid-row: auto; }
+    .lower, .lower.ret { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 720px) {
+    :root { --sidebar: 0px; }
+    .sidebar { display: none; }
+    .content { padding: 20px 16px 60px; }
+    .topbar { padding: 18px 16px; }
+    .hero-grid { grid-template-columns: 1fr; }
+    .sales-card { grid-column: auto; }
+    .sales-top { flex-direction: column; gap: 18px; }
+  }
+</style>
+</head>
+<body>
+<div class="root">
+  <!-- ── sidebar ── -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="wm">LUNE</div>
+      <div class="sub">Admin · Studio OS</div>
+    </div>
+    <nav class="nav">
+      <a class="on" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 19V5M4 19h16M8 16v-5M12 16V8M16 16v-3"/></svg>Analytics</a>
+      <a href="LUNE Admin Dashboard.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 9.5h16M8.5 3v4M15.5 3v4"/></svg>Today</a>
+      <a href="LUNE Admin Dashboard.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 5h14v14H5zM5 10h14M9 14h6"/></svg>Schedule</a>
+      <a href="LUNE Admin Dashboard.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="9" cy="8" r="3.4"/><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><path d="M17 4l2 2 3.5-3.5"/></svg>Customers</a>
+      <a href="LUNE Admin Dashboard.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h3"/></svg>Payments</a>
+      <a href="LUNE Admin Dashboard.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="9" cy="9" r="3"/><path d="M3.5 19c0-3 2.5-4.8 5.5-4.8s5.5 1.8 5.5 4.8"/><path d="M16 6.4a3 3 0 0 1 0 5.2"/></svg>Staff</a>
+    </nav>
+    <div class="side-foot">
+      <a href="LUNE Admin Mobile.html"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg>Open mobile admin</a>
+    </div>
+  </aside>
+
+  <!-- ── main ── -->
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <h1>Business Overview</h1>
+        <div class="date">As of Tuesday, 30 June 2026 · ภาพรวมธุรกิจ</div>
+      </div>
+      <div class="seg" id="seg">
+        <button class="on" data-p="mtd">Month to date</button>
+        <button data-p="today">Today</button>
+      </div>
+    </header>
+
+    <div class="content">
+
+      <!-- ════ 1 · SALES & REVENUE (HERO) ════ -->
+      <div class="sec-label">
+        <span class="n">01</span>
+        <h2>Sales &amp; revenue</h2>
+        <span class="th">ยอดขายและรายได้ · top priority</span>
+      </div>
+
+      <div class="hero-grid">
+        <!-- sales headline -->
+        <div class="card sales-card">
+          <div class="sales-top">
+            <div class="sales-fig">
+              <div class="eyebrow">Month to date · MTD</div>
+              <div class="v mtd" id="mtdVal">฿341,800</div>
+              <div class="delta up" id="mtdDelta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 15l6-6 6 6"/></svg>+10.4% vs last month</div>
+            </div>
+            <div class="sales-fig">
+              <div class="eyebrow">Today</div>
+              <div class="v" id="todayVal">฿18,400</div>
+              <div class="delta up" id="todayDelta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 15l6-6 6 6"/></svg>+23% vs yesterday</div>
+            </div>
+          </div>
+          <div class="spark">
+            <div class="eyebrow">Daily revenue · last 14 days</div>
+            <div id="barChart" class="barchart"></div>
+            <div class="spark-label"><span>17 Jun</span><span>23 Jun</span><span>30 Jun</span></div>
+          </div>
+        </div>
+
+        <!-- revenue mix -->
+        <div class="card mini">
+          <div class="eyebrow">Revenue mix · MTD</div>
+          <div class="mix" style="margin-top:14px">
+            <svg width="118" height="118" viewBox="0 0 42 42" id="donut" style="flex-shrink:0"></svg>
+            <div class="legend">
+              <div class="row"><span class="dot" style="background:var(--taupe)"></span><span class="nm">Group</span><span class="pct">58%</span></div>
+              <div class="amt" style="margin:-4px 0 4px 19px">฿198,000</div>
+              <div class="row"><span class="dot" style="background:var(--sage)"></span><span class="nm">Privates</span><span class="pct">33%</span></div>
+              <div class="amt" style="margin:-4px 0 4px 19px">฿112,800</div>
+              <div class="row"><span class="dot" style="background:var(--blue)"></span><span class="nm">Rentals</span><span class="pct">9%</span></div>
+              <div class="amt" style="margin:-4px 0 0 19px">฿31,000</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- trial conversion -->
+        <div class="card mini">
+          <div class="eyebrow">Trial conversion</div>
+          <div class="note" style="margin:2px 0 0">Buy 1 Get 1 → paying member</div>
+          <div style="display:flex;align-items:center;gap:16px;margin-top:14px">
+            <svg width="86" height="86" viewBox="0 0 42 42" id="gauge" style="flex-shrink:0"></svg>
+            <div>
+              <div class="big" style="font-size:30px">64%</div>
+              <div class="note"><b style="color:var(--ink-soft)">32 of 50</b> trials<br/>converted this month</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- package liability -->
+        <div class="card mini">
+          <div class="eyebrow">Package liability</div>
+          <div class="note" style="margin:2px 0 0">Unredeemed hours on the books</div>
+          <div class="big" style="margin-top:12px;color:var(--taupe-deep)">฿284,500</div>
+          <div style="display:flex;gap:18px;margin-top:10px">
+            <div><div style="font-family:var(--head);font-weight:700;font-size:17px">612 h</div><div class="note">outstanding</div></div>
+            <div><div style="font-family:var(--head);font-weight:700;font-size:17px">38%</div><div class="note">of all sold</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- revenue per instructor -->
+      <div class="card panel" style="margin-top:16px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px">
+          <h3>Revenue per instructor</h3>
+          <span class="note" style="font-size:12.5px;color:var(--muted)">MTD · privates, duos &amp; trios</span>
+        </div>
+        <p class="ph-sub">Income generated by each instructor's booked sessions</p>
+        <div class="instr-rev" id="instrRev"></div>
+      </div>
+
+      <!-- ════ 2 · CAPACITY & OPERATIONS ════ -->
+      <div class="sec-label spaced">
+        <span class="n">02</span>
+        <h2>Capacity &amp; daily operations</h2>
+        <span class="th">ความจุและการดำเนินงาน</span>
+      </div>
+
+      <div class="lower">
+        <!-- fill rate -->
+        <div class="card panel">
+          <h3>Class fill rate</h3>
+          <p class="ph-sub">Average group-class utilisation · last 30 days</p>
+          <div class="fillbig"><span class="v">78%</span><span class="delta up" style="margin:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 15l6-6 6 6"/></svg>+5 pts</span></div>
+          <div class="barrow"><div class="top"><span class="k"><span class="cdot" style="background:var(--taupe)"></span>Group</span><span class="val">82%</span></div><div class="track"><span style="width:82%;background:var(--taupe)"></span></div></div>
+          <div class="barrow"><div class="top"><span class="k"><span class="cdot" style="background:var(--sage)"></span>Private 1:1</span><span class="val">71%</span></div><div class="track"><span style="width:71%;background:var(--sage)"></span></div></div>
+          <div class="barrow"><div class="top"><span class="k"><span class="cdot" style="background:#C0A079"></span>Duo</span><span class="val">68%</span></div><div class="track"><span style="width:68%;background:#C0A079"></span></div></div>
+          <div class="barrow"><div class="top"><span class="k"><span class="cdot" style="background:var(--blue)"></span>Trio</span><span class="val">60%</span></div><div class="track"><span style="width:60%;background:var(--blue)"></span></div></div>
+        </div>
+
+        <!-- actionable alerts -->
+        <div class="card panel">
+          <h3>Actionable alerts</h3>
+          <p class="ph-sub">Classes in the next 24–48 h that need a decision</p>
+          <div class="alert warn">
+            <div class="tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 9v4M12 17h.01M10.3 4l-7 12A2 2 0 0 0 5 19h14a2 2 0 0 0 1.7-3l-7-12a2 2 0 0 0-3.4 0Z"/></svg></div>
+            <div class="body"><div class="t">Wed 17:00 · Group</div><div class="d">3 booked · <b style="color:var(--amber)">5 on waitlist</b> — demand exceeds supply</div></div>
+            <div class="act"><button class="btn solid"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Add class</button></div>
+          </div>
+          <div class="alert low">
+            <div class="tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 17l6-6 4 4 7-8"/></svg></div>
+            <div class="body"><div class="t">Thu 10:00 · Group</div><div class="d">1 booked / 3 — <b style="color:var(--blue)">low enrolment</b></div></div>
+            <div class="act"><button class="btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v12H7l-3 3V4Z"/></svg>Promote</button><button class="btn ghost-rose">Cancel</button></div>
+          </div>
+          <div class="alert low">
+            <div class="tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 17l6-6 4 4 7-8"/></svg></div>
+            <div class="body"><div class="t">Fri 08:00 · Group</div><div class="d">0 booked / 3 — <b style="color:var(--rose)">empty</b>, 22 h out</div></div>
+            <div class="act"><button class="btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v12H7l-3 3V4Z"/></svg>Promote</button><button class="btn ghost-rose">Cancel</button></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════ 3 · RETENTION & CRM ════ -->
+      <div class="sec-label spaced">
+        <span class="n">03</span>
+        <h2>Retention &amp; CRM</h2>
+        <span class="th">การรักษาลูกค้า</span>
+      </div>
+
+      <div class="lower ret">
+        <!-- expiring soon -->
+        <div class="card panel">
+          <h3>Expiring in the next 7 days</h3>
+          <p class="ph-sub">One tap sends a renewal nudge via LINE OA</p>
+          <div id="expList">
+            <div class="exp" data-name="Nok C.">
+              <div class="av" style="background:#A98F71">N</div>
+              <div class="nm"><div class="n">Nok Charoen</div><div class="s">Member · House B-203</div></div>
+              <div class="hrs"><div class="h">2.0 h</div><div class="e">exp 8 Jun</div></div>
+              <button class="pill-line" onclick="sendReminder(this)"><span class="l">L</span>Send reminder</button>
+            </div>
+            <div class="exp" data-name="Mind A.">
+              <div class="av" style="background:#8E9A82">M</div>
+              <div class="nm"><div class="n">Mind Arunee</div><div class="s">Guest · 5-hr pack</div></div>
+              <div class="hrs"><div class="h">0.5 h</div><div class="e">exp 4 Jun</div></div>
+              <button class="pill-line" onclick="sendReminder(this)"><span class="l">L</span>Send reminder</button>
+            </div>
+            <div class="exp" data-name="Title N.">
+              <div class="av" style="background:#C0A079">T</div>
+              <div class="nm"><div class="n">Title Nattha</div><div class="s">Guest · drop-in credit</div></div>
+              <div class="hrs"><div class="h">1.0 h</div><div class="e">exp 6 Jun</div></div>
+              <button class="pill-line" onclick="sendReminder(this)"><span class="l">L</span>Send reminder</button>
+            </div>
+            <div class="exp" data-name="June W.">
+              <div class="av" style="background:#6E84A3">J</div>
+              <div class="nm"><div class="n">June Wattana</div><div class="s">Guest · House A-114</div></div>
+              <div class="hrs"><div class="h">1.5 h</div><div class="e">exp 7 Jun</div></div>
+              <button class="pill-line" onclick="sendReminder(this)"><span class="l">L</span>Send reminder</button>
+            </div>
+          </div>
+          <button class="btn" style="width:100%;justify-content:center;height:42px;margin-top:14px" onclick="remindAll()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v12H7l-3 3V4Z"/></svg>Remind all 4 at once</button>
+        </div>
+
+        <!-- house usage -->
+        <div class="card panel">
+          <h3>House usage</h3>
+          <p class="ph-sub">How fast shared family packages are being consumed</p>
+
+          <div class="house">
+            <div class="hh">
+              <div class="hn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--taupe)" stroke-width="1.8"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg>House A-114</div>
+              <div class="members"><span class="a" style="background:#A98F71">P</span><span class="a" style="background:#8E9A82">G</span><span class="a" style="background:#6E84A3">J</span></div>
+            </div>
+            <div class="usewrap"><div class="track"><span style="width:60%;background:var(--rose)"></span></div><span style="font-family:var(--head);font-weight:700;font-size:13px;white-space:nowrap">12 / 20 h</span></div>
+            <div class="burn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2s5 4 5 9a5 5 0 0 1-10 0c0-2 1-3 1-3s4 1 4-6Z"/></svg><b>Fast burn</b> · 3 members · ~5 h / week · refill in ~10 days</div>
+          </div>
+
+          <div class="house">
+            <div class="hh">
+              <div class="hn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--taupe)" stroke-width="1.8"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg>House C-007</div>
+              <div class="members"><span class="a" style="background:#8E9A82">F</span><span class="a" style="background:#B98C3E">K</span></div>
+            </div>
+            <div class="usewrap"><div class="track"><span style="width:33%;background:var(--sage)"></span></div><span style="font-family:var(--head);font-weight:700;font-size:13px;white-space:nowrap">8 / 24 h</span></div>
+            <div class="burn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg>Steady · 2 members · ~2 h / week · healthy runway</div>
+          </div>
+
+          <div class="house">
+            <div class="hh">
+              <div class="hn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--taupe)" stroke-width="1.8"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg>House B-203</div>
+              <div class="members"><span class="a" style="background:#A98F71">P</span></div>
+            </div>
+            <div class="usewrap"><div class="track"><span style="width:88%;background:var(--amber)"></span></div><span style="font-family:var(--head);font-weight:700;font-size:13px;white-space:nowrap">14 / 16 h</span></div>
+            <div class="burn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.3 4l-7 12A2 2 0 0 0 5 19h14a2 2 0 0 0 1.7-3l-7-12a2 2 0 0 0-3.4 0Z"/></svg><b style="color:var(--amber)">Nearly spent</b> · prompt a renewal soon</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footnote">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="7.8" r="1" fill="currentColor" stroke="none"/></svg>
+        Figures are illustrative for layout review. Renewal &amp; alert actions are wired to fire through LINE OA / webhooks in production.
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  // ── 14-day sales bar chart ──
+  (function () {
+    var data = [12.1, 9.4, 14.8, 11.2, 16.0, 18.9, 22.4, 13.1, 15.6, 12.8, 17.2, 19.5, 14.9, 18.4];
+    var max = 24, n = data.length;
+    var html = data.map(function (v, i) {
+      return '<div class="bar' + (i === n - 1 ? ' last' : '') + '" style="height:' + ((v / max) * 100).toFixed(1) + '%" title="฿' + (v * 1000).toLocaleString() + '"></div>';
+    }).join('');
+    document.getElementById('barChart').innerHTML = html;
+  })();
+
+  // ── donut (revenue mix) ──
+  (function () {
+    var segs = [[58, '#8C7A63'], [33, '#8C9A7E'], [9, '#6E84A3']];
+    var off = 25, html = '<circle cx="21" cy="21" r="15.9155" fill="none" stroke="#E7DCCE" stroke-width="5.4"/>';
+    segs.forEach(function (s) {
+      html += '<circle cx="21" cy="21" r="15.9155" fill="none" stroke="' + s[1] + '" stroke-width="5.4" stroke-dasharray="' + s[0] + ' ' + (100 - s[0]) + '" stroke-dashoffset="' + off + '" stroke-linecap="butt"/>';
+      off -= s[0];
+    });
+    html += '<text x="21" y="20.5" text-anchor="middle" font-family="Schibsted Grotesk,sans-serif" font-weight="700" font-size="6.6" fill="#2E2820">฿342k</text>';
+    html += '<text x="21" y="25.6" text-anchor="middle" font-family="Hanken Grotesk,sans-serif" font-size="2.9" fill="#9C8C77">MONTH</text>';
+    document.getElementById('donut').innerHTML = html;
+  })();
+
+  // ── gauge (trial conversion 64%) ──
+  (function () {
+    var pct = 64;
+    document.getElementById('gauge').innerHTML =
+      '<circle cx="21" cy="21" r="15.9155" fill="none" stroke="#E7DCCE" stroke-width="4.2"/>' +
+      '<circle cx="21" cy="21" r="15.9155" fill="none" stroke="#5F6E52" stroke-width="4.2" stroke-dasharray="' + pct + ' ' + (100 - pct) + '" stroke-dashoffset="25" stroke-linecap="round"/>' +
+      '<path d="M17 21.3l2.6 2.6 5-5.2" fill="none" stroke="#5F6E52" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+  })();
+
+  // ── revenue per instructor ──
+  (function () {
+    var rows = [
+      { initial: 'M', name: 'Kru Mai', spec: 'Rehab · Founder', rev: 128400, hrs: 96, color: '#8C7A63' },
+      { initial: 'P', name: 'Kru Ploy', spec: 'Flow · Pre/Postnatal', rev: 96200, hrs: 78, color: '#8C9A7E' },
+      { initial: 'N', name: 'Kru Nina', spec: 'Strength · Athletic', rev: 71600, hrs: 61, color: '#C0A079' }
+    ];
+    var max = Math.max.apply(null, rows.map(function (r) { return r.rev; }));
+    document.getElementById('instrRev').innerHTML = rows.map(function (r) {
+      return '<div class="irow">' +
+        '<div class="iav" style="background:' + r.color + '">' + r.initial + '</div>' +
+        '<div class="ibody">' +
+          '<div class="itop">' +
+            '<span class="inm">' + r.name + '<span class="spec">' + r.spec + '</span></span>' +
+            '<span class="ifig"><span class="v">฿' + r.rev.toLocaleString() + '</span><span class="h">' + r.hrs + ' h</span></span>' +
+          '</div>' +
+          '<div class="itrack"><span style="width:' + ((r.rev / max) * 100).toFixed(1) + '%;background:' + r.color + '"></span></div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  })();
+
+  // ── period toggle (swaps the two headline figures) ──
+  var seg = document.getElementById('seg');
+  seg.addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    [].forEach.call(seg.children, function (c) { c.classList.toggle('on', c === b); });
+  });
+
+  // ── renewal reminder buttons ──
+  function markSent(btn) {
+    btn.classList.add('sent');
+    btn.innerHTML = '<span class="l">L</span>Sent';
+    btn.disabled = true;
+  }
+  window.sendReminder = function (btn) { markSent(btn); };
+  window.remindAll = function () {
+    document.querySelectorAll('#expList .pill-line:not(.sent)').forEach(markSent);
+  };
+</script>
+</body>
+</html>

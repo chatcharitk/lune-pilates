@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LUNE Pilates — Admin</title>
+<meta name="ext-resource-dependency" content="assets/studio-hero.jpg" data-resource-id="studioHero" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Schibsted+Grotesk:wght@400;500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<template id="__bundler_thumbnail" data-bg-color="#23201C">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="800" fill="#23201C"/>
+    <text x="600" y="430" text-anchor="middle" font-family="Georgia, serif" font-weight="600" font-size="150" letter-spacing="30" fill="#C9B89E">LUNE</text>
+    <text x="600" y="500" text-anchor="middle" font-family="Georgia, serif" font-size="30" letter-spacing="14" fill="#8C7A63">ADMIN</text>
+  </svg>
+</template>
+<style>
+  :root {
+    --a-cream: #F1E9E0; --a-cream-2: #E7DCCE;
+    --a-surface: #FBF6EF; --a-surface-2: #FFFCF7;
+    --a-ink: #2E2820; --a-ink-soft: #6B5D4C; --a-muted: #9C8C77;
+    --a-line: rgba(140,122,99,0.16); --a-line-strong: rgba(140,122,99,0.3);
+    --a-taupe: #8C7A63; --a-taupe-deep: #6E5E49;
+    --a-sage: #8C9A7E; --a-sage-deep: #6E7C60;
+    --a-shadow: 0 1px 2px rgba(72,58,40,0.04), 0 6px 18px rgba(72,58,40,0.05);
+    --sidebar-w: 232px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--a-cream); color: var(--a-ink);
+    font-family: 'Hanken Grotesk', 'IBM Plex Sans Thai', system-ui, sans-serif;
+  }
+  button { font-family: inherit; }
+  input, select { font-family: inherit; outline: none; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--a-line-strong); border-radius: 99px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  /* ── layout shell ── */
+  .admin-root { display: flex; min-height: 100vh; }
+  .admin-sidebar {
+    width: var(--sidebar-w); flex-shrink: 0; background: #23201C;
+    display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh;
+  }
+  .admin-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .admin-topbar {
+    display: flex; align-items: center; gap: 14px; padding: 16px 26px;
+    border-bottom: 1px solid var(--a-line); background: var(--a-cream);
+    position: sticky; top: 0; z-index: 20;
+  }
+  .admin-topbar-brand { display: none; }
+  .admin-content { padding: 26px; max-width: 1180px; width: 100%; margin: 0 auto; }
+  .admin-mobilenav { display: none; }
+
+  /* stat + table grids */
+  .admin-statgrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  .admin-instr-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .admin-table { background: var(--a-surface-2); border: 1px solid var(--a-line); border-radius: 18px; overflow: hidden; box-shadow: var(--a-shadow); }
+  .admin-thead, .admin-trow { display: grid; align-items: center; gap: 14px; padding: 13px 18px; }
+  .admin-thead { background: var(--a-cream); border-bottom: 1px solid var(--a-line); font-family: 'Hanken Grotesk', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--a-muted); }
+  .admin-trow + .admin-trow, .admin-thead + .admin-trow { border-top: 1px solid var(--a-line); }
+  .admin-trow:hover { background: var(--a-surface); }
+  .admin-bk-grid  { grid-template-columns: 1.6fr 1.4fr 1fr 40px; }
+  .admin-mem-grid { grid-template-columns: 1.8fr 1fr 1.1fr 1fr 30px; }
+  .admin-pay-grid { grid-template-columns: 1.6fr 1.2fr 1fr 1fr 1fr; }
+
+  /* class row */
+  .admin-classrow { display: flex; align-items: center; gap: 16px; padding: 15px 18px; }
+  .admin-classtime { width: 58px; flex-shrink: 0; text-align: left; border-right: 1px solid var(--a-line); padding-right: 14px; }
+  .admin-classmeta { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+
+  /* drawer: right on desktop, bottom sheet on mobile */
+  .admin-drawer {
+    position: absolute; top: 0; right: 0; height: 100%; width: 440px; max-width: 92vw;
+    background: var(--a-surface); border-left: 1px solid var(--a-line);
+    display: flex; flex-direction: column; box-shadow: -20px 0 60px rgba(40,32,24,0.2);
+    --drawer-hidden: translate(101%, 0);
+  }
+
+  /* ── tablet ── */
+  @media (max-width: 1000px) {
+    .admin-statgrid { grid-template-columns: repeat(3, 1fr); }
+    .admin-instr-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ── mobile ── */
+  @media (max-width: 720px) {
+    :root { --sidebar-w: 0px; }
+    .admin-sidebar { display: none; }
+    .admin-topbar-brand { display: block; }
+    .admin-content { padding: 18px 16px 100px; }
+    .admin-mobilenav {
+      display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
+      padding: 9px 6px calc(9px + env(safe-area-inset-bottom)); background: var(--a-surface-2);
+      border-top: 1px solid var(--a-line); box-shadow: 0 -8px 24px rgba(72,58,40,0.05);
+    }
+    .admin-statgrid { grid-template-columns: repeat(2, 1fr); }
+    .admin-hide-sm { display: none !important; }
+    .admin-bk-grid  { grid-template-columns: 1.5fr 1fr 30px; }
+    .admin-mem-grid { grid-template-columns: 1.7fr 1fr 24px; }
+    .admin-pay-grid { grid-template-columns: 1.5fr 1fr 1fr; }
+    .admin-classtime { width: 48px; padding-right: 11px; }
+    .admin-classrow { gap: 12px 12px; padding: 14px 15px; flex-wrap: wrap; }
+    .admin-classmeta { width: 100%; justify-content: space-between; padding-left: 60px; margin-top: 2px; }
+    .admin-drawer {
+      top: auto; bottom: 0; right: 0; width: 100%; max-width: 100%; height: auto; max-height: 90%;
+      border-left: none; border-top: 1px solid var(--a-line); border-radius: 26px 26px 0 0;
+      box-shadow: 0 -20px 60px rgba(40,32,24,0.25); --drawer-hidden: translate(0, 101%);
+    }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="lune-icons.jsx"></script>
+<script type="text/babel" src="admin-data.jsx"></script>
+<script type="text/babel" src="admin-shell.jsx"></script>
+<script type="text/babel" src="admin-today.jsx"></script>
+<script type="text/babel" src="admin-schedule.jsx"></script>
+<script type="text/babel" src="admin-more.jsx"></script>
+
+<script type="text/babel">
+
+const { useState } = React;
+
+function AdminApp() {
+  const [screen, setScreen] = useState('today');
+  const [lang, setLang] = useState('th');
+  const ctx = { screen, go: setScreen, lang, setLang };
+
+  return (
+    <AdminCtx.Provider value={ctx}>
+      <div className="admin-root">
+        <Sidebar />
+        <div className="admin-main" style={{ color: "rgb(33, 27, 19)" }}>
+          <Topbar />
+          <div className="admin-content">
+            {screen === 'today' && <TodayScreen />}
+            {screen === 'schedule' && <ScheduleAdminScreen />}
+            {screen === 'bookings' && <BookingsAdminScreen />}
+            {screen === 'members' && <MembersScreen />}
+            {screen === 'payments' && <PaymentsScreen />}
+            {screen === 'instructors' && <InstructorsScreen />}
+          </div>
+        </div>
+        <MobileNav />
+      </div>
+    </AdminCtx.Provider>);
+
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<AdminApp />);
+</script>
+</body>
+</html>

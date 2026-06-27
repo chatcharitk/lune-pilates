@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LUNE Pilates — Product Spec & Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Schibsted+Grotesk:wght@400;500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --cream: #F1E9E0; --cream-2: #E7DCCE; --paper: #FBF6EF; --paper-2: #FFFCF7;
+    --ink: #2E2820; --ink-soft: #6B5D4C; --muted: #9C8C77;
+    --line: rgba(140,122,99,0.18); --line-2: rgba(140,122,99,0.32);
+    --taupe: #8C7A63; --taupe-deep: #6E5E49;
+    --sage: #8C9A7E; --sage-deep: #5F6E52; --rose: #C49A86; --blue: #6E84A3;
+    --serif: 'Cormorant Garamond', Georgia, serif;
+    --head: 'Schibsted Grotesk', 'IBM Plex Sans Thai', sans-serif;
+    --body: 'Hanken Grotesk', 'IBM Plex Sans Thai', system-ui, sans-serif;
+    --shadow: 0 1px 2px rgba(72,58,40,0.04), 0 10px 30px rgba(72,58,40,0.06);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--cream); color: var(--ink); font-family: var(--body); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 28px; }
+
+  /* ── hero ── */
+  header.hero { padding: 92px 0 56px; }
+  .eyebrow { font-family: var(--body); font-size: 13px; font-weight: 600; letter-spacing: 3px; text-transform: uppercase; color: var(--taupe); }
+  .wordmark { font-family: var(--serif); font-weight: 600; letter-spacing: 1px; color: var(--taupe-deep); }
+  h1 { font-family: var(--head); font-weight: 600; font-size: 52px; line-height: 1.14; letter-spacing: -1px; margin: 22px 0 0; max-width: 18ch; }
+  h1 em { font-family: var(--serif); font-style: italic; font-weight: 500; color: var(--taupe-deep); }
+  .lede { font-size: 20px; color: var(--ink-soft); margin-top: 30px; max-width: 64ch; }
+  .meta-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 34px; }
+  .chip { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 999px; border: 1px solid var(--line-2); font-size: 14px; font-weight: 500; color: var(--ink-soft); background: var(--paper-2); }
+
+  /* ── section scaffold ── */
+  section { padding: 30px 0; }
+  .sec-head { display: flex; align-items: baseline; gap: 16px; border-top: 1.5px solid var(--line-2); padding-top: 26px; margin-bottom: 30px; }
+  .sec-num { font-family: var(--serif); font-style: italic; font-size: 26px; color: var(--taupe); flex-shrink: 0; }
+  .sec-head h2 { font-family: var(--head); font-weight: 600; font-size: 33px; letter-spacing: -0.5px; margin: 0; }
+  .sec-head p { margin: 6px 0 0; color: var(--ink-soft); font-size: 16px; }
+
+  .card { background: var(--paper-2); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow); }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+
+  /* ── pricing ── */
+  .price-group { margin-bottom: 22px; }
+  .price-group > h3 { font-family: var(--head); font-size: 17px; font-weight: 600; margin: 0 0 4px; display: flex; align-items: center; gap: 10px; }
+  .price-group > h3 .th { font-family: var(--body); font-size: 13px; font-weight: 500; color: var(--muted); }
+  .price-note { font-size: 13.5px; color: var(--muted); margin: 0 0 14px; }
+  table.price { width: 100%; border-collapse: collapse; background: var(--paper-2); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+  table.price th { text-align: left; font-family: var(--body); font-size: 11.5px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--muted); padding: 12px 18px; background: var(--cream); border-bottom: 1px solid var(--line); }
+  table.price td { padding: 13px 18px; border-bottom: 1px solid var(--line); font-size: 15px; }
+  table.price tr:last-child td { border-bottom: none; }
+  table.price td.name { font-weight: 600; }
+  table.price td.price { font-family: var(--head); font-weight: 600; font-size: 16px; text-align: right; white-space: nowrap; }
+  table.price td.per { color: var(--muted); font-size: 13.5px; white-space: nowrap; }
+  table.price td.valid { color: var(--ink-soft); font-size: 14px; }
+  .tag { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; background: var(--cream-2); color: var(--taupe-deep); margin-left: 8px; vertical-align: middle; white-space: nowrap; }
+  .price-group > h3 { flex-wrap: wrap; }
+  .tag.dark { background: var(--ink); color: var(--cream); }
+  .promo { display: flex; align-items: center; gap: 16px; background: var(--ink); color: #F3ECE2; border-radius: 18px; padding: 20px 24px; margin-top: 6px; }
+  .promo .star { width: 46px; height: 46px; border-radius: 13px; background: rgba(201,184,158,0.18); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .promo h3 { margin: 0; font-family: var(--head); font-size: 18px; font-weight: 600; }
+  .promo p { margin: 3px 0 0; font-size: 14px; color: rgba(243,236,226,0.72); }
+
+  /* ── schedule grid ── */
+  .sched { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
+  .sched .day { background: var(--paper-2); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .sched .day h4 { margin: 0; font-family: var(--head); font-size: 14px; font-weight: 600; text-align: center; padding: 10px; background: var(--cream); border-bottom: 1px solid var(--line); }
+  .sched .day.wknd h4 { background: var(--cream-2); color: var(--taupe-deep); }
+  .sched .slot { font-family: var(--head); font-size: 13px; font-weight: 500; text-align: center; padding: 8px 4px; color: var(--ink-soft); border-bottom: 1px solid var(--line); }
+  .sched .slot:last-child { border-bottom: none; }
+
+  /* ── journey flows ── */
+  .flow { position: relative; padding-left: 0; }
+  .step { display: flex; gap: 18px; padding: 0 0 4px; }
+  .step .rail { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+  .step .dot { width: 38px; height: 38px; border-radius: 50%; background: var(--paper-2); border: 1.5px solid var(--line-2); color: var(--taupe-deep); font-family: var(--head); font-weight: 600; font-size: 16px; display: flex; align-items: center; justify-content: center; }
+  .step .line { width: 1.5px; flex: 1; background: var(--line-2); margin: 4px 0; min-height: 14px; }
+  .step:last-child .line { display: none; }
+  .step .body { padding-bottom: 26px; }
+  .step .body h4 { margin: 6px 0 5px; font-family: var(--head); font-size: 17px; font-weight: 600; }
+  .step .body p { margin: 0; color: var(--ink-soft); font-size: 15px; }
+  .step .body .sys { display: inline-flex; align-items: center; gap: 7px; margin-top: 9px; padding: 5px 11px; border-radius: 8px; background: var(--cream-2); font-size: 12.5px; font-weight: 600; color: var(--taupe-deep); }
+  .actor { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; color: var(--taupe-deep); margin-bottom: 18px; padding: 6px 13px; border-radius: 999px; background: var(--cream-2); }
+
+  /* ── screen breakdown ── */
+  .panel { padding: 26px 26px 8px; }
+  .panel.dark { background: #23201C; color: #F3ECE2; border: none; }
+  .panel h3 { font-family: var(--head); font-size: 20px; font-weight: 600; margin: 0 0 4px; display: flex; align-items: center; gap: 10px; }
+  .panel .sub { font-size: 14px; color: var(--muted); margin: 0 0 18px; }
+  .panel.dark .sub { color: rgba(243,236,226,0.6); }
+  .feat-list { list-style: none; margin: 0; padding: 0; }
+  .feat-list li { padding: 13px 0; border-top: 1px solid var(--line); display: flex; gap: 12px; align-items: flex-start; }
+  .panel.dark .feat-list li { border-color: rgba(243,236,226,0.12); }
+  .feat-list li:first-child { border-top: none; }
+  .feat-list .k { font-weight: 600; font-size: 15px; min-width: 0; }
+  .feat-list .d { color: var(--ink-soft); font-size: 14px; }
+  .panel.dark .feat-list .d { color: rgba(243,236,226,0.66); }
+  .feat-list .ic { flex-shrink: 0; width: 22px; height: 22px; color: var(--taupe); margin-top: 1px; }
+  .panel.dark .feat-list .ic { color: #C9B89E; }
+
+  /* ── architecture ── */
+  .arch-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  .arch-card { padding: 24px 26px; }
+  .arch-card h3 { font-family: var(--head); font-size: 19px; font-weight: 600; margin: 0 0 6px; }
+  .arch-card > p.intro { margin: 0 0 18px; color: var(--ink-soft); font-size: 15px; }
+  .entity { background: var(--cream); border: 1px solid var(--line); border-radius: 12px; padding: 12px 15px; margin-bottom: 10px; }
+  .entity .en-name { font-family: var(--head); font-weight: 600; font-size: 14px; color: var(--taupe-deep); display: flex; align-items: center; gap: 8px; }
+  .entity .en-fields { font-family: 'IBM Plex Sans Thai', ui-monospace, monospace; font-size: 12.5px; color: var(--ink-soft); margin-top: 6px; line-height: 1.7; }
+  .entity .en-fields b { color: var(--ink); font-weight: 600; }
+  .arrow-note { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); margin: 4px 0 12px; padding-left: 4px; }
+  .callout { border-left: 3px solid var(--taupe); background: var(--paper); border-radius: 0 12px 12px 0; padding: 14px 18px; margin-top: 16px; font-size: 14.5px; color: var(--ink-soft); }
+  .callout b { color: var(--ink); }
+
+  .visnote { display: grid; grid-template-columns: auto 1fr; gap: 14px 18px; align-items: center; margin-top: 6px; }
+  .visnote .vt { font-family: var(--head); font-weight: 600; font-size: 14px; padding: 6px 12px; border-radius: 8px; text-align: center; white-space: nowrap; }
+  .visnote .vt.m { background: var(--sage); color: #fff; }
+  .visnote .vt.p { background: var(--cream-2); color: var(--taupe-deep); }
+  .visnote .vd { font-size: 14.5px; color: var(--ink-soft); }
+
+  /* ── automation table ── */
+  table.auto { width: 100%; border-collapse: collapse; background: var(--paper-2); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+  table.auto th { text-align: left; font-family: var(--body); font-size: 11.5px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--muted); padding: 13px 18px; background: var(--cream); border-bottom: 1px solid var(--line); }
+  table.auto td { padding: 14px 18px; border-bottom: 1px solid var(--line); font-size: 14.5px; vertical-align: top; }
+  table.auto tr:last-child td { border-bottom: none; }
+  table.auto td.trig { font-weight: 600; width: 30%; }
+  table.auto td .chan { display: inline-block; padding: 2px 9px; border-radius: 6px; font-size: 11.5px; font-weight: 700; margin-bottom: 4px; }
+  .chan.line { background: #06C755; color: #fff; }
+  .chan.push { background: var(--blue); color: #fff; }
+  .chan.sms { background: var(--taupe); color: #fff; }
+  td .time { color: var(--muted); font-size: 13px; }
+
+  footer { padding: 60px 0 90px; text-align: center; color: var(--muted); font-size: 14px; }
+  footer .wordmark { font-size: 26px; display: block; margin-bottom: 10px; }
+
+  svg.i { width: 100%; height: 100%; display: block; }
+
+  @media (max-width: 820px) {
+    h1 { font-size: 40px; }
+    .grid-2, .arch-cols { grid-template-columns: 1fr; }
+    .sched { grid-template-columns: 1fr 1fr; }
+  }
+  @media print {
+    body { background: #fff; }
+    section, header.hero { break-inside: avoid; }
+    .promo, .panel.dark { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">Product Specification &amp; System Architecture</div>
+    <h1>LUNE Pilates — flows, screens &amp; <em>the logic beneath</em></h1>
+    <p class="lede">A working reference for the two apps: how members move from balance to booked, how staff publish a week of classes, and how shared household credits and tiered visibility behave under the hood — with the automation that ties it together.</p>
+    <div class="meta-row">
+      <span class="chip">Customer app · Member &amp; guest</span>
+      <span class="chip">Admin · mobile-first, responsive</span>
+      <span class="chip">LINE-native CRM</span>
+      <span class="chip">v1 · June 2026</span>
+    </div>
+  </div>
+</header>
+
+<!-- ░░ 1 · PRICING ░░ -->
+<section id="pricing">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="sec-num">01</span>
+      <div>
+        <h2>Pricing &amp; packages</h2>
+        <p>The single source of truth the catalog, POS and checkout all read from.</p>
+      </div>
+    </div>
+
+    <div class="price-group">
+      <h3>Group Class <span class="th">คลาสกลุ่ม · hour credits</span></h3>
+      <p class="price-note">Hour-based credits. Sharable across a member's household. Max 3 reformers per class.</p>
+      <table class="price">
+        <thead><tr><th>Package</th><th>Validity</th><th>Per hour</th><th style="text-align:right">Price</th></tr></thead>
+        <tbody>
+          <tr><td class="name">Drop-in (1 hr)</td><td class="valid">Single visit</td><td class="per">฿650 / hr</td><td class="price">฿650</td></tr>
+          <tr><td class="name">5-hour pack</td><td class="valid">1 month</td><td class="per">฿590 / hr</td><td class="price">฿2,950</td></tr>
+          <tr><td class="name">10-hour pack <span class="tag">Popular</span></td><td class="valid">2 months</td><td class="per">฿550 / hr</td><td class="price">฿5,500</td></tr>
+          <tr><td class="name">15-hour pack <span class="tag dark">Best value</span></td><td class="valid">3 months</td><td class="per">฿500 / hr</td><td class="price">฿7,500</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="price-group">
+      <h3>Private &amp; Semi-Private <span class="th">ส่วนตัว · instructor selectable</span></h3>
+      <p class="price-note">Separate credit pools per format. 8-hour packs valid 2 months. Instructor is chosen at booking.</p>
+      <table class="price">
+        <thead><tr><th>Format</th><th>Plan</th><th>Per hour</th><th style="text-align:right">Price</th></tr></thead>
+        <tbody>
+          <tr><td class="name">1:1</td><td class="valid">Drop-in</td><td class="per">฿1,700 / hr</td><td class="price">฿1,700</td></tr>
+          <tr><td class="name">1:1</td><td class="valid">8-hour pack</td><td class="per">฿1,500 / hr</td><td class="price">฿12,000</td></tr>
+          <tr><td class="name">Duo</td><td class="valid">Drop-in</td><td class="per">฿2,000 / hr</td><td class="price">฿2,000</td></tr>
+          <tr><td class="name">Duo</td><td class="valid">8-hour pack</td><td class="per">฿1,800 / hr</td><td class="price">฿14,400</td></tr>
+          <tr><td class="name">Trio</td><td class="valid">Drop-in</td><td class="per">฿2,200 / hr</td><td class="price">฿2,200</td></tr>
+          <tr><td class="name">Trio</td><td class="valid">8-hour pack</td><td class="per">฿2,000 / hr</td><td class="price">฿16,000</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="grid-2">
+      <div class="price-group" style="margin:0;">
+        <h3>Studio Rental <span class="th">เช่าสตูดิโอ · full apparatus</span></h3>
+        <p class="price-note">Per-hour rental of the reformer space, by group size.</p>
+        <table class="price">
+          <thead><tr><th>Format</th><th style="text-align:right">Per hour</th></tr></thead>
+          <tbody>
+            <tr><td class="name">1:1</td><td class="price">฿600</td></tr>
+            <tr><td class="name">Duo</td><td class="price">฿800</td></tr>
+            <tr><td class="name">Trio</td><td class="price">฿1,000</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="price-group" style="margin:0; display:flex; flex-direction:column; justify-content:flex-end;">
+        <h3>Promotion <span class="th">โปรโมชัน</span></h3>
+        <p class="price-note">Acquisition offer for first-time visitors.</p>
+        <div class="promo">
+          <div class="star"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M12 1.5c.5 6 4 9.5 10 10-6 .5-9.5 4-10 10-.5-6-4-9.5-10-10 6-.5 9.5-4 10-10Z" fill="#C9B89E"/></svg></div>
+          <div>
+            <h3>Trial · Buy 1 Get 1</h3>
+            <p>First-timers book a trial class and receive a second session free. Redeemable once per phone number.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ░░ 2 · OPERATING MODEL ░░ -->
+<section id="hours">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="sec-num">02</span>
+      <div>
+        <h2>Operating model</h2>
+        <p>Open daily 8:00–20:00. Group classes follow a weekly baseline the admin can adjust and republish.</p>
+      </div>
+    </div>
+    <div class="sched">
+      <div class="day"><h4>Mon</h4><div class="slot">08:00</div><div class="slot">09:00</div><div class="slot">16:00</div><div class="slot">17:00</div></div>
+      <div class="day"><h4>Tue</h4><div class="slot">09:00</div><div class="slot">10:00</div><div class="slot">17:00</div><div class="slot">18:00</div></div>
+      <div class="day"><h4>Wed</h4><div class="slot">08:00</div><div class="slot">09:00</div><div class="slot">16:00</div><div class="slot">17:00</div></div>
+      <div class="day"><h4>Thu</h4><div class="slot">09:00</div><div class="slot">10:00</div><div class="slot">17:00</div><div class="slot">18:00</div></div>
+      <div class="day"><h4>Fri</h4><div class="slot">08:00</div><div class="slot">09:00</div><div class="slot">16:00</div><div class="slot">17:00</div></div>
+      <div class="day wknd"><h4>Sat</h4><div class="slot">09:00</div><div class="slot">10:00</div><div class="slot">11:00</div><div class="slot">17:00</div></div>
+      <div class="day wknd"><h4>Sun</h4><div class="slot">09:00</div><div class="slot">10:00</div><div class="slot">11:00</div><div class="slot">17:00</div></div>
+    </div>
+    <div class="callout" style="margin-top:20px;">Private, Duo, Trio and Studio Rental sit <b>outside</b> the group baseline — they're booked by appointment into any open hour, subject to instructor availability and a free reformer.</div>
+  </div>
+</section>
+
+<!-- ░░ 3 · JOURNEYS ░░ -->
+<section id="journeys">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="sec-num">03</span>
+      <div>
+        <h2>Key user journeys</h2>
+        <p>The two flows that exercise the trickiest logic: shared household credits, and weekly schedule publishing.</p>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <!-- Journey A -->
+      <div class="card" style="padding:28px 28px 22px;">
+        <span class="actor"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg> Member · Pim · House A-114</span>
+        <h3 style="font-family:var(--head); font-size:21px; margin:0 0 22px;">Booking with a shared family package</h3>
+        <div class="flow">
+          <div class="step"><div class="rail"><div class="dot">1</div><div class="line"></div></div><div class="body"><h4>Opens Home</h4><p>Balance shows the <b>household pool</b> (7.5 hrs), not a personal wallet — every member of A-114 sees the same number.</p></div></div>
+          <div class="step"><div class="rail"><div class="dot">2</div><div class="line"></div></div><div class="body"><h4>Browses the week ahead</h4><p>As a member she sees the full published week and can book in advance.</p><span class="sys"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> Tiered visibility · member tier</span></div></div>
+          <div class="step"><div class="rail"><div class="dot">3</div><div class="line"></div></div><div class="body"><h4>Picks a Group class &amp; books</h4><p>Class detail shows 1 of 3 reformers open. She taps Book.</p></div></div>
+          <div class="step"><div class="rail"><div class="dot">4</div><div class="line"></div></div><div class="body"><h4>System debits the shared pool</h4><p>One atomic transaction: −1 hr from <b>household balance</b>, ledger row stamped <i>actor = Pim</i>. Booking is confirmed only if the debit succeeds.</p><span class="sys"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Atomic ledger debit</span></div></div>
+          <div class="step"><div class="rail"><div class="dot">5</div><div class="line"></div></div><div class="body"><h4>Everyone stays in sync</h4><p>Pim gets a LINE confirmation; her husband on A-114 opens the app and sees <b>6.5 hrs</b> — the pool already reflects her booking.</p></div></div>
+        </div>
+      </div>
+
+      <!-- Journey B -->
+      <div class="card" style="padding:28px 28px 22px;">
+        <span class="actor"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18"/></svg> Admin · Front desk</span>
+        <h3 style="font-family:var(--head); font-size:21px; margin:0 0 22px;">Updating &amp; publishing the weekly schedule</h3>
+        <div class="flow">
+          <div class="step"><div class="rail"><div class="dot">1</div><div class="line"></div></div><div class="body"><h4>Opens next week from the baseline</h4><p>Schedule loads pre-filled from the recurring template (M/W/F, Tu/Th, Sat/Sun) — nothing to build from scratch.</p></div></div>
+          <div class="step"><div class="rail"><div class="dot">2</div><div class="line"></div></div><div class="body"><h4>Adjusts just what changed</h4><p>Cancels Friday 16:00 (instructor away), adds a Duo at Wednesday 13:00, bumps Saturday 09:00 capacity. Edits apply to <b>this week only</b>; the baseline is untouched.</p></div></div>
+          <div class="step"><div class="rail"><div class="dot">3</div><div class="line"></div></div><div class="body"><h4>Reviews the diff</h4><p>A summary shows added / moved / cancelled against baseline so nothing slips through.</p><span class="sys"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg> Changes vs baseline</span></div></div>
+          <div class="step"><div class="rail"><div class="dot">4</div><div class="line"></div></div><div class="body"><h4>Publishes the week</h4><p>Class instances flip to <i>published</i>. Visibility windows compute automatically — members can book now, drop-ins unlock closer to class time.</p></div></div>
+          <div class="step"><div class="rail"><div class="dot">5</div><div class="line"></div></div><div class="body"><h4>Members are notified</h4><p>Publishing fires a single LINE broadcast: "Next week's schedule is live." No manual messaging.</p><span class="sys"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v12H7l-3 3V4Z"/></svg> Auto-broadcast on publish</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ░░ 4 · SCREEN BREAKDOWN ░░ -->
+<section id="screens">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="sec-num">04</span>
+      <div>
+        <h2>Screen-by-screen essentials</h2>
+        <p>What must live on each home surface — the non-negotiable elements for each audience.</p>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="card panel">
+        <h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--taupe)" stroke-width="1.7"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg> Customer Dashboard</h3>
+        <p class="sub">Member &amp; guest · mobile</p>
+        <ul class="feat-list">
+          <li><span class="ic"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2v6M12 22v-4M4 12H2M22 12h-2M5 5 7 7M19 5l-2 2"/><circle cx="12" cy="14" r="4"/></svg></span><div><div class="k">Balance &amp; expiry, hero-level</div><div class="d">Hours remaining + nearest expiry date, with a "household" marker when it's a shared pool.</div></div></li>
+          <li><span class="ic"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg></span><div><div class="k">Next class card</div><div class="d">Date, time, type; one tap to detail, reschedule or cancel.</div></div></li>
+          <li><span class="ic"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span><div><div class="k">One primary action — Book a class</div><div class="d">Everything else is secondary. No competing CTAs.</div></div></li>
+          <li><span class="ic"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg></span><div><div class="k">Policy clarity at point of action</div><div class="d">The 5-hour free-cancel cutoff is shown before booking and on every booking.</div></div></li>
+          <li><span class="ic"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="7" cy="12" r="2.5"/><circle cx="17" cy="6" r="2.5"/><circle cx="17" cy="18" r="2.5"/><path d="M9 11l6-3.5M9 13l6 3.5"/></svg></span><div><div class="k">Household sharing surface</div><div class="d">Who's on the house number, shared balance, invite a member.</div></div></li>
+          <li><span class="ic"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 10h18M7 15h4M5 6h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z"/></svg></span><div><div class="k">Buy credits / PromptPay</div><div class="d">Category-segmented catalog → QR checkout → instant balance update.</div></div></li>
+        </ul>
+      </div>
+
+      <div class="card panel dark">
+        <h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C9B89E" stroke-width="1.7"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18M8 21h8"/></svg> Admin Dashboard</h3>
+        <p class="sub">Front desk · mobile-first, responsive to iPad &amp; desktop</p>
+        <ul class="feat-list">
+          <li><span class="ic"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 19V5M4 19h16M8 16v-4M12 16V8M16 16v-6"/></svg></span><div><div class="k">Today at a glance</div><div class="d">Classes, attendee counts, check-in status, utilisation — the opening screen.</div></div></li>
+          <li><span class="ic"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M16 3v4M8 3v4M3 9h18M5 5h14v16H5z"/></svg></span><div><div class="k">Schedule mgmt — baseline + publish</div><div class="d">Edit a week from the template, set instructor &amp; capacity, publish.</div></div></li>
+          <li><span class="ic"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 5h18v14H3zM3 10h18M9 14h6"/></svg></span><div><div class="k">Bookings &amp; waitlist control</div><div class="d">Manual book/cancel, and waitlist with the notify-and-confirm window.</div></div></li>
+          <li><span class="ic"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0M16 4l2 2 4-4"/></svg></span><div><div class="k">Customers (not just members)</div><div class="d">House numbers, sharing groups, balances; add a new customer on the spot.</div></div></li>
+          <li><span class="ic"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h3"/></svg></span><div><div class="k">POS checkout</div><div class="d">Sell packages &amp; retail, take PromptPay or cash, issue a receipt.</div></div></li>
+          <li><span class="ic"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 6h12M8 12h12M8 18h12M3 6h.01M3 12h.01M3 18h.01"/></svg></span><div><div class="k">Instructor availability &amp; Gantt</div><div class="d">Set who works when; a vertical day timeline shows lanes per instructor.</div></div></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ░░ 5 · ARCHITECTURE ░░ -->
+<section id="architecture">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="sec-num">05</span>
+      <div>
+        <h2>Logic &amp; architecture</h2>
+        <p>Two mechanisms carry most of the product's complexity: shared-credit deduction and tiered visibility.</p>
+      </div>
+    </div>
+
+    <div class="arch-cols">
+      <!-- house sharing -->
+      <div class="card arch-card">
+        <h3>House / family sharing</h3>
+        <p class="intro">Model the package as belonging to a <b>household</b>, not a person. Members are linked to a household by house number; deductions draw from one shared balance via an append-only ledger.</p>
+
+        <div class="entity">
+          <div class="en-name"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg> Household</div>
+          <div class="en-fields"><b>id</b> · house_number · owner_user_id · created_at</div>
+        </div>
+        <div class="entity">
+          <div class="en-name"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg> User</div>
+          <div class="en-fields"><b>id</b> · phone · name · tier <i>(member | guest)</i> · <b>household_id?</b></div>
+        </div>
+        <div class="entity">
+          <div class="en-name"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg> Package <span style="font-weight:500; color:var(--muted); font-family:var(--body); font-size:12px;">(balance holder)</span></div>
+          <div class="en-fields"><b>id</b> · type · hours_total · hours_left · expires_at<br/>· <b>owner</b>: household_id <i>(member)</i> · OR user_id <i>(guest)</i></div>
+        </div>
+        <div class="entity">
+          <div class="en-name"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M4 12h16M4 19h10"/></svg> CreditLedger <span style="font-weight:500; color:var(--muted); font-family:var(--body); font-size:12px;">(append-only)</span></div>
+          <div class="en-fields"><b>id</b> · package_id · delta <i>(−1 / +5)</i> · <b>actor_user_id</b> · booking_id? · reason · created_at</div>
+        </div>
+
+        <div class="callout">
+          <b>Deduction =</b> one atomic transaction: re-check <code>hours_left &gt; 0</code> and <code>expires_at &gt; now</code>, insert a <code>−1</code> ledger row, decrement <code>hours_left</code>, write the booking — all or nothing. The ledger's <code>actor_user_id</code> answers "who used the household's hours," so sharing never becomes a dispute.
+        </div>
+        <div class="callout" style="border-color:var(--sage);">
+          <b>Guest packages</b> set <code>owner = user_id</code> and skip the household join entirely — non-transferable by construction, no special-casing needed.
+        </div>
+      </div>
+
+      <!-- tiered visibility -->
+      <div class="card arch-card">
+        <h3>Tiered visibility (early booking)</h3>
+        <p class="intro">Don't store two schedules. Store one class instance with two computed timestamps, then filter by the viewer's tier and the current time.</p>
+
+        <div class="entity">
+          <div class="en-name"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3v4M8 3v4M5 5h14v14H5z"/></svg> ClassInstance</div>
+          <div class="en-fields"><b>id</b> · template_id? · starts_at · type · capacity · instructor_id?<br/>· status <i>(draft | published)</i><br/>· <b>members_visible_at</b> = published_at<br/>· <b>public_visible_at</b> = starts_at − <b>N hrs</b></div>
+        </div>
+
+        <div class="arrow-note"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--taupe)" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg> The booking query, simplified</div>
+        <div class="entity" style="background:#23201C;">
+          <div class="en-fields" style="color:#D8CBB8;">
+            <span style="color:#9DB089;">where</span> status = <span style="color:#C9B89E;">'published'</span><br/>
+            <span style="color:#9DB089;">and</span> starts_at &gt; now()<br/>
+            <span style="color:#9DB089;">and</span> ( viewer.tier = <span style="color:#C9B89E;">'member'</span><br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#9DB089;">or</span> now() &gt;= public_visible_at )
+          </div>
+        </div>
+
+        <div class="visnote">
+          <span class="vt m">Member</span>
+          <span class="vd">Sees every published class the moment the week goes live — books days ahead.</span>
+          <span class="vt p">Guest</span>
+          <span class="vd">Sees a class only once <code>now ≥ starts_at − N</code> (e.g. 24 hrs before) — fills the late, open spots.</span>
+        </div>
+
+        <div class="callout">
+          <b>N is a single tunable.</b> Want guests to see further out for under-filled classes? Lower <code>N</code> per class type, or derive it from current occupancy — no schema change, just the formula behind <code>public_visible_at</code>.
+        </div>
+      </div>
+    </div>
+
+    <div class="callout" style="margin-top:22px; background:var(--paper-2); border-radius:14px; border-left-width:3px;">
+      <b>Waitlist follows the same discipline:</b> joining writes a <code>Waitlist</code> row, never a booking. When a seat frees, the system offers it to the head of the queue with a <b>30-minute confirm window</b> (a short-lived hold); on timeout it cascades to the next person. No auto-charge, no surprise booking.
+    </div>
+  </div>
+</section>
+
+<!-- ░░ 6 · AUTOMATION ░░ -->
+<section id="automation">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="sec-num">06</span>
+      <div>
+        <h2>Automation &amp; CRM</h2>
+        <p>LINE is where this audience already lives — make it the primary channel, event-driven off the same system actions.</p>
+      </div>
+    </div>
+    <table class="auto">
+      <thead><tr><th>Trigger</th><th>Channel · message</th><th>Timing</th></tr></thead>
+      <tbody>
+        <tr><td class="trig">Weekly schedule published</td><td><span class="chan line">LINE</span> &nbsp;Broadcast: next week is live, with a "Book now" link.</td><td><span class="time">On admin publish</span></td></tr>
+        <tr><td class="trig">Booking confirmed</td><td><span class="chan line">LINE</span> &nbsp;Flex card: class, time, instructor, add-to-calendar + balance left.</td><td><span class="time">Instant</span></td></tr>
+        <tr><td class="trig">Class reminder</td><td><span class="chan line">LINE</span> &nbsp;Gentle nudge with cancel/reschedule still in the free window.</td><td><span class="time">2 hrs before</span></td></tr>
+        <tr><td class="trig">Waitlist spot opens</td><td><span class="chan line">LINE</span> &nbsp;"A spot opened — confirm within 30 min to claim it." Countdown link.</td><td><span class="time">On seat free · 30-min hold</span></td></tr>
+        <tr><td class="trig">Credit expiry approaching</td><td><span class="chan line">LINE</span> &nbsp;Hours left + expiry date, one-tap re-purchase.</td><td><span class="time">7 days &amp; 1 day before</span></td></tr>
+        <tr><td class="trig">Household balance low</td><td><span class="chan line">LINE</span> &nbsp;To the household owner: pool is down to 1 hr — top up.</td><td><span class="time">At ≤ 1 hr left</span></td></tr>
+        <tr><td class="trig">Post-class follow-up</td><td><span class="chan line">LINE</span> &nbsp;Thank-you + quick rebook of the same slot next week.</td><td><span class="time">~2 hrs after class</span></td></tr>
+        <tr><td class="trig">Win-back (lapsing)</td><td><span class="chan line">LINE</span> &nbsp;Warm check-in for members inactive 30 days.</td><td><span class="time">Day 30 of inactivity</span></td></tr>
+      </tbody>
+    </table>
+    <div class="callout" style="margin-top:20px;">Every row is fired by a <b>system event already in the data model</b> (publish, booking insert, ledger change, waitlist offer) — so the CRM is a thin listener, not a parallel source of truth. SMS or push can mirror any row as a fallback when a member hasn't linked LINE.</div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span class="wordmark">LUNE</span>
+    Product Specification &amp; System Architecture · prepared for LUNE Pilates Studio · June 2026
+  </div>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>LUNE Pilates — Admin (Mobile)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Schibsted+Grotesk:wght@400;500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --a-cream: #F1E9E0; --a-cream-2: #E7DCCE;
+    --a-surface: #FBF6EF; --a-surface-2: #FFFCF7;
+    --a-ink: #2E2820; --a-ink-soft: #6B5D4C; --a-muted: #9C8C77;
+    --a-line: rgba(140,122,99,0.16); --a-line-strong: rgba(140,122,99,0.3);
+    --a-taupe: #8C7A63; --a-taupe-deep: #6E5E49;
+    --a-sage: #8C9A7E; --a-sage-deep: #6E7C60;
+    --a-shadow: 0 1px 2px rgba(72,58,40,0.04), 0 6px 18px rgba(72,58,40,0.05);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body { background: #DAD2C7; font-family: 'Hanken Grotesk', 'IBM Plex Sans Thai', system-ui, sans-serif; overflow: hidden; }
+  #stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  button { font-family: inherit; }
+  input { font-family: inherit; outline: none; }
+  ::-webkit-scrollbar { width: 0; height: 0; }
+  .m-scroll::-webkit-scrollbar { display: none; }
+</style>
+</head>
+<body>
+<template id="__bundler_thumbnail" data-bg-color="#23201C">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="800" fill="#23201C"/>
+    <text x="600" y="400" text-anchor="middle" font-family="Georgia, serif" font-weight="600" font-size="150" letter-spacing="26" fill="#C9B89E">LUNE</text>
+    <text x="600" y="470" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="27" letter-spacing="13" fill="#8C7A63">ADMIN · MOBILE</text>
+  </svg>
+</template>
+<div id="stage"><div id="root"></div></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="lune-icons.jsx"></script>
+<script type="text/babel" src="admin-data.jsx"></script>
+<script type="text/babel" src="admin-shell.jsx"></script>
+<script type="text/babel" src="admin-mobile-data.jsx"></script>
+<script type="text/babel" src="admin-mobile-ui.jsx"></script>
+<script type="text/babel" src="admin-mobile-today.jsx"></script>
+<script type="text/babel" src="admin-mobile-customers.jsx"></script>
+<script type="text/babel" src="admin-mobile-pos.jsx"></script>
+<script type="text/babel" src="admin-mobile-more.jsx"></script>
+<script type="text/babel" src="admin-mobile-analytics.jsx"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+const TABS = ['today', 'schedule', 'pos', 'customers', 'more'];
+const TAB_TITLES = {
+  today: { en: 'Today', th: 'วันนี้' },
+  schedule: { en: 'Schedule', th: 'ตารางคลาส' },
+  customers: { en: 'Customers', th: 'ลูกค้า' },
+  more: { en: 'More', th: 'เพิ่มเติม' },
+};
+
+function MobileAdmin() {
+  const [lang, setLang] = useState('th');
+  const [stack, setStack] = useState(['today']);
+  const [selCustomer, setSelCustomer] = useState(null);
+  const [rosterCls, setRosterCls] = useState(null);
+  const [custSheet, setCustSheet] = useState(false);
+  const [editCls, setEditCls] = useState(null);
+  const scrollRef = useRef(null);
+  const T = mkT(lang);
+  const screen = stack[stack.length - 1];
+  const tab = TABS.includes(screen) ? screen : (stack.find((s) => TABS.includes(s)) || 'today');
+
+  useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [screen]);
+
+  const go = (key) => {
+    if (TABS.includes(key)) setStack([key]);
+    else setStack((s) => (s[s.length - 1] === key ? s : [...s, key]));
+  };
+  const back = () => setStack((s) => (s.length > 1 ? s.slice(0, -1) : s));
+  const openCustomer = (id) => { setSelCustomer(id); setCustSheet(true); };
+  const openClass = (id) => { setRosterCls(id); };
+  const openEditClass = (clsObj) => { setEditCls(clsObj); setStack((s) => [...s, 'editClass']); };
+
+  const ctx = { ...T, setLang, tab, screen, go, back, openCustomer, openClass, openEditClass };
+
+  // full-screen pushed screens (own header, hide bottom nav)
+  const pushed = ['addCustomer', 'instructors', 'payments', 'waitlist', 'newClass', 'staff', 'addStaff', 'editClass', 'analytics'].includes(screen);
+
+  // title for tab screens
+  const headerTitle = (key) => T.tt(TAB_TITLES[key]);
+
+  return (
+    <MCtx.Provider value={ctx}>
+      <div style={{ width: '100%', height: '100%', background: 'var(--a-cream)', display: 'flex', flexDirection: 'column', color: 'var(--a-ink)' }}>
+        {/* POS / Add customer / sub-screens render full-screen */}
+        {screen === 'addCustomer' && <MAddCustomer onBack={back} />}
+        {screen === 'instructors' && <MInstructors onBack={back} />}
+        {screen === 'payments' && <MPayments onBack={back} />}
+        {screen === 'waitlist' && <MWaitlist onBack={back} />}
+        {screen === 'newClass' && <MNewClass onBack={back} />}
+        {screen === 'editClass' && <MNewClass onBack={back} editObj={editCls} />}
+        {screen === 'staff' && <MStaff onBack={back} />}
+        {screen === 'addStaff' && <MAddStaff onBack={back} />}
+        {screen === 'analytics' && <MAnalytics onBack={back} />}
+
+        {/* POS is a primary tab — keeps the bottom nav */}
+        {tab === 'pos' && !pushed && (
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}><MPos /></div>
+        )}
+
+        {/* tab screens with shared chrome */}
+        {!pushed && tab !== 'pos' && (
+          <>
+            <MHeader
+              title={headerTitle(tab)}
+              sub={tab === 'today' ? T.tt({ en: 'Monday, 1 June 2026', th: 'วันจันทร์ที่ 1 มิถุนายน 2569' }) : null}
+              big={tab === 'today'}
+              right={tab === 'customers'
+                ? <button onClick={() => go('addCustomer')} style={{ ...mIconBtn, background: 'var(--a-ink)', color: '#fff', border: 'none' }}><Icon name="plus" size={20} /></button>
+                : <MLangToggle />}
+            />
+            <main ref={scrollRef} className="m-scroll" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', background: 'var(--a-cream)' }}>
+              {tab === 'today' && <MToday />}
+              {tab === 'schedule' && <MSchedule />}
+              {tab === 'customers' && <MCustomers />}
+              {tab === 'more' && <MMore />}
+            </main>
+          </>
+        )}
+
+        {/* bottom nav hidden on full-screen pushed flows */}
+        {!pushed && <MBottomNav />}
+
+        {/* customer detail sheet */}
+        <MSheet open={custSheet} onClose={() => setCustSheet(false)} maxH="86%">
+          {selCustomer && <MCustomerDetail id={selCustomer} onClose={() => setCustSheet(false)} />}
+        </MSheet>
+
+        {/* roster sheet */}
+        <MSheet open={!!rosterCls} onClose={() => setRosterCls(null)} maxH="88%">
+          {rosterCls && <MRoster clsId={rosterCls} onClose={() => setRosterCls(null)} />}
+        </MSheet>
+      </div>
+    </MCtx.Provider>
+  );
+}
+
+// new / edit class screen (reuses field styles)
+function MNewClass({ onBack, editObj }) {
+  const { t, tt, lang } = useM();
+  const isEdit = !!editObj;
+  const [type, setType] = useState(editObj ? editObj.type : 'group');
+  const [time, setTime] = useState(editObj ? editObj.time : '07:00');
+  const [instr, setInstr] = useState(editObj ? (editObj.instr || 'mai') : 'mai');
+  const [cap, setCap] = useState(editObj ? ((ATYPES[editObj.type] && ATYPES[editObj.type].cap) || 3) : 3);
+  const [done, setDone] = useState(false);
+  const [deleted, setDeleted] = useState(false);
+  // ensure the class's own time is selectable even if not a preset
+  const baseTimes = ['07:00','08:00','09:00','09:30','10:00','11:00','16:00','17:00','17:30','18:00','18:30','19:00'];
+  const times = editObj && !baseTimes.includes(editObj.time) ? [editObj.time, ...baseTimes] : baseTimes;
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--a-cream)' }}>
+      <MHeader title={isEdit ? t('edit_class') : t('new_class')} onBack={onBack} />
+      <div style={{ flex: 1, overflowY: 'auto', padding: '8px 18px 26px' }}>
+        <FieldM label={lang === 'th' ? 'ประเภทคลาส' : 'Class type'}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {Object.keys(ATYPES).map((k) => {
+              const on = type === k;
+              return (
+                <button key={k} onClick={() => { setType(k); setCap((ATYPES[k] && ATYPES[k].cap) || 3); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '13px 13px', borderRadius: 12, cursor: 'pointer', textAlign: 'left', border: '1.5px solid ' + (on ? 'var(--a-taupe)' : 'var(--a-line)'), background: on ? 'var(--a-surface-2)' : 'transparent' }}>
+                  <Dot type={k} size={9} /><span style={{ fontFamily: "'Hanken Grotesk','IBM Plex Sans Thai',sans-serif", fontSize: 13.5, fontWeight: 600, color: 'var(--a-ink)' }}>{tt(ATYPES[k].short)}</span>
+                </button>
+              );
+            })}
+          </div>
+        </FieldM>
+        <FieldM label={lang === 'th' ? 'เวลาเริ่ม' : 'Start time'}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {times.map((tm) => {
+              const on = time === tm;
+              return <button key={tm} onClick={() => setTime(tm)} style={{ padding: '11px 15px', borderRadius: 11, cursor: 'pointer', border: '1.5px solid ' + (on ? 'var(--a-taupe)' : 'var(--a-line)'), background: on ? 'var(--a-surface-2)' : 'transparent', fontFamily: "'Schibsted Grotesk',sans-serif", fontSize: 14, fontWeight: 700, color: 'var(--a-ink)' }}>{tm}</button>;
+            })}
+          </div>
+        </FieldM>
+        <FieldM label={t('capacity_c')}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {[1,2,3].map((n) => {
+              const on = cap === n;
+              return <button key={n} onClick={() => setCap(n)} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '13px 0', borderRadius: 12, cursor: 'pointer', border: '1.5px solid ' + (on ? 'var(--a-taupe)' : 'var(--a-line)'), background: on ? 'var(--a-surface-2)' : 'transparent', fontFamily: "'Schibsted Grotesk',sans-serif", fontWeight: 700, fontSize: 16, color: 'var(--a-ink)' }}><Icon name="reformer" size={16} style={{ color: 'var(--a-taupe)' }} />{n}</button>;
+            })}
+          </div>
+        </FieldM>
+        <FieldM label={t('instructor')}>
+          <div style={{ display: 'flex', gap: 9 }}>
+            {Object.keys(AINSTR).map((k) => {
+              const on = instr === k;
+              return (
+                <button key={k} onClick={() => setInstr(k)} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7, padding: '13px 6px', borderRadius: 12, cursor: 'pointer', border: '1.5px solid ' + (on ? 'var(--a-taupe)' : 'var(--a-line)'), background: on ? 'var(--a-surface-2)' : 'transparent' }}>
+                  <Avatar id={k} size={36} /><span style={{ fontFamily: "'Hanken Grotesk','IBM Plex Sans Thai',sans-serif", fontSize: 12.5, fontWeight: 600, color: 'var(--a-ink)' }}>{tt(AINSTR[k].name)}</span>
+                </button>
+              );
+            })}
+          </div>
+        </FieldM>
+        {isEdit && (
+          <button onClick={() => setDeleted(true)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', marginTop: 4, height: 48, borderRadius: 13, border: '1px solid rgba(165,106,82,0.4)', background: 'rgba(165,106,82,0.07)', cursor: 'pointer', fontFamily: "'Hanken Grotesk','IBM Plex Sans Thai',sans-serif", fontSize: 14, fontWeight: 600, color: '#A56A52' }}><Icon name="x" size={17} />{t('delete_class')}</button>
+        )}
+      </div>
+      <div style={{ flexShrink: 0, padding: '14px 18px 30px', background: 'var(--a-surface-2)', borderTop: '1px solid var(--a-line)' }}>
+        <MPrimary onClick={() => setDone(true)} icon="check">{t('save')}</MPrimary>
+      </div>
+      <MSheet open={done} onClose={onBack} maxH="56%">
+        <div style={{ textAlign: 'center', paddingTop: 8 }}>
+          <div style={{ width: 72, height: 72, borderRadius: 99, margin: '4px auto 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--a-sage)', color: '#fff', boxShadow: '0 10px 28px rgba(140,154,126,0.4)' }}><Icon name="check" size={34} stroke={2} /></div>
+          <h2 style={{ margin: '0 0 8px', fontFamily: "'Schibsted Grotesk','IBM Plex Sans Thai',sans-serif", fontWeight: 600, fontSize: 25, color: 'var(--a-ink)' }}>{isEdit ? t('class_updated') : (lang === 'th' ? 'สร้างคลาสแล้ว' : 'Class created')}</h2>
+          <p style={{ margin: '0 auto 20px', maxWidth: 260, fontFamily: "'Hanken Grotesk','IBM Plex Sans Thai',sans-serif", fontSize: 14, color: 'var(--a-ink-soft)' }}>{tt(ATYPES[type].label)} · {time} · {tt(AINSTR[instr].name)} · {cap} {t('capacity_c').toLowerCase()}</p>
+          <MPrimary onClick={onBack}>{t('done2')}</MPrimary>
+        </div>
+      </MSheet>
+      <MSheet open={deleted} onClose={onBack} maxH="52%">
+        <div style={{ textAlign: 'center', paddingTop: 8 }}>
+          <div style={{ width: 72, height: 72, borderRadius: 99, margin: '4px auto 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--a-cream-2)', color: '#A56A52' }}><Icon name="x" size={32} stroke={2.2} /></div>
+          <h2 style={{ margin: '0 0 8px', fontFamily: "'Schibsted Grotesk','IBM Plex Sans Thai',sans-serif", fontWeight: 600, fontSize: 24, color: 'var(--a-ink)' }}>{lang === 'th' ? 'ลบคลาสแล้ว' : 'Class deleted'}</h2>
+          <p style={{ margin: '0 auto 20px', maxWidth: 260, fontFamily: "'Hanken Grotesk','IBM Plex Sans Thai',sans-serif", fontSize: 14, color: 'var(--a-ink-soft)' }}>{lang === 'th' ? 'ระบบจะแจ้งผู้ที่จองไว้ทาง LINE ให้อัตโนมัติ' : 'Booked members will be notified via LINE automatically.'}</p>
+          <MPrimary onClick={onBack}>{t('done2')}</MPrimary>
+        </div>
+      </MSheet>
+    </div>
+  );
+}
+
+function Root() {
+  const wrapRef = useRef(null);
+  useEffect(() => {
+    const fit = () => {
+      const el = wrapRef.current; if (!el) return;
+      const pad = 24;
+      const s = Math.min(1, (window.innerWidth - pad) / 402, (window.innerHeight - pad) / 874);
+      el.style.transform = `scale(${s})`;
+    };
+    fit(); window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, []);
+  return (
+    <div ref={wrapRef} style={{ transformOrigin: 'center center' }}>
+      <IOSDevice>
+        <MobileAdmin />
+      </IOSDevice>
+    </div>
+  );
+}
+
+Object.assign(window, { MNewClass });
+ReactDOM.createRoot(document.getElementById('root')).render(<Root />);
+</script>
+</body>
+</html>

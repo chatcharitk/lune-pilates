@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LUNE Pilates — UX/UI Presentation</title>
+<link rel="stylesheet" href="lune-deck.css" />
+<style>
+  /* slide-local helpers */
+  .phoneFrame { border-radius: 30px; overflow: hidden; box-shadow: 0 30px 70px rgba(40,32,24,0.26); background: #000; }
+  .phoneFrame img { display: block; width: 100%; height: auto; }
+  /* gallery phone with caption */
+  .gallery { position: absolute; left: 130px; right: 130px; top: 332px; display: flex; justify-content: center; gap: 56px; }
+  .gphone { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+  .gphone .pf { height: 556px; border-radius: 26px; overflow: hidden; box-shadow: 0 22px 50px rgba(40,32,24,0.2); background: #000; }
+  .gphone .pf img { display: block; height: 100%; width: auto; }
+  .gphone .cap h4 { font-family: var(--head); font-weight: 600; font-size: 26px; color: var(--ink); text-align: center; letter-spacing: -0.3px; }
+  .gphone .cap p { font-family: var(--body); font-size: 18px; color: var(--muted); text-align: center; margin-top: 3px; }
+  /* compact callout for combined slides */
+  .mini { display: flex; gap: 16px; align-items: flex-start; }
+  .mini .d { flex-shrink: 0; width: 12px; height: 12px; border-radius: 50%; margin-top: 9px; }
+  .mini h4 { font-family: var(--head); font-weight: 600; font-size: 25px; color: var(--ink); letter-spacing: -0.3px; }
+  .mini p { font-family: var(--body); font-size: 19px; line-height: 1.45; color: var(--ink-2); margin-top: 3px; }
+  .shot { border-radius: 20px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 30px 60px rgba(40,32,24,0.16); }
+  .shot img { width: 100%; display: block; }
+  /* LINE notification bubbles */
+  .trig { display:inline-flex; align-items:center; gap:7px; font-family: var(--body); font-size:16px; font-weight:700; letter-spacing:0.2px; }
+  .bub { width:300px; display:block; border-radius:18px; box-shadow:0 18px 44px rgba(40,32,24,0.16); }
+  .bcap { text-align:center; }
+  .bcap h4 { font-family: var(--head); font-weight:600; font-size:23px; color: var(--ink); letter-spacing:-0.3px; }
+  .bcap p { font-family: var(--body); font-size:16px; color: var(--muted); margin-top:2px; }
+</style>
+</head>
+<body>
+<deck-stage width="1920" height="1080">
+
+  <!-- ░░ 1 · COVER ░░ -->
+  <section data-label="Cover" class="cover">
+    <div class="aionova-badge">
+      <img src="deck-assets/aionova-logo-white.png" alt="AIONOVA"/>
+    </div>
+    <div class="bg" style="background-image:url('deck-assets/studio-hero.jpg');"></div>
+    <div class="scrim"></div>
+    <div style="position:absolute; left:130px; top:330px; right:130px;">
+      <div class="eyebrow on-dark anim">Boutique Reformer Pilates · Bangkok</div>
+      <img class="anim2" src="deck-assets/logo-cream.png" alt="LUNE Pilates Studio" style="display:block; width:620px; max-width:62%; margin:40px 0 0;"/>
+      <div class="lead anim3" style="font-size:58px; color:#F6EFE6; margin-top:50px; max-width:1160px;">The booking experience —<br/><em style="color:#D8C7AD;">customer app, studio admin &amp; LINE</em></div>
+      <div class="anim3" style="font-family:var(--body); font-size:24px; color:rgba(243,236,226,0.72); margin-top:26px; letter-spacing:1px;">UX / UI Design Presentation · Bilingual ภาษาไทย · English</div>
+    </div>
+    <div class="chrome on-dark"><img src="deck-assets/wordmark-cream.png" alt="LUNE Pilates Studio" style="height:21px; display:block;"/><span>UX / UI · 2026</span></div>
+  </section>
+
+  <!-- ░░ 2 · VISION ░░ -->
+  <section data-label="Vision">
+    <div class="aionova-badge"><img src="deck-assets/aionova-logo-white.png" alt="AIONOVA" style="width: 200px"/></div>
+    <div style="position:absolute; left:130px; top:0; bottom:0; width:980px; display:flex; flex-direction:column; justify-content:center;">
+      <div class="eyebrow anim">The intention</div>
+      <div class="kicker-line anim"></div>
+      <div class="h1 anim" style="font-size:76px;">A booking app as<br/>calm as the<br/><span style="font-family:var(--serif); font-weight:500; font-style:italic; color:var(--taupe-deep);">studio itself.</span></div>
+      <p class="body anim2" style="font-size:26px; margin-top:36px; max-width:780px;">Warm, minimal, unhurried. Every screen does one thing well — so members aged 28&ndash;60 book in seconds, and staff run a full day from a phone. The interface borrows the studio's own materials: oak, linen, soft light and generous space.</p>
+      <div class="anim3" style="display:flex; gap:14px; margin-top:42px;">
+        <span class="tag">Warm minimal</span>
+        <span class="tag">Bilingual TH · EN</span>
+        <span class="tag">Mobile-first</span>
+      </div>
+    </div>
+    <div style="position:absolute; right:0; top:0; bottom:0; width:660px; padding:64px 64px 64px 0; display:flex; flex-direction:column; gap:26px;">
+      <div class="anim2" style="flex:1; border-radius:28px; overflow:hidden; box-shadow:0 30px 60px rgba(40,32,24,0.18);"><img src="deck-assets/studio-window.jpg" style="width:100%; height:100%; object-fit:cover;"/></div>
+      <div class="anim3" style="flex:1; border-radius:28px; overflow:hidden; box-shadow:0 30px 60px rgba(40,32,24,0.18);"><img src="deck-assets/studio-reception.jpg" style="width:100%; height:100%; object-fit:cover;"/></div>
+    </div>
+    <div class="chrome"><img src="deck-assets/wordmark-taupe.png" alt="LUNE" style="height:21px; display:block;"/><span class="pagenum">02</span></div>
+  </section>
+
+  <!-- ░░ 3 · DESIGN LANGUAGE ░░ -->
+  <section data-label="Design language">
+    <div class="aionova-badge"><img src="deck-assets/aionova-logo-white.png" alt="AIONOVA" style="width: 200px"/></div>
+    <div style="position:absolute; left:130px; top:90px; right:130px;">
+      <div class="eyebrow anim">Design language</div>
+      <div class="kicker-line anim"></div>
+      <div class="h2 anim" style="font-size:58px;">Linen, oak &amp; light — translated to pixels</div>
+    </div>
+    <!-- palette -->
+    <div style="position:absolute; left:130px; top:320px; right:130px;">
+      <div class="anim2" style="font-family:var(--head); font-size:22px; font-weight:600; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-bottom:20px;">Palette</div>
+      <div class="anim2" style="display:flex; gap:20px;">
+        <div style="flex:1;"><div class="sw" style="background:#F1E9E0;"><span style="color:#9C8C77;">Cream</span></div><div style="font-family:var(--body); font-size:18px; color:var(--muted); margin-top:10px;">#F1E9E0 · canvas</div></div>
+        <div style="flex:1;"><div class="sw" style="background:#E7DCCE;"><span style="color:#8C7A63;">Blush sand</span></div><div style="font-family:var(--body); font-size:18px; color:var(--muted); margin-top:10px;">#E7DCCE · surfaces</div></div>
+        <div style="flex:1;"><div class="sw" style="background:#8C7A63;"><span style="color:#F1E9E0;">Taupe</span></div><div style="font-family:var(--body); font-size:18px; color:var(--muted); margin-top:10px;">#8C7A63 · accent</div></div>
+        <div style="flex:1;"><div class="sw" style="background:#8C9A7E;"><span style="color:#fff;">Sage</span></div><div style="font-family:var(--body); font-size:18px; color:var(--muted); margin-top:10px;">#8C9A7E · success</div></div>
+        <div style="flex:1;"><div class="sw" style="background:#23201C;"><span style="color:#C9B89E;">Soft black</span></div><div style="font-family:var(--body); font-size:18px; color:var(--muted); margin-top:10px;">#23201C · ink</div></div>
+      </div>
+    </div>
+    <!-- type -->
+    <div style="position:absolute; left:130px; top:624px; right:130px; display:flex; gap:30px;">
+      <div class="card anim3" style="flex:1; padding:38px 44px;">
+        <div style="font-family:var(--head); font-size:19px; font-weight:600; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-bottom:16px;">Display · Cormorant Garamond</div>
+        <img src="deck-assets/logo-taupe.png" alt="LUNE Pilates Studio" style="display:block; width:340px; margin:6px 0 4px;"/>
+        <div style="font-family:var(--serif); font-style:italic; font-size:34px; color:var(--taupe-deep); margin-top:8px;">elegant · editorial · the wordmark</div>
+      </div>
+      <div class="card anim3" style="flex:1; padding:38px 44px;">
+        <div style="font-family:var(--head); font-size:19px; font-weight:600; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-bottom:16px;">Interface · Schibsted + IBM Plex Thai</div>
+        <div class="h2" style="font-size:42px;">Book a class</div>
+        <div class="h2" style="font-size:42px; margin-top:6px;">จองคลาสง่าย ๆ</div>
+        <div style="font-family:var(--body); font-size:20px; color:var(--ink-2); margin-top:14px; line-height:1.5;">Clean and modern, with generous line-height for Thai script.</div>
+      </div>
+    </div>
+    <div class="chrome"><img src="deck-assets/wordmark-taupe.png" alt="LUNE" style="height:21px; display:block;"/><span class="pagenum">03</span></div>
+  </section>
+
+  <!-- ░░ 4 · FEATURE HIGHLIGHTS ░░ -->
+  <section data-label="Feature highlights">
+    <div class="aionova-badge"><img src="deck-assets/aionova-logo-white.png" alt="AIONOVA" style="width: 200px"/></div>
+    <div style="position:absolute; left:130px; top:84px; right:130px;">
+      <div class="eyebrow anim">Highlights</div>
+      <div class="kicker-line anim"></div>
+      <div class="h2 anim" style="font-size:58px;">Six features that make LUNE feel effortless</div>
+    </div>
+    <div style="position:absolute; left:130px; right:130px; top:300px; display:grid; grid-template-columns:repeat(3,1fr); gap:26px;">
+      <div class="feat anim2">
+        <div class="ic"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.4 2.5 14.6 0 17M12 3.5c-2.5 2.4-2.5 14.6 0 17"/></svg></div>
+        <h4>Bilingual by default</h4>
+        <p>Thai-first with an instant TH · EN toggle on every screen — comfortable for members and staff alike.</p>
+      </div>
+      <div class="feat anim2">
+        <div class="ic"><svg width="30" height="30" viewBox="0 0 24 24"><path d="M12 2c.5 6 4 9.5 10 10-6 .5-9.5 4-10 10-.5-6-4-9.5-10-10 6-.5 9.5-4 10-10Z" fill="currentColor"/></svg></div>
+        <h4>Credits &amp; expiry, up front</h4>
+        <p>Hours remaining and the validity date are the hero — time-limited packages never expire by surprise.</p>
+      </div>
+      <div class="feat anim2">
+        <div class="ic"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="9" width="17" height="6" rx="1.5"/><path d="M6 15v3M18 15v3M3.5 12H2M22 12h-1.5"/></svg></div>
+        <h4>Reformer-lane availability</h4>
+        <p>Each of the three reformers shows as a lane — booked or open — with instructor choice on Private, Duo &amp; Trio.</p>
+      </div>
+      <div class="feat anim3">
+        <div class="ic"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M18 16H6l1.2-1.6V10a4.8 4.8 0 0 1 9.6 0v4.4Z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg></div>
+        <h4>Fair waitlists</h4>
+        <p>Full classes never auto-book. A freed spot notifies the next member, who confirms within a short window.</p>
+      </div>
+      <div class="feat anim3">
+        <div class="ic"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="12" r="2.5"/><circle cx="17" cy="6" r="2.5"/><circle cx="17" cy="18" r="2.5"/><path d="M9.2 10.8 14.8 7.2M9.2 13.2 14.8 16.8"/></svg></div>
+        <h4>House-number sharing</h4>
+        <p>Members share credits across a household by house number — a benefit guests don't get, shown clearly in both apps.</p>
+      </div>
+      <div class="feat anim3">
+        <div class="ic"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2M20 14v6M14 20h6"/></svg></div>
+        <h4>PromptPay &amp; LINE</h4>
+        <p>Pay by the QR flow Thai members trust, with booking confirmations and reminders delivered through LINE.</p>
+      </div>
+    </div>
+    <div class="chrome"><img src="deck-assets/wordmark-taupe.png" alt="LUNE" style="height:21px; display:block;"/><span class="pagenum">04</span></div>
+  </section>
+
+  <!-- ░░ 5 · MEMBER APP GALLERY ░░ -->
+  <section data-label="The member app">
+    <div class="aionova-badge"><img src="deck-assets/aionova-logo-white.png" alt="AIONOVA" style="width: 200px"/></div>
+    <div style="position:absolute; left:130px; top:84px; right:130px; display:flex; align-items:flex-end; justify-content:space-between;">
+      <div>
+        <div class="eyebrow anim">The member app</div>
+        <div class="kicker-line anim"></div>
+        <div class="h2 anim" style="font-size:54px;">Arrival to booked, in four screens</div>
+      </div>
+      <div class="anim2" style="display:flex; gap:12px; padding-bottom:8px;">
+        <span class="tag" style="font-size:20px; padding:9px 18px;">Mobile · iOS</span>
+      </div>
+    </div>
+    <div class="gallery">
+      <div class="gphone anim2"><div class="pf"><img src="deck-assets/cust_home.png"/></div><div class="cap"><h4>Home</h4><p>หน้าแรก · greeting &amp; credits</p></div></div>
+      <div class="gphone anim2"><div class="pf"><img src="deck-assets/cust_schedule.png"/></div><div class="cap"><h4>Schedule</h4><p>ตารางเรียน · filter by type</p></div></div>
+      <div class="gphone anim3"><div class="pf"><img src="deck-assets/cust_detail.png"/></div><div class="cap"><h4>Class detail</h4><p>รายละเอียด · book or waitlist</p></div></div>
+      <div class="gphone anim3"><div class="pf"><img src="deck-assets/cust_credits.png"/></div><div class="cap"><h4>Buy credits</h4><p>ซื้อเครดิต · PromptPay</p></div></div>
+    </div>
+    <div class="chrome"><img src="deck-assets/wordmark-taupe.png" alt="LUNE" style="height:21px; display:block;"/><span class="pagenum">05</span></div>
+  </section>
+
+  <!-- ░░ 6 · THOUGHTFUL FLOWS ░░ -->
+  <section data-label="Thoughtful flows">
+    <div class="aionova-badge"><img src="deck-assets/aionova-logo-white.png" alt="AIONOVA" style="width: 200px"/></div>
+    <div style="position:absolute; left:130px; top:90px; right:130px;">
+      <div class="eyebrow anim">Designed-in care</div>
+      <div class="kicker-line anim"></div>
+      <div class="h2 anim" style="font-size:58px;">The details that prevent disputes</div>
+    </div>
+    <div style="position:absolute; left:130px; top:316px; right:130px; display:flex; gap:30px;">
+      <div class="feat anim2" style="flex:1;">
+        <div class="ic"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v4.5l3 2"/></svg></div>
+        <h4>5-hour cutoff, made obvious</h4>
+        <p>Free cancel or reschedule up to five hours before class. Inside the window, the app shows exactly what a cancellation costs — one credit — before you confirm.</p>
+      </div>
+      <div class="feat anim2" style="flex:1;">
+        <div class="ic"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M18 16H6l1.2-1.6V10a4.8 4.8 0 0 1 9.6 0v4.4Z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg></div>
+        <h4>Waitlist = notify + confirm</h4>
+        <p>Full classes never auto-book. When a spot opens, the member is notified and has a short window to confirm and claim it — fair and transparent.</p>
+      </div>
+      <div class="feat anim3" style="flex:1;">
+        <div class="ic"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="12" r="2.5"/><circle cx="17" cy="6" r="2.5"/><circle cx="17" cy="18" r="2.5"/><path d="M9.2 10.8 14.8 7.2M9.2 13.2 14.8 16.8"/></svg></div>
+        <h4>House-number sharing</h4>
+        <p>Membership ties to a house number so credits can be shared within a household — a benefit guests don't get, surfaced clearly in both apps.</p>
+      </div>
+    </div>
+    <div style="position:absolute; left:130px; right:130px; top:744px;" class="soft anim3">
+      <div style="padding:32px 40px; display:flex; align-items:center; gap:24px;">
+        <div style="width:54px; height:54px; border-radius:50%; background:var(--cream-2); color:var(--taupe-deep); display:flex; align-items:center; justify-content:center; flex-shrink:0;"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+        <p style="font-family:var(--serif); font-style:italic; font-size:30px; color:var(--ink); line-height:1.4;">Calm UX is not just how it looks — it's removing the moments where a member could feel confused or treated unfairly.</p>
+      </div>
+    </div>
+    <div class="chrome"><img src="deck-assets/wordmark-taupe.png" alt="LUNE" style="height:21px; display:block;"/><span class="pagenum">06</span></div>
+  </section>
+
+  <!-- ░░ 7 · ADMIN DASHBOARD ░░ -->
+  <section data-label="Admin dashboard">
+    <div class="aionova-badge"><img src="deck-assets/aionova-logo-white.png" alt="AIONOVA" style="width: 200px; margin: 0px; padding: 0px"/></div>
+    <div style="position:absolute; left:130px; top:84px; right:130px;">
+      <div class="eyebrow anim">The studio dashboard</div>
+      <div class="kicker-line anim"></div>
+      <div class="h2 anim" style="font-size:54px;">Run the whole studio from one place</div>
+    </div>
+    <div style="position:absolute; left:130px; right:130px; top:292px; display:flex; gap:36px; justify-content:center;">
+      <div class="anim2" style="width:716px;">
+        <div class="shot"><img src="deck-assets/admin_today.png"/></div>
+        <div style="display:flex; align-items:baseline; gap:10px; margin-top:18px; white-space:nowrap;">
+          <h4 style="font-family:var(--head); font-weight:600; font-size:26px; color:var(--ink);">Today's overview</h4>
+          <span style="font-family:var(--body); font-size:18px; color:var(--muted);">ภาพรวมวันนี้</span>
+        </div>
+        <p style="font-family:var(--body); font-size:19px; line-height:1.45; color:var(--ink-2); margin-top:5px;">Live stats, a class timeline and one-tap roster check-in.</p>
+      </div>
+      <div class="anim3" style="width:716px;">
+        <div class="shot"><img src="deck-assets/admin_members.png"/></div>
+        <div style="display:flex; align-items:baseline; gap:10px; margin-top:18px; white-space:nowrap;">
+          <h4 style="font-family:var(--head); font-weight:600; font-size:26px; color:var(--ink);">Members &amp; sharing</h4>
+          <span style="font-family:var(--body); font-size:18px; color:var(--muted);">สมาชิก</span>
+        </div>
+        <p style="font-family:var(--body); font-size:19px; line-height:1.45; color:var(--ink-2); margin-top:5px;">House numbers, credit expiry and sharing groups at a glance.</p>
+      </div>
+    </div>
+    <div style="position:absolute; left:130px; right:130px; top:958px; display:flex; gap:12px; flex-wrap:wrap; justify-content:center;" class="anim3">
+      <span class="tag" style="font-size:18px; padding:8px 16px;">Check-in</span>
+      <span class="tag" style="font-size:18px; padding:8px 16px;">Schedule management</span>
+      <span class="tag" style="font-size:18px; padding:8px 16px;">Bookings &amp; waitlist</span>
+      <span class="tag" style="font-size:18px; padding:8px 16px;">Payments</span>
+      <span class="tag" style="font-size:18px; padding:8px 16px;">Instructor availability</span>
+    </div>
+    <div class="chrome" style="bottom:34px;"><img src="deck-assets/wordmark-taupe.png" alt="LUNE" style="height:21px; display:block;"/><span class="pagenum">07</span></div>
+  </section>
+
+  <!-- ░░ 8 · ADMIN MOBILE & RESPONSIVE ░░ -->
+  <section data-label="Mobile-first admin">
+    <div class="aionova-badge"><img src="deck-assets/aionova-logo-white.png" alt="AIONOVA" style="width: 200px"/></div>
+    <div style="position:absolute; left:130px; top:0; bottom:0; width:920px; display:flex; flex-direction:column; justify-content:center;">
+      <div class="eyebrow anim">Mobile-first for staff</div>
+      <div class="kicker-line anim"></div>
+      <div class="h1 anim" style="font-size:66px;">Phone at the door.<br/>iPad at reception.<br/>Desktop out back.</div>
+      <p class="body anim2" style="font-size:25px; margin-top:32px; max-width:760px;">Staff run the day from their phone — a built-in <strong style="color:var(--ink);">POS checkout</strong>, a vertical <strong style="color:var(--ink);">instructor Gantt</strong>, availability editing and quick customer add. The same dashboard reflows up to a full sidebar on iPad and desktop.</p>
+      <div class="anim3" style="display:flex; gap:14px; margin-top:38px;">
+        <span class="tag">POS checkout</span><span class="tag">Instructor timeline</span><span class="tag">Responsive</span>
+      </div>
+    </div>
+    <div style="position:absolute; right:180px; top:0; bottom:0; display:flex; align-items:center; gap:30px;">
+      <img class="anim2" src="deck-assets/admin_phone_new.png" alt="LUNE admin mobile" style="width:368px; display:block; filter:drop-shadow(0 30px 60px rgba(40,32,24,0.28));"/>
+    </div>
+    <div class="chrome"><img src="deck-assets/wordmark-taupe.png" alt="LUNE" style="height:21px; display:block;"/><span class="pagenum">08</span></div>
+  </section>
+
+  <!-- ░░ 9 · LINE ░░ -->
+  <section data-label="LINE integration">
+    <div class="aionova-badge"><img src="deck-assets/aionova-logo-white.png" alt="AIONOVA" style="width: 200px"/></div>
+    <div style="position:absolute; left:130px; top:80px; right:130px;">
+      <div class="eyebrow anim">Meet members on LINE</div>
+      <div class="kicker-line anim"></div>
+      <div class="h2 anim" style="font-size:48px;">Booking updates through LINE</div>
+    </div>
+    <div class="anim2" style="position:absolute; right:130px; top:84px; display:inline-flex; align-items:center; gap:9px; height:42px; padding:0 18px; border-radius:99px; background:#06C755;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M12 2C6.5 2 2 5.6 2 10c0 4 3.6 7.3 8.5 7.9.3.07.8.2.9.5.1.3.07.7.03 1l-.14.9c-.04.26-.2 1 .9.55s5.9-3.5 8-6C21.4 12.9 22 11.5 22 10c0-4.4-4.5-8-10-8Z"/></svg>
+      <span style="font-family:var(--body); font-size:17px; font-weight:700; color:#fff; white-space:nowrap;">LINE Official</span>
+    </div>
+    <p class="body anim2" style="position:absolute; left:130px; top:212px; font-size:22px; max-width:1240px; color:var(--ink-2);">A rich menu for one-tap access, plus Flex message notifications at every key moment — each on-brand, warm and bilingual, never corporate.</p>
+
+    <div style="position:absolute; left:130px; right:130px; top:316px; display:flex; gap:38px; justify-content:center; align-items:flex-start;">
+      <div class="anim2" style="display:flex; flex-direction:column; align-items:center; gap:16px; width:300px;">
+        <span class="trig" style="color:var(--sage-deep);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg>After booking · หลังจองสำเร็จ</span>
+        <img src="deck-assets/notif-booking.png" alt="Booking confirmed" class="bub"/>
+        <div class="bcap"><h4>Booking confirmed</h4><p>Class, time &amp; remaining credits</p></div>
+      </div>
+      <div class="anim2" style="display:flex; flex-direction:column; align-items:center; gap:16px; width:300px;">
+        <span class="trig" style="color:#9A7B45;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 16H6l1.2-1.6V10a4.8 4.8 0 0 1 9.6 0v4.4Z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>Spot opens · มีที่ว่าง</span>
+        <img src="deck-assets/notif-waitlist.png" alt="Waitlist spot open" class="bub"/>
+        <div class="bcap"><h4>Waitlist · confirm</h4><p>Countdown to claim the spot</p></div>
+      </div>
+      <div class="anim3" style="display:flex; flex-direction:column; align-items:center; gap:16px; width:300px;">
+        <span class="trig" style="color:var(--taupe-deep);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v4.5l3 2"/></svg>Before class · เตือนล่วงหน้า</span>
+        <img src="deck-assets/notif-reminder.png" alt="Class reminder" class="bub"/>
+        <div class="bcap"><h4>Class reminder</h4><p>The day before, with policy</p></div>
+      </div>
+      <div class="anim3" style="display:flex; flex-direction:column; align-items:center; gap:16px; width:300px;">
+        <span class="trig" style="color:var(--taupe-deep);"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M12 2c.4 5 3 7.6 8 8-5 .4-7.6 3-8 8-.4-5-3-7.6-8-8 5-.4 7.6-3 8-8Z" fill="currentColor"/></svg>After payment · หลังชำระเงิน</span>
+        <img src="deck-assets/notif-receipt.png" alt="Payment receipt" class="bub"/>
+        <div class="bcap"><h4>Payment receipt</h4><p>PromptPay total &amp; credits added</p></div>
+      </div>
+    </div>
+    <div class="chrome"><img src="deck-assets/wordmark-taupe.png" alt="LUNE" style="height:21px; display:block;"/><span class="pagenum">09</span></div>
+  </section>
+
+  <!-- ░░ 10 · CLOSE ░░ -->
+  <section data-label="Thank you" class="cover">
+    <div class="aionova-badge"><img src="deck-assets/aionova-logo-white.png" alt="AIONOVA"/></div>
+    <div class="bg" style="background-image:url('deck-assets/studio-reception.jpg'); background-position:center 40%;"></div>
+    <div class="scrim" style="background:linear-gradient(105deg, rgba(20,17,13,0.88) 0%, rgba(20,17,13,0.62) 50%, rgba(20,17,13,0.3) 100%);"></div>
+    <div style="position:absolute; left:130px; top:0; bottom:0; right:130px; display:flex; flex-direction:column; justify-content:center;">
+      <img class="anim" src="deck-assets/logo-cream.png" alt="LUNE Pilates Studio" style="display:block; width:560px; max-width:58%;"/>
+      <div class="lead anim2" style="font-size:50px; color:#F6EFE6; margin-top:40px; max-width:1100px;">A calm, considered booking<br/>experience — ready to <em style="color:#D8C7AD;">come to life.</em></div>
+      <p class="anim3" style="font-family:var(--body); font-size:24px; color:rgba(243,236,226,0.74); margin-top:30px; line-height:1.6; max-width:840px;">Next: real photography and copy, member testing, then build. We'd love your feedback on the screens and the admin direction.</p>
+      <div class="anim3" style="font-family:var(--body); font-size:21px; letter-spacing:3px; text-transform:uppercase; color:rgba(243,236,226,0.5); margin-top:44px;">Thank you · ขอบคุณค่ะ</div>
+    </div>
+    <div class="chrome on-dark"><img src="deck-assets/wordmark-cream.png" alt="LUNE Pilates Studio" style="height:21px; display:block;"/><span class="pagenum">10</span></div>
+  </section>
+
+</deck-stage>
+<script src="deck-stage.js"></script>
+</body>
+</html>

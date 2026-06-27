@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LUNE Pilates — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Schibsted+Grotesk:wght@400;500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --a-cream: #EFE7DD; --a-cream-2: #E7DCCD;
+    --a-surface: #F8F2EA; --a-surface-2: #FFFCF7;
+    --a-ink: #2B241B; --a-ink-soft: #6B5D4C; --a-muted: #9C8C77;
+    --a-line: rgba(140,122,99,0.16); --a-line-strong: rgba(140,122,99,0.3);
+    --a-taupe: #8C7A63; --a-taupe-deep: #6E5E49;
+    --a-sage: #8C9A7E; --a-sage-deep: #6E7C60;
+    --a-shadow: 0 1px 2px rgba(72,58,40,0.04), 0 6px 18px rgba(72,58,40,0.06);
+    --sidebar-bg: #2B241B;
+    --drawer-hidden: translateX(100%);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--a-cream); font-family: 'Hanken Grotesk', 'IBM Plex Sans Thai', system-ui, sans-serif; color: var(--a-ink); overflow: hidden; }
+  button { font-family: inherit; }
+  input, select { outline: none; }
+  input:focus, select:focus { border-color: var(--a-taupe) !important; }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-thumb { background: rgba(140,122,99,0.24); border-radius: 99px; border: 2px solid transparent; background-clip: padding-box; }
+
+  .admin-shell { display: flex; height: 100vh; overflow: hidden; }
+  .admin-sidebar { width: 244px; flex-shrink: 0; background: var(--sidebar-bg); display: flex; flex-direction: column; }
+  .admin-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .admin-topbar { display: flex; align-items: center; gap: 16px; padding: 15px 30px; border-bottom: 1px solid var(--a-line); background: var(--a-cream); flex-shrink: 0; }
+  .admin-content { flex: 1; overflow-y: auto; padding: 28px 30px 48px; }
+  .admin-content-inner { max-width: 1120px; margin: 0 auto; }
+  .admin-topbar-brand { display: none; }
+  .admin-mobilenav { display: none; }
+
+  /* responsive grids */
+  .admin-statgrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  .admin-instr-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+
+  /* class rows */
+  .admin-classrow { display: flex; align-items: center; gap: 16px; padding: 15px 18px; }
+  .admin-classtime { width: 58px; flex-shrink: 0; padding-right: 16px; border-right: 1px solid var(--a-line); }
+  .admin-classmeta { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+
+  /* tables */
+  .admin-table { background: var(--a-surface-2); border: 1px solid var(--a-line); border-radius: 18px; overflow: hidden; box-shadow: var(--a-shadow); }
+  .admin-thead { padding: 13px 18px; border-bottom: 1px solid var(--a-line); background: var(--a-surface); }
+  .admin-thead span { font-family: 'Hanken Grotesk', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: var(--a-muted); }
+  .admin-trow { padding: 13px 18px; border-bottom: 1px solid var(--a-line); align-items: center; }
+  .admin-trow:last-child { border-bottom: none; }
+  .admin-trow:hover { background: var(--a-surface); }
+  .admin-bk-grid { display: grid; grid-template-columns: 2fr 1.4fr 1fr 40px; gap: 12px; }
+  .admin-mem-grid { display: grid; grid-template-columns: 2fr 1fr 1.1fr 1fr 30px; gap: 12px; }
+  .admin-pay-grid { display: grid; grid-template-columns: 1.6fr 1.2fr 1.1fr 1fr 1fr; gap: 12px; }
+
+  /* drawer: right on desktop, bottom sheet on mobile */
+  .admin-drawer { position: absolute; top: 0; right: 0; bottom: 0; width: 440px; max-width: 92vw; background: var(--a-surface); display: flex; flex-direction: column; box-shadow: -20px 0 60px rgba(40,32,24,0.2); }
+
+  @media (max-width: 1080px) {
+    .admin-statgrid { grid-template-columns: repeat(3, 1fr); }
+    .admin-instr-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 859px) {
+    .admin-sidebar { display: none; }
+    .admin-topbar-brand { display: flex; }
+    .admin-mobilenav { display: flex; position: fixed; bottom: 0; left: 0; right: 0; height: 62px; padding: 6px 6px; padding-bottom: max(6px, env(safe-area-inset-bottom)); background: var(--a-surface-2); border-top: 1px solid var(--a-line); z-index: 50; box-shadow: 0 -8px 24px rgba(72,58,40,0.05); }
+    .admin-content { padding: 20px 18px 92px; }
+    .admin-topbar { padding: 13px 18px; }
+    .admin-statgrid { grid-template-columns: repeat(2, 1fr); }
+    .admin-instr-grid { grid-template-columns: 1fr; }
+    .admin-hide-sm { display: none !important; }
+    .admin-classrow { gap: 12px; padding: 14px 15px; flex-wrap: wrap; }
+    .admin-classmeta { width: 100%; justify-content: space-between; padding-left: 74px; }
+    .admin-bk-grid { grid-template-columns: 2fr 1.3fr auto; }
+    .admin-bk-grid > :nth-child(4) { display: none; }
+    .admin-mem-grid { grid-template-columns: 2.4fr 1fr 24px; }
+    .admin-pay-grid { grid-template-columns: 1.6fr 1fr auto; }
+    .admin-pay-grid > :nth-child(3) { display: none; }
+    .admin-drawer { top: auto; left: 0; right: 0; bottom: 0; width: 100%; max-width: 100%; max-height: 90%; border-radius: 28px 28px 0 0; box-shadow: 0 -20px 60px rgba(40,32,24,0.25); }
+    :root { --drawer-hidden: translateY(100%); }
+  }
+  @media (max-width: 460px) {
+    .admin-statgrid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="lune-icons.jsx"></script>
+<script type="text/babel" src="admin-data.jsx"></script>
+<script type="text/babel" src="admin-shell.jsx"></script>
+<script type="text/babel" src="admin-today.jsx"></script>
+<script type="text/babel" src="admin-schedule.jsx"></script>
+<script type="text/babel" src="admin-more.jsx"></script>
+
+<script type="text/babel">
+const { useState } = React;
+
+function AdminApp() {
+  const [screen, setScreen] = useState('today');
+  const [lang, setLang] = useState('en');
+  const ctx = { screen, go: setScreen, lang, setLang };
+  return (
+    <AdminCtx.Provider value={ctx}>
+      <div className="admin-shell">
+        <Sidebar />
+        <div className="admin-main">
+          <Topbar />
+          <div className="admin-content">
+            <div className="admin-content-inner">
+              {screen === 'today' && <TodayScreen />}
+              {screen === 'schedule' && <ScheduleAdminScreen />}
+              {screen === 'bookings' && <BookingsAdminScreen />}
+              {screen === 'members' && <MembersScreen />}
+              {screen === 'payments' && <PaymentsScreen />}
+              {screen === 'instructors' && <InstructorsScreen />}
+            </div>
+          </div>
+        </div>
+        <MobileNav />
+      </div>
+    </AdminCtx.Provider>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<AdminApp />);
+</script>
+</body>
+</html>

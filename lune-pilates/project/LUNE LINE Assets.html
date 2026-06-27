@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LUNE Pilates — LINE Assets</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Schibsted+Grotesk:wght@400;500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --cream:#F1E9E0; --cream2:#E7DCCE; --surf:#FBF6EF; --surf2:#FFFCF7;
+    --ink:#2E2820; --inks:#6B5D4C; --muted:#9C8C77;
+    --line:rgba(140,122,99,0.18); --lineS:rgba(140,122,99,0.32);
+    --taupe:#8C7A63; --taupeD:#6E5E49; --sage:#8C9A7E; --sageD:#6E7C60; --rose:#C49A86; --amber:#B98E4F;
+    --line-green:#06C755;
+    --head:"Schibsted Grotesk","IBM Plex Sans Thai",sans-serif;
+    --serif:"Cormorant Garamond","IBM Plex Sans Thai",serif;
+    --body:"Hanken Grotesk","IBM Plex Sans Thai",sans-serif;
+    --chatbg:#D7CFC4;
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; }
+  body { background:#E2DBD2; color:var(--ink); font-family:var(--body); padding:0 0 80px; }
+  .wrap { max-width:1340px; margin:0 auto; padding:0 40px; }
+
+  /* page header */
+  .masthead { padding:50px 0 30px; display:flex; align-items:flex-end; justify-content:space-between; flex-wrap:wrap; gap:20px; }
+  .wm { font-family:var(--serif); font-weight:600; font-size:46px; letter-spacing:8px; color:var(--taupeD); line-height:1; }
+  .wm .sp { position:relative; }
+  .mast-sub { font-family:var(--body); font-size:14px; letter-spacing:3px; text-transform:uppercase; color:var(--muted); margin-top:10px; }
+  .mast-r { text-align:right; font-family:var(--body); font-size:13.5px; color:var(--inks); line-height:1.7; }
+  .badge-line { display:inline-flex; align-items:center; gap:8px; padding:7px 14px; border-radius:99px; background:var(--line-green); color:#fff; font-weight:700; font-size:13px; }
+
+  /* section */
+  .section { background:#ECE6DE; border:1px solid var(--line); border-radius:28px; padding:38px 40px 44px; margin-bottom:30px; }
+  .sec-head { display:flex; align-items:baseline; gap:16px; margin-bottom:6px; }
+  .eyebrow { font-family:var(--body); font-size:12px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--taupe); }
+  .sec-title { font-family:var(--head); font-weight:600; font-size:34px; letter-spacing:-0.5px; color:var(--ink); margin:6px 0 0; }
+  .sec-desc { font-family:var(--body); font-size:15.5px; line-height:1.6; color:var(--inks); max-width:680px; margin:14px 0 30px; }
+
+  /* phone */
+  .phone { width:392px; flex-shrink:0; border-radius:46px; background:#1c1814; padding:11px; box-shadow:0 40px 90px rgba(40,32,24,0.32); }
+  .phone-scr { border-radius:36px; overflow:hidden; background:var(--chatbg); height:812px; display:flex; flex-direction:column; position:relative; }
+  .notch { position:absolute; top:9px; left:50%; transform:translateX(-50%); width:116px; height:30px; background:#1c1814; border-radius:20px; z-index:30; }
+
+  /* LINE chat header */
+  .line-head { background:#fff; padding:40px 14px 11px; display:flex; align-items:center; gap:11px; border-bottom:1px solid #eee; flex-shrink:0; z-index:20; }
+  .oa-av { width:40px; height:40px; border-radius:50%; background:var(--taupeD); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .oa-av span { font-family:var(--serif); font-weight:600; font-size:17px; letter-spacing:1px; color:#F1E9E0; }
+  .oa-name { font-family:var(--body); font-weight:700; font-size:16px; color:#15130f; display:flex; align-items:center; gap:5px; }
+  .verif { width:15px; height:15px; border-radius:4px; background:var(--line-green); display:inline-flex; align-items:center; justify-content:center; }
+  .line-head .hi { margin-left:auto; display:flex; gap:18px; color:#4a4a4a; }
+
+  /* chat body */
+  .chat { flex:1; overflow-y:auto; padding:16px 14px 8px; display:flex; flex-direction:column; gap:14px; }
+  .chat::-webkit-scrollbar { display:none; }
+  .daychip { align-self:center; padding:4px 13px; border-radius:99px; background:rgba(43,34,24,0.28); color:#fff; font-size:11.5px; font-weight:600; font-family:var(--body); }
+  .msg { display:flex; gap:8px; align-items:flex-end; max-width:90%; }
+  .msg .mav { width:30px; height:30px; border-radius:50%; background:var(--taupeD); flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+  .msg .mav span { font-family:var(--serif); font-weight:600; font-size:12px; color:#F1E9E0; }
+  .txtbub { background:#fff; border-radius:4px 18px 18px 18px; padding:11px 14px; font-family:var(--body); font-size:14px; line-height:1.5; color:#1a1a1a; box-shadow:0 1px 1px rgba(0,0,0,0.06); }
+  .tstamp { font-size:10.5px; color:rgba(40,32,24,0.5); align-self:flex-end; font-family:var(--body); }
+
+  /* rich menu dock */
+  .dock { flex-shrink:0; background:#fff; border-top:1px solid #e6e6e6; }
+  .dock-bar { display:flex; align-items:center; gap:0; height:38px; border-bottom:1px solid #eee; }
+  .dock-tab { flex:1; display:flex; align-items:center; justify-content:center; gap:7px; font-family:var(--body); font-size:12.5px; font-weight:600; color:var(--inks); }
+  .dock-tab.active { color:var(--taupeD); box-shadow:inset 0 -2px 0 var(--taupe); }
+
+  /* rich menu grid */
+  .rich { background:var(--cream); position:relative; }
+  /* LINE "4 ช่อง" template: wide banner on top, 3 cells below */
+  .rich-grid { display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:1.06fr 1fr; aspect-ratio:2500/1686; }
+  .rcell { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; text-align:center; padding:12px; cursor:pointer; }
+  .rcell .rtext { display:flex; flex-direction:column; gap:3px; }
+  .rcell.wide { grid-column:1 / -1; flex-direction:row; gap:16px; border-bottom:1px solid var(--line); }
+  .rcell.wide .rtext { text-align:left; }
+  .rcell.sm { border-right:1px solid var(--line); }
+  .rcell.sm:last-child { border-right:none; }
+  .ric { width:42px; height:42px; color:var(--taupeD); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .rcell.wide .ric { width:50px; height:50px; }
+  .rlab { font-family:var(--head); font-weight:600; font-size:15px; color:var(--ink); line-height:1.15; }
+  .rcell.wide .rlab { font-size:23px; }
+  .rsub { font-family:var(--body); font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); }
+  .rcell.wide .rsub { font-size:11.5px; letter-spacing:2px; }
+  .rich-wm { position:absolute; bottom:8px; right:12px; font-family:var(--serif); font-size:11px; letter-spacing:3px; color:var(--muted); opacity:0.55; }
+  /* phone-dock rich menu: tighter cells, single-line subtitles */
+  .phone-rich .rcell { gap:7px; padding:11px 6px; }
+  .phone-rich .ric { width:34px; height:34px; }
+  .phone-rich .rcell.wide { gap:13px; }
+  .phone-rich .rcell.wide .ric { width:42px; height:42px; }
+  .phone-rich .rlab { font-size:13px; }
+  .phone-rich .rcell.wide .rlab { font-size:19px; }
+  .phone-rich .rsub { font-size:8.5px; letter-spacing:1px; white-space:nowrap; }
+  .phone-rich .rcell.wide .rsub { font-size:9.5px; }
+
+  /* layout split */
+  .split { display:flex; gap:48px; align-items:flex-start; flex-wrap:wrap; }
+  .col { flex:1; min-width:300px; }
+
+  /* standalone rich menu artboard */
+  .artboard { background:var(--cream); border:1px solid var(--line); border-radius:18px; overflow:hidden; box-shadow:0 20px 50px rgba(40,32,24,0.12); }
+  .art-cap { display:flex; align-items:center; justify-content:space-between; margin:0 2px 12px; }
+  .art-cap .t { font-family:var(--head); font-weight:600; font-size:17px; color:var(--ink); }
+  .art-cap .d { font-family:var(--body); font-size:12.5px; color:var(--muted); }
+  .speclist { margin:18px 0 0; display:grid; grid-template-columns:1fr 1fr; gap:10px 18px; }
+  .specrow { display:flex; gap:10px; align-items:flex-start; font-family:var(--body); font-size:13px; color:var(--inks); line-height:1.45; }
+  .specrow b { color:var(--ink); font-weight:700; }
+  .specnum { width:20px; height:20px; border-radius:6px; background:var(--cream2); color:var(--taupeD); font-family:var(--head); font-weight:700; font-size:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; }
+
+  /* flex bubble cards */
+  .flexgrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:26px; }
+  .flexwrap { }
+  .flex-label { display:flex; align-items:center; gap:9px; margin-bottom:12px; }
+  .trigchip { display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:99px; background:var(--cream); border:1px solid var(--lineS); font-family:var(--body); font-size:12px; font-weight:600; color:var(--taupeD); }
+  .flex-label .fl-name { font-family:var(--head); font-weight:600; font-size:16px; color:var(--ink); }
+
+  /* the LINE flex bubble */
+  .bubble { width:328px; max-width:100%; background:#fff; border-radius:18px; overflow:hidden; box-shadow:0 14px 36px rgba(40,32,24,0.16); }
+  .b-hero { height:150px; background-color:var(--cream2); background-size:cover; background-position:center 62%; position:relative; }
+  .b-hero::after { content:""; position:absolute; inset:0; background:linear-gradient(180deg, rgba(40,32,24,0.12) 0%, rgba(40,32,24,0) 38%, rgba(40,32,24,0.18) 100%); }
+  .b-hero .pill { position:absolute; left:14px; bottom:12px; z-index:2; display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:99px; background:rgba(255,255,255,0.94); backdrop-filter:blur(4px); font-family:var(--body); font-size:12px; font-weight:700; color:var(--ink); }
+  .b-strip { padding:14px 18px; display:flex; align-items:center; gap:10px; }
+  .b-body { padding:16px 18px 4px; }
+  .b-kicker { display:flex; align-items:center; gap:7px; font-family:var(--body); font-size:12px; font-weight:700; letter-spacing:0.3px; }
+  .b-title { font-family:var(--serif); font-weight:600; font-size:25px; color:var(--ink); line-height:1.1; margin:7px 0 0; }
+  .b-rows { margin:14px 0 4px; display:flex; flex-direction:column; gap:10px; }
+  .b-row { display:flex; align-items:center; gap:10px; font-family:var(--body); font-size:13.5px; color:var(--inks); }
+  .b-row .ri { color:var(--taupe); flex-shrink:0; }
+  .b-row b { color:var(--ink); font-weight:600; }
+  .b-note { margin:14px 18px 0; padding:11px 13px; border-radius:12px; background:var(--cream); display:flex; gap:9px; }
+  .b-note p { margin:0; font-family:var(--body); font-size:12px; line-height:1.5; color:var(--inks); }
+  .b-foot { padding:14px 18px 18px; display:flex; gap:10px; }
+  .b-btn { flex:1; height:46px; border-radius:12px; display:flex; align-items:center; justify-content:center; gap:7px; font-family:var(--body); font-size:13.5px; font-weight:600; cursor:pointer; border:none; }
+  .b-solid { background:var(--ink); color:#fff; }
+  .b-taupe { background:var(--taupe); color:#fff; }
+  .b-amber { background:var(--amber); color:#fff; }
+  .b-ghost { background:transparent; border:1px solid var(--lineS); color:var(--ink); }
+  .countbox { margin:14px 0 2px; padding:13px 14px; border-radius:13px; background:rgba(185,142,79,0.12); border:1px solid rgba(185,142,79,0.3); display:flex; align-items:center; justify-content:space-between; }
+  .countbox .cl { font-family:var(--body); font-size:12.5px; font-weight:600; color:#8A6A35; }
+  .countbox .cv { font-family:var(--head); font-weight:700; font-size:22px; color:#8A6A35; letter-spacing:0.5px; }
+  .amtbox { text-align:center; margin:8px 0 2px; }
+  .amtbox .a { font-family:var(--head); font-weight:700; font-size:40px; color:var(--ink); letter-spacing:-1px; }
+  .hdrstrip { padding:15px 18px; color:#fff; }
+  .hdrstrip .hk { font-family:var(--body); font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; opacity:0.85; }
+  .hdrstrip .ht { font-family:var(--serif); font-weight:600; font-size:24px; margin-top:2px; }
+  .ppay { display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border-radius:99px; background:#10358a; color:#fff; font-family:var(--body); font-size:11.5px; font-weight:700; }
+
+  .divln { height:1px; background:var(--line); margin:4px 18px; }
+  @media (max-width:560px){ .wrap{padding:0 18px;} .section{padding:26px 20px;} }
+</style>
+</head>
+<body>
+<!-- icon sprite -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <g id="i-chevL"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></g>
+    <g id="i-search"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M16 16l5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></g>
+    <g id="i-menu"><circle cx="5" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="19" cy="12" r="1.7" fill="currentColor"/></g>
+    <g id="i-calplus"><rect x="4" y="5.5" width="16" height="15" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M4 9.5h16M8.5 3.5v4M15.5 3.5v4M12 12.5v5M9.5 15h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></g>
+    <g id="i-cal"><rect x="4" y="5.5" width="16" height="15" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M4 9.5h16M8.5 3.5v4M15.5 3.5v4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></g>
+    <g id="i-spark"><path d="M12 1.5c.5 6 4 9.5 10 10-6 .5-9.5 4-10 10-.5-6-4-9.5-10-10 6-.5 9.5-4 10-10Z" fill="currentColor"/></g>
+    <g id="i-book"><path d="M6 3.5h12a1.5 1.5 0 0 1 1.5 1.5v15.5l-3-2-2 1.5-2-1.5-2 1.5-2-1.5-3 2V5A1.5 1.5 0 0 1 6 3.5Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 8.5h6M9 12h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></g>
+    <g id="i-cart"><rect x="4" y="4" width="6" height="6" rx="1" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="14" y="4" width="6" height="6" rx="1" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="4" y="14" width="6" height="6" rx="1" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M14 14h2v2M20 14v6M14 20h6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></g>
+    <g id="i-chat"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H9l-4 3.5V6.5Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></g>
+    <g id="i-check"><path d="M5 12.5l4.5 4.5L19 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g>
+    <g id="i-bell"><path d="M18 16H6l1.2-1.6V10a4.8 4.8 0 0 1 9.6 0v4.4Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 19a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></g>
+    <g id="i-clock"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 8v4.5l3 2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></g>
+    <g id="i-person"><circle cx="12" cy="8.5" r="3.4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 19c0-3.2 2.7-5.2 6-5.2s6 2 6 5.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></g>
+    <g id="i-pin"><path d="M12 21c4-4.5 6.5-7.7 6.5-11A6.5 6.5 0 0 0 5.5 10c0 3.3 2.5 6.5 6.5 11Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.3" fill="none" stroke="currentColor" stroke-width="1.6"/></g>
+    <g id="i-info"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 11v5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="7.8" r="1.05" fill="currentColor"/></g>
+    <g id="i-share"><circle cx="7" cy="12" r="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="17" cy="6" r="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="17" cy="18" r="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9.2 10.8 14.8 7.2M9.2 13.2 14.8 16.8" stroke="currentColor" stroke-width="1.6"/></g>
+    <g id="i-arrow"><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></g>
+  </defs>
+</svg>
+
+<div class="wrap">
+  <!-- masthead -->
+  <div class="masthead">
+    <div>
+      <div class="wm">LUN<span class="sp">E<svg width="13" height="13" viewBox="0 0 24 24" style="position:absolute;top:2px;right:-5px"><use href="#i-spark" style="color:var(--taupe)"/></svg></span></div>
+      <div class="mast-sub">Pilates Studio · LINE Official Account</div>
+    </div>
+    <div class="mast-r">
+      <span class="badge-line"><span style="width:18px;height:18px;border-radius:5px;background:#fff;color:var(--line-green);display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px">L</span>LINE OA Design</span>
+      <div style="margin-top:10px">Rich menu &amp; booking flex messages · TH / EN</div>
+    </div>
+  </div>
+
+  <!-- ░░ RICH MENU ░░ -->
+  <div class="section">
+    <div class="sec-head"><span class="eyebrow">01 · Rich menu</span></div>
+    <h2 class="sec-title">The tappable home for members</h2>
+    <p class="sec-desc">A four-tile rich menu docked beneath the chat — the fastest way for members to book, see their bookings, find the studio and reach the team without opening the app. Warm cream, quiet icons, bilingual labels.</p>
+
+    <div class="split">
+      <!-- phone with chat + rich menu -->
+      <div class="phone">
+        <div class="phone-scr">
+          <div class="notch"></div>
+          <div class="line-head">
+            <span style="color:#3a3a3a"><svg width="24" height="24"><use href="#i-chevL"/></svg></span>
+            <div class="oa-av"><span>L</span></div>
+            <div>
+              <div class="oa-name">LUNE Pilates Studio <span class="verif"><svg width="10" height="10" viewBox="0 0 24 24"><use href="#i-check" style="color:#fff"/></svg></span></div>
+            </div>
+            <div class="hi"><svg width="22" height="22"><use href="#i-search"/></svg><svg width="22" height="22"><use href="#i-menu"/></svg></div>
+          </div>
+          <div class="chat">
+            <div class="daychip">วันนี้ · Today</div>
+            <div class="msg">
+              <div class="mav"><span>L</span></div>
+              <div class="txtbub">สวัสดีค่ะคุณพิม ✨<br/>ยินดีต้อนรับสู่ LUNE เลือกเมนูด้านล่างเพื่อจองคลาสหรือดูเครดิตได้เลยค่ะ</div>
+            </div>
+            <div class="msg">
+              <div class="mav"><span>L</span></div>
+              <div class="txtbub" style="padding:0;overflow:hidden;width:236px">
+                <div style="height:96px;background-image:url('assets/studio-equipment.jpg');background-size:cover;background-position:center"></div>
+                <div style="padding:11px 13px">
+                  <div style="font-family:var(--body);font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--taupe)">คลาสถัดไป</div>
+                  <div style="font-family:var(--serif);font-weight:600;font-size:18px;color:var(--ink);margin-top:2px">รีฟอร์มเมอร์กลุ่ม</div>
+                  <div style="font-family:var(--body);font-size:12px;color:var(--inks);margin-top:3px">วันนี้ · 18:00 · ครูพลอย</div>
+                </div>
+              </div>
+            </div>
+            <div class="tstamp">09:41</div>
+          </div>
+          <!-- dock -->
+          <div class="dock">
+            <div class="rich">
+              <div class="rich-grid phone-rich" id="richGrid"></div>
+            </div>
+            <div style="height:24px;display:flex;justify-content:center;align-items:flex-end;padding-bottom:7px;background:var(--cream)"><div style="width:120px;height:5px;border-radius:99px;background:rgba(40,32,24,0.25)"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- artboard + spec -->
+      <div class="col">
+        <div class="art-cap"><span class="t">Rich menu artwork</span><span class="d">2500 × 1686 px · 4 areas</span></div>
+        <div class="artboard"><div class="rich"><div class="rich-grid" id="richGrid2"></div><div class="rich-wm" style="font-size:15px">LUNE</div></div></div>
+        <div class="speclist" id="specList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ░░ FLEX MESSAGES ░░ -->
+  <div class="section">
+    <div class="sec-head"><span class="eyebrow">02 · Flex messages</span></div>
+    <h2 class="sec-title">Booking notifications, on brand</h2>
+    <p class="sec-desc">Push messages sent through LINE at the key moments of the booking journey. Each is a Flex bubble in the LUNE palette — warm, encouraging, never corporate — with clear action buttons.</p>
+
+    <div class="flexgrid">
+
+      <!-- 1 booking confirmation -->
+      <div class="flexwrap">
+        <div class="flex-label"><span class="trigchip"><svg width="13" height="13" viewBox="0 0 24 24"><use href="#i-check" style="color:var(--sageD)"/></svg>หลังจองสำเร็จ</span><span class="fl-name">Booking confirmed</span></div>
+        <div class="bubble">
+          <div class="b-hero" style="background-image:url('assets/studio-hero.jpg')"><span class="pill"><svg width="13" height="13" viewBox="0 0 24 24"><use href="#i-check" style="color:var(--sageD)"/></svg>จองสำเร็จ</span></div>
+          <div class="b-body">
+            <div class="b-kicker" style="color:var(--sageD)"><svg width="15" height="15" viewBox="0 0 24 24"><use href="#i-check"/></svg>ยืนยันการจองแล้ว</div>
+            <div class="b-title">รีฟอร์มเมอร์กลุ่ม</div>
+            <div class="b-rows">
+              <div class="b-row"><span class="ri"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-cal"/></svg></span><span><b>จันทร์ 9 มิ.ย.</b> · 07:00–07:50</span></div>
+              <div class="b-row"><span class="ri"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-person"/></svg></span><span>ครูใหม่ · Kru Mai</span></div>
+              <div class="b-row"><span class="ri"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-pin"/></svg></span><span>LUNE Studio · ชั้น 3</span></div>
+              <div class="b-row"><span class="ri"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-clock"/></svg></span><span>ใช้ <b>1 ชั่วโมง</b> · คงเหลือ 6.5 ชม.</span></div>
+            </div>
+          </div>
+          <div class="divln"></div>
+          <div class="b-foot">
+            <button class="b-btn b-ghost"><svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-calplus"/></svg>ปฏิทิน</button>
+            <button class="b-btn b-taupe">ดูการจอง</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2 waitlist -->
+      <div class="flexwrap">
+        <div class="flex-label"><span class="trigchip"><svg width="13" height="13" viewBox="0 0 24 24"><use href="#i-bell" style="color:var(--amber)"/></svg>มีที่ว่างจากคิวรอ</span><span class="fl-name">Waitlist · spot open</span></div>
+        <div class="bubble">
+          <div class="hdrstrip" style="background:var(--amber)"><div class="hk">Waitlist · คิวรอ</div><div class="ht">มีที่ว่างแล้ว!</div></div>
+          <div class="b-body">
+            <div class="b-title" style="font-size:22px">รีฟอร์มเมอร์กลุ่ม</div>
+            <div class="b-rows">
+              <div class="b-row"><span class="ri"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-cal"/></svg></span><span><b>วันนี้</b> · 17:30–18:20 · ครูใหม่</span></div>
+            </div>
+            <div class="countbox"><span class="cl">⏱ ยืนยันภายใน</span><span class="cv">29:48</span></div>
+          </div>
+          <div class="b-note"><span style="color:var(--amber);flex-shrink:0"><svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-info"/></svg></span><p>หากไม่ยืนยันภายในเวลา ที่นั่งจะถูกส่งต่อให้คิวถัดไปโดยอัตโนมัติ</p></div>
+          <div class="b-foot">
+            <button class="b-btn b-ghost">สละสิทธิ์</button>
+            <button class="b-btn b-amber">ยืนยันการจอง</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3 reminder -->
+      <div class="flexwrap">
+        <div class="flex-label"><span class="trigchip"><svg width="13" height="13" viewBox="0 0 24 24"><use href="#i-clock" style="color:var(--taupe)"/></svg>เตือนก่อนคลาส</span><span class="fl-name">Class reminder</span></div>
+        <div class="bubble">
+          <div class="b-body" style="padding-top:18px">
+            <div class="b-kicker" style="color:var(--taupe)"><svg width="15" height="15" viewBox="0 0 24 24"><use href="#i-spark"/></svg>พรุ่งนี้เจอกันนะคะ</div>
+            <div class="b-title">Private 1:1</div>
+            <div class="b-rows">
+              <div class="b-row"><span class="ri"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-cal"/></svg></span><span><b>อังคาร 10 มิ.ย.</b> · 09:30–10:30</span></div>
+              <div class="b-row"><span class="ri"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-person"/></svg></span><span>ครูนีน่า · Kru Nina</span></div>
+            </div>
+          </div>
+          <div class="b-note"><span style="color:var(--taupe);flex-shrink:0"><svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-info"/></svg></span><p>ยกเลิกหรือเลื่อนฟรีได้ถึง <b style="color:var(--ink)">5 ชั่วโมง</b> ก่อนเริ่มคลาส หลังจากนั้นจะถูกหัก 1 เครดิต</p></div>
+          <div class="b-foot">
+            <button class="b-btn b-ghost">เลื่อนเวลา</button>
+            <button class="b-btn b-solid">รายละเอียด</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4 receipt -->
+      <div class="flexwrap">
+        <div class="flex-label"><span class="trigchip"><svg width="13" height="13" viewBox="0 0 24 24"><use href="#i-spark" style="color:var(--taupeD)"/></svg>หลังชำระเงิน</span><span class="fl-name">Payment receipt</span></div>
+        <div class="bubble">
+          <div class="hdrstrip" style="background:var(--taupeD)"><div class="hk">Receipt · ใบเสร็จ</div><div class="ht">ได้รับชำระเงินแล้ว</div></div>
+          <div class="b-body">
+            <div class="amtbox"><div class="a">฿5,500</div><span class="ppay"><span style="width:14px;height:14px;border-radius:4px;background:#fff;color:#10358a;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:9px">P</span>PromptPay</span></div>
+            <div class="b-rows" style="margin-top:16px">
+              <div class="b-row"><span class="ri"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-cart"/></svg></span><span>แพ็กเกจ <b>10 ชั่วโมง</b></span></div>
+              <div class="b-row"><span class="ri"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-spark"/></svg></span><span>เพิ่มเข้าบัญชี <b>+10 ชม.</b> · คงเหลือ 17.5 ชม.</span></div>
+              <div class="b-row"><span class="ri"><svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-clock"/></svg></span><span>ใช้ได้ถึง <b>2 ส.ค. 2569</b></span></div>
+            </div>
+          </div>
+          <div class="divln"></div>
+          <div class="b-foot">
+            <button class="b-btn b-solid">ดูเครดิตของฉัน</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  const RICH = [
+    { ic:'i-calplus', th:'จองคลาส', en:'Book a class' },
+    { ic:'i-book', th:'การจองของฉัน', en:'My booking' },
+    { ic:'i-pin', th:'แผนที่สตูดิโอ', en:'Our location' },
+    { ic:'i-chat', th:'ติดต่อเรา', en:'Contact us' },
+  ];
+  function cellHTML(c, wide){
+    return `<div class="rcell ${wide ? 'wide' : 'sm'}"><div class="ric"><svg width="42" height="42" viewBox="0 0 24 24"><use href="#${c.ic}"/></svg></div><div class="rtext"><div class="rlab">${c.th}</div><div class="rsub">${c.en}</div></div></div>`;
+  }
+  document.getElementById('richGrid').innerHTML = RICH.map((c,i)=>cellHTML(c, i===0)).join('');
+  document.getElementById('richGrid2').innerHTML = RICH.map((c,i)=>cellHTML(c, i===0)).join('');
+  document.getElementById('specList').innerHTML = RICH.map((c,i)=>
+    `<div class="specrow"><span class="specnum">${i+1}</span><span><b>${c.th}</b> · ${c.en}</span></div>`
+  ).join('');
+</script>
+</body>
+</html>
+
+<style id="__om-edit-overrides">
+#richGrid >.wide svg { width: 30px !important }
+#richGrid >.wide svg { height: 30px !important }
+#richGrid >.wide .rlab { font-size: 14px !important }
+#richGrid >.wide .rlab { font-size: 15px !important }
+#richGrid >.wide .rsub { font-size: 112px !important }
+#richGrid >.wide .rlab { font-size: 6px !important }
+</style>

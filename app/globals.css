@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────────────────────────
+   LUNE design tokens — canonical "warm" theme.
+   Source of truth: lune-pilates/project/lune-ui.jsx (themeVars)
+   + LUNE Product Spec.html :root
+   ───────────────────────────────────────────────────────────── */
+@theme {
+  --color-cream: #f1e9e0;
+  --color-cream-2: #e9decf;
+  --color-surface: #fbf6ef;
+  --color-surface-2: #fffcf7;
+  --color-ink: #2e2820;
+  --color-ink-soft: #6b5d4c;
+  --color-muted: #9c8c77;
+  --color-line: rgba(140, 122, 99, 0.16);
+  --color-line-strong: rgba(140, 122, 99, 0.3);
+  --color-taupe: #8c7a63;
+  --color-taupe-deep: #6e5e49;
+  --color-sage: #8c9a7e;
+  --color-sage-deep: #6e7c60;
+  --color-rose: #c49a86;
+  --color-blue: #6e84a3;
+
+  /* admin parallel namespace (dark sidebar surfaces) */
+  --color-admin-ink: #23201c;
+  --color-admin-ink-2: #2c2823;
+
+  --font-brand: "Cormorant Garamond", "Trirong", Georgia, serif;
+  --font-head: "Schibsted Grotesk", "IBM Plex Sans Thai", system-ui, sans-serif;
+  --font-body: "Hanken Grotesk", "IBM Plex Sans Thai", system-ui, sans-serif;
+
+  --radius-lune: 30px;
+  --radius-lune-sm: 16px;
+
+  --shadow-soft: 0 1px 2px rgba(72, 58, 40, 0.04), 0 4px 14px rgba(72, 58, 40, 0.05);
+  --shadow-lift: 0 4px 14px rgba(72, 58, 40, 0.06), 0 18px 40px rgba(72, 58, 40, 0.09);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Respect reduced-motion: neutralise transitions/animations/transforms app-wide
+   (sheets slide-ups, button active:scale, etc.) for users who ask for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* the small sparkle motif that sits on the LUNE wordmark's "E" */
+.lune-spark {
+  position: relative;
+}
+.lune-spark::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  right: -4px;
+  width: 7px;
+  height: 7px;
+  background: var(--color-taupe);
+  clip-path: polygon(50% 0%, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0% 50%, 40% 40%);
+}
