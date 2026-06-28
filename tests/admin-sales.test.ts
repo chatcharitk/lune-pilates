@@ -4,7 +4,14 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { csvCell, salesRowsToCsv } from "@/lib/admin/csv";
-import { rangeBounds } from "@/lib/admin/period";
+import {
+  monthBounds,
+  presetRange,
+  rangeBounds,
+  todayBounds,
+  weekBounds,
+  yearBounds,
+} from "@/lib/admin/period";
 import { listSales, type SalesRow } from "@/lib/admin/sales";
 
 describe("csvCell (RFC 4180 escaping)", () => {
@@ -80,6 +87,89 @@ describe("rangeBounds (half-open [start, end), end inclusive day)", () => {
     expect(start.getDate()).toBe(1);
     expect(start.getMonth()).toBe(5);
     expect(end.getDate()).toBe(21); // today (20th) inclusive → 21st exclusive
+  });
+});
+
+describe("sales preset range helpers (pure, half-open [start, end))", () => {
+  // A fixed Wednesday for deterministic week math.
+  const wed = new Date(2026, 5, 24, 14, 30); // 2026-06-24 is a Wednesday
+
+  it("todayBounds is [00:00 today, 00:00 tomorrow)", () => {
+    const { start, end } = todayBounds(wed);
+    expect(start.getFullYear()).toBe(2026);
+    expect(start.getMonth()).toBe(5);
+    expect(start.getDate()).toBe(24);
+    expect(start.getHours()).toBe(0);
+    expect(end.getDate()).toBe(25);
+    expect(end.getHours()).toBe(0);
+  });
+
+  it("weekBounds spans Monday → next Monday (Mon-first)", () => {
+    const { start, end } = weekBounds(wed);
+    // Monday of the week containing Wed 2026-06-24 is 2026-06-22.
+    expect(start.getDate()).toBe(22);
+    expect(start.getDay()).toBe(1); // Monday
+    expect(start.getHours()).toBe(0);
+    // Next Monday = 2026-06-29 (exclusive).
+    expect(end.getDate()).toBe(29);
+    expect(end.getDay()).toBe(1);
+    // Exactly 7 days wide.
+    expect((end.getTime() - start.getTime()) / (24 * 3_600_000)).toBe(7);
+  });
+
+  it("weekBounds treats a Sunday as the LAST day of its Mon-first week", () => {
+    const sun = new Date(2026, 5, 28, 9, 0); // 2026-06-28 is a Sunday
+    const { start, end } = weekBounds(sun);
+    expect(start.getDate()).toBe(22); // still that Monday
+    expect(end.getDate()).toBe(29); // next Monday
+  });
+
+  it("monthBounds = first-of-month → first-of-next-month", () => {
+    const { start, end } = monthBounds(wed);
+    expect(start.getDate()).toBe(1);
+    expect(start.getMonth()).toBe(5); // June
+    expect(end.getDate()).toBe(1);
+    expect(end.getMonth()).toBe(6); // July
+  });
+
+  it("yearBounds = Jan 1 → next-year Jan 1", () => {
+    const { start, end } = yearBounds(wed);
+    expect(start.getFullYear()).toBe(2026);
+    expect(start.getMonth()).toBe(0);
+    expect(start.getDate()).toBe(1);
+    expect(end.getFullYear()).toBe(2027);
+    expect(end.getMonth()).toBe(0);
+    expect(end.getDate()).toBe(1);
+  });
+
+  it("presetRange returns matching yyyy-mm-dd from/to strings (inclusive end day)", () => {
+    expect(presetRange("today", wed)).toMatchObject({
+      preset: "today",
+      fromDay: "2026-06-24",
+      toDay: "2026-06-24",
+    });
+    expect(presetRange("week", wed)).toMatchObject({
+      preset: "week",
+      fromDay: "2026-06-22",
+      toDay: "2026-06-28", // inclusive last day = Sunday (end is next Monday, exclusive)
+    });
+    expect(presetRange("month", wed)).toMatchObject({
+      preset: "month",
+      fromDay: "2026-06-01",
+      toDay: "2026-06-30",
+    });
+    expect(presetRange("year", wed)).toMatchObject({
+      preset: "year",
+      fromDay: "2026-01-01",
+      toDay: "2026-12-31",
+    });
+  });
+
+  it("presetRange from/to round-trips back through rangeBounds", () => {
+    const p = presetRange("month", wed);
+    const rt = rangeBounds(p.fromDay, p.toDay, wed);
+    expect(rt.start.getTime()).toBe(p.start.getTime());
+    expect(rt.end.getTime()).toBe(p.end.getTime());
   });
 });
 

@@ -15,7 +15,13 @@ import {
   WEEKDAYS,
   type Weekday,
 } from "@/lib/admin/instructors";
-import { setInstructorAvailability } from "@/app/actions/instructors";
+import {
+  createInstructor,
+  setInstructorActive,
+  setInstructorAvailability,
+  updateInstructor,
+} from "@/app/actions/instructors";
+import { slugifyInstructorId } from "@/lib/admin/instructor-id";
 
 const ORIGINAL_DB_URL = process.env.DATABASE_URL;
 const ORIGINAL_ADMIN_AUTH = process.env.ADMIN_AUTH;
@@ -172,5 +178,118 @@ describe("setInstructorAvailability (no-DB contract)", () => {
       week: { Mon: [["bad", "bad"]] },
     });
     expect(res).toEqual({ ok: false, code: "UNAUTHORIZED" });
+  });
+});
+
+describe("slugifyInstructorId (pure)", () => {
+  it("lowercases, asciifies, and hyphenates", () => {
+    expect(slugifyInstructorId("Kru Mai")).toBe("kru-mai");
+    expect(slugifyInstructorId("  Best  Pongsak  ")).toBe("best-pongsak");
+  });
+  it("is deterministic for the same name", () => {
+    expect(slugifyInstructorId("Kru Nina")).toBe(slugifyInstructorId("Kru Nina"));
+  });
+  it("strips accents to plain ascii", () => {
+    expect(slugifyInstructorId("José")).toBe("jose");
+  });
+  it("yields only [a-z0-9-]", () => {
+    const slug = slugifyInstructorId("A1! B2? — C3");
+    expect(slug).toMatch(/^[a-z0-9-]+$/);
+  });
+  it("returns '' for a name with no ascii alnum (random-id fallback territory)", () => {
+    expect(slugifyInstructorId("ครูใหม่")).toBe("");
+    expect(slugifyInstructorId("!!!")).toBe("");
+  });
+});
+
+describe("instructor CRUD (no-DB contract)", () => {
+  it("createInstructor: valid input → ok with a deterministic ascii slug id", async () => {
+    const res = await createInstructor({ name: "Kru Mei", nameTh: "ครูเหมย", tag: "Reformer" });
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.id).toBe("kru-mei"); // deterministic slug of the EN name
+      expect(res.id).toMatch(/^[a-z0-9-]+$/); // ascii
+    }
+  });
+
+  it("createInstructor: non-ascii name → ok with a random ascii fallback id", async () => {
+    const res = await createInstructor({ name: "ครูใหม่", nameTh: "ครูใหม่" });
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.id.length).toBeGreaterThan(0);
+      expect(res.id).toMatch(/^[a-z0-9]+$/); // random base36/hex fallback, still ascii
+    }
+  });
+
+  it("createInstructor: empty name → INVALID_INPUT", async () => {
+    expect(await createInstructor({ name: "", nameTh: "ครู" })).toEqual({
+      ok: false,
+      code: "INVALID_INPUT",
+    });
+    expect(await createInstructor({ name: "  ", nameTh: "ครู" })).toEqual({
+      ok: false,
+      code: "INVALID_INPUT",
+    });
+  });
+
+  it("createInstructor: empty nameTh → INVALID_INPUT", async () => {
+    expect(await createInstructor({ name: "Kru X", nameTh: "" })).toEqual({
+      ok: false,
+      code: "INVALID_INPUT",
+    });
+  });
+
+  it("updateInstructor: valid input → ok (no-DB echoes the id)", async () => {
+    const res = await updateInstructor({ id: "mai", name: "Kru Mai", nameTh: "ครูใหม่", tag: "Founder" });
+    expect(res).toEqual({ ok: true, id: "mai" });
+  });
+
+  it("updateInstructor: empty name → INVALID_INPUT", async () => {
+    expect(await updateInstructor({ id: "mai", name: "", nameTh: "ครู" })).toEqual({
+      ok: false,
+      code: "INVALID_INPUT",
+    });
+  });
+
+  it("setInstructorActive: toggling active → ok echoing the state", async () => {
+    expect(await setInstructorActive({ id: "mai", active: false })).toEqual({
+      ok: true,
+      id: "mai",
+      active: false,
+    });
+    expect(await setInstructorActive({ id: "mai", active: true })).toEqual({
+      ok: true,
+      id: "mai",
+      active: true,
+    });
+  });
+
+  it("owner-gate first: all three → UNAUTHORIZED in deny mode, before input parse", async () => {
+    process.env.ADMIN_AUTH = "deny";
+    // Each call carries malformed input so UNAUTHORIZED can only come from the gate.
+    expect(await createInstructor({ name: "", nameTh: "" })).toEqual({
+      ok: false,
+      code: "UNAUTHORIZED",
+    });
+    expect(await updateInstructor({ id: "", name: "", nameTh: "" })).toEqual({
+      ok: false,
+      code: "UNAUTHORIZED",
+    });
+    // @ts-expect-error malformed active on purpose — the gate must beat INVALID_INPUT
+    expect(await setInstructorActive({ id: "", active: "nope" })).toEqual({
+      ok: false,
+      code: "UNAUTHORIZED",
+    });
+  });
+});
+
+describe("getAdminInstructors (raw editable fields for the owner edit form)", () => {
+  it("each instructor exposes nameEn / nameRawTh / tagRaw / active", async () => {
+    const list = await getAdminInstructors();
+    const mai = list.find((i) => i.id === "mai")!;
+    expect(mai.nameEn).toBe(mai.name.en);
+    expect(mai.nameRawTh).toBe(mai.name.th);
+    expect(mai.tagRaw).toBe(mai.tag?.en ?? "");
+    expect(mai.active).toBe(true);
   });
 });

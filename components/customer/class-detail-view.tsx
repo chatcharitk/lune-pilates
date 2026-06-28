@@ -46,7 +46,7 @@ export function ClassDetailView({ detail, cost, balanceBefore, usesPositions }: 
   return (
     <div className="flex min-h-dvh flex-col bg-cream">
       {/* hero */}
-      <div className="relative h-[200px] shrink-0 bg-gradient-to-b from-taupe/40 via-taupe/20 to-cream">
+      <div className="relative h-[168px] shrink-0 bg-gradient-to-b from-taupe/40 via-taupe/20 to-cream">
         <div className="absolute inset-x-4 top-5 flex justify-between">
           <Link
             href="/schedule"
@@ -59,7 +59,7 @@ export function ClassDetailView({ detail, cost, balanceBefore, usesPositions }: 
       </div>
 
       <div className="relative -mt-[34px]">
-        <div className="px-[22px]">
+        <div className="px-[18px]">
           {/* type pill */}
           <div className="mb-2 flex items-center gap-2">
             <span className="inline-flex items-center gap-[7px] rounded-full border border-line bg-surface-2 px-[13px] py-1.5 shadow-soft">
@@ -75,12 +75,12 @@ export function ClassDetailView({ detail, cost, balanceBefore, usesPositions }: 
           </div>
 
           {/* title */}
-          <h1 className="mb-1 font-head text-[34px] font-semibold leading-[1.05] tracking-[0.01em] text-ink">
+          <h1 className="mb-1 font-head text-[28px] font-semibold leading-[1.05] tracking-[0.01em] text-ink">
             {tt(detail.typeMeta.label)}
           </h1>
 
           {/* fact grid */}
-          <div className="mt-[18px] grid grid-cols-2 gap-2.5">
+          <div className="mt-4 grid grid-cols-2 gap-2.5">
             <Fact icon={<CalendarIcon size={17} />} label={t("when")} value={timeRange} sub={dateStr} />
             <Fact icon={<Clock size={17} />} label={t("duration")} value={`${detail.durationMin} ${t("min")}`} />
             <Fact
@@ -114,16 +114,16 @@ export function ClassDetailView({ detail, cost, balanceBefore, usesPositions }: 
             TODO: instructor *selection* belongs to the private-appointment
             booking flow (future slice). */}
         {detail.instructor && (
-          <div className="px-[22px]">
+          <div className="px-[18px]">
             <h2 className="mb-3 font-body text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
               {t("instructor")}
             </h2>
-            <div className="flex items-center gap-3.5 rounded-lune-sm border border-line bg-surface-2 px-4 py-3.5 shadow-soft">
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-taupe font-head text-lg font-semibold text-surface-2">
+            <div className="flex items-center gap-3 rounded-lune-sm border border-line bg-surface-2 px-4 py-3 shadow-soft">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-taupe font-head text-base font-semibold text-surface-2">
                 {tt(detail.instructor.name).replace(/^Kru\s+|^ครู/, "").charAt(0) || "·"}
               </span>
               <div>
-                <div className="font-head text-[19px] font-semibold leading-[1.1] text-ink">
+                <div className="font-head text-[17px] font-semibold leading-[1.1] text-ink">
                   {tt(detail.instructor.name)}
                 </div>
                 {detail.instructor.tag && (
@@ -137,7 +137,7 @@ export function ClassDetailView({ detail, cost, balanceBefore, usesPositions }: 
         )}
 
         {/* about */}
-        <div className="mt-[22px] px-[22px]">
+        <div className="mt-5 px-[18px]">
           <h2 className="mb-2 font-body text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
             {t("about_class")}
           </h2>
@@ -147,7 +147,7 @@ export function ClassDetailView({ detail, cost, balanceBefore, usesPositions }: 
         </div>
 
         {/* cancellation policy */}
-        <div className="mx-[22px] mb-12 mt-[18px] flex gap-3 rounded-lune-sm bg-cream-2 px-4 py-[15px]">
+        <div className="mx-[18px] mb-10 mt-4 flex gap-3 rounded-lune-sm bg-cream-2 px-4 py-3.5">
           <span className="mt-px shrink-0 text-taupe-deep">
             <Info size={20} />
           </span>
@@ -177,14 +177,14 @@ function Fact({
   sub?: string | null;
 }) {
   return (
-    <div className="rounded-lune-sm border border-line bg-surface-2 px-[15px] py-3.5 shadow-soft">
-      <div className="mb-2.5 flex items-center gap-[7px] text-taupe">
+    <div className="rounded-lune-sm border border-line bg-surface-2 px-[15px] py-3 shadow-soft">
+      <div className="mb-2 flex items-center gap-[7px] text-taupe">
         {icon}
         <span className="font-body text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted">
           {label}
         </span>
       </div>
-      <div className="font-head text-[18px] font-semibold leading-[1.1] text-ink">{value}</div>
+      <div className="font-head text-[16px] font-semibold leading-[1.1] text-ink">{value}</div>
       {sub && <div className="mt-0.5 font-body text-[12px] text-muted">{sub}</div>}
     </div>
   );

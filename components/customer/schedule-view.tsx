@@ -54,13 +54,13 @@ export function ScheduleView({
     <div>
       {/* sticky sub-header: title + month + week chips + filters */}
       <div className="sticky top-0 z-10 bg-cream pt-1">
-        <div className="px-[22px] pb-0.5 pt-1">
-          <h1 className="font-head text-3xl font-medium tracking-[0.01em] text-ink">
+        <div className="px-[18px] pb-0.5 pt-1">
+          <h1 className="font-head text-[26px] font-medium tracking-[0.01em] text-ink">
             {t("nav_schedule")}
           </h1>
         </div>
 
-        <div className="flex items-center justify-between px-[22px] pb-1.5 pt-2">
+        <div className="flex items-center justify-between px-[18px] pb-1.5 pt-2">
           <span className="font-body text-[13.5px] font-semibold text-ink-soft">{tt(month)}</span>
           <div className="flex gap-1.5">
             <button
@@ -82,7 +82,7 @@ export function ScheduleView({
 
         {/* day chips */}
         <div
-          className="flex gap-2 overflow-x-auto px-[22px] pb-3 pt-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex gap-2 overflow-x-auto px-[18px] pb-3 pt-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           role="tablist"
           aria-label={t("nav_schedule")}
         >
@@ -121,7 +121,7 @@ export function ScheduleView({
         </div>
 
         {/* filter chips */}
-        <div className="flex gap-2 overflow-x-auto border-b border-line px-[22px] pb-3.5 pt-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex gap-2 overflow-x-auto border-b border-line px-[18px] pb-3.5 pt-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <FilterChip active={filter === "all"} onClick={() => setFilter("all")}>
             {t("filter_all")}
           </FilterChip>
@@ -139,7 +139,7 @@ export function ScheduleView({
       </div>
 
       {/* sessions */}
-      <div className="px-[22px] pb-7 pt-2">
+      <div className="px-[18px] pb-7 pt-2">
         {groups.length === 0 && (
           <div className="px-5 py-[60px] text-center text-muted">
             <Sparkle size={26} className="mx-auto mb-3.5 text-line-strong" />
@@ -202,7 +202,7 @@ function SessionRow({ c, lang }: { c: BookableClass; lang: Lang }) {
   return (
     <Link
       href={`/schedule/${c.id}`}
-      className={`flex items-stretch gap-3.5 rounded-lune-sm border border-line bg-surface-2 px-4 py-[15px] shadow-soft transition-opacity ${
+      className={`flex items-stretch gap-3.5 rounded-lune-sm border border-line bg-surface-2 px-4 py-3 shadow-soft transition-opacity ${
         c.full ? "opacity-90" : ""
       }`}
     >
@@ -227,7 +227,7 @@ function SessionRow({ c, lang }: { c: BookableClass; lang: Lang }) {
             {tt(c.typeMeta.short)}
           </span>
         </div>
-        <div className="font-head text-[19px] font-semibold leading-[1.1] text-ink">
+        <div className="font-head text-[17px] font-semibold leading-[1.1] text-ink">
           {tt(c.typeMeta.label)}
         </div>
         {c.instructor && (

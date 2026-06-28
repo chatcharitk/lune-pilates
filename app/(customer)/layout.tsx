@@ -14,7 +14,7 @@ export default function CustomerLayout({ children }: { children: React.ReactNode
             the pushed booking/checkout flows (Header decides via the pathname). */}
         <Header />
         {/* clear the fixed bottom nav + the home-indicator safe area */}
-        <main className="flex-1 pb-[calc(6rem+env(safe-area-inset-bottom))]">{children}</main>
+        <main className="flex-1 pb-[calc(5rem+env(safe-area-inset-bottom))]">{children}</main>
         <BottomNav />
       </div>
     </CustomerLangProvider>

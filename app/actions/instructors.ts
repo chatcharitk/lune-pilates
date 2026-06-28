@@ -16,12 +16,14 @@
 // interactive transaction (WebSocket Pool, db.transaction) — delete-then-insert,
 // all-or-nothing, so a partial write can never leave a half-edited week.
 
+import { randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getDb } from "@/lib/db/client";
 import { instructorAvailability, instructors } from "@/lib/db/schema";
 import { WEEKDAYS, type Weekday } from "@/lib/admin/instructors";
+import { slugifyInstructorId } from "@/lib/admin/instructor-id";
 import { requireOwner } from "@/lib/auth/admin";
 
 /** Sentinel to roll the replace transaction back when the instructor is missing/inactive. */
@@ -156,4 +158,183 @@ export async function setInstructorAvailability(
 
   revalidatePath("/admin/instructors");
   return { ok: true };
+}
+
+// ───────────────────────── instructor CRUD (Owner-only) ─────────────────────────
+// Create / rename / soft-remove instructors. Each is OWNER-ONLY (requireOwner first,
+// before input parsing and the no-DB branch — same ordering as every other admin
+// action, see tests/admin-auth.test.ts), zod-validated server-side (CLAUDE.md §8),
+// and returns a typed result union (never throws on an expected conflict).
+//
+// IDs are the text PRIMARY KEY (a slug, e.g. "mai"). They are referenced by
+// class_instances.instructor_id, class_templates.instructor_id, and
+// instructor_availability.instructor_id, so:
+//   - the id is generated once at create and NEVER changed by an update;
+//   - "remove" is a SOFT deactivate (active=false), never a delete, to preserve those
+//     FKs (past classes keep their instructor; availability rows survive).
+
+/** Shared failure codes for the instructor CRUD actions. */
+export type InstructorCrudFailureCode =
+  | "UNAUTHORIZED"
+  | "INVALID_INPUT"
+  | "UNKNOWN_INSTRUCTOR"
+  | "ID_TAKEN";
+
+/** A short base36 random suffix (collision-breaker / random-id fallback). */
+function randomSuffix(): string {
+  return randomBytes(6).toString("hex").replace(/[^0-9a-f]/g, "").slice(0, 8) ||
+    Math.random().toString(36).slice(2, 10);
+}
+
+// Trimmed, non-empty name fields (CLAUDE.md §8). Tag is optional free text.
+const nameField = z.string().trim().min(1).max(120);
+const tagField = z.string().trim().min(1).max(120).optional();
+
+const createInstructorInput = z.object({
+  name: nameField,
+  nameTh: nameField,
+  tag: tagField,
+});
+export type CreateInstructorInput = z.infer<typeof createInstructorInput>;
+
+export type CreateInstructorResult =
+  | { ok: true; id: string }
+  | { ok: false; code: InstructorCrudFailureCode };
+
+/**
+ * Create a new instructor. The text PK id is derived by slugifying the EN name; when
+ * the slug is empty or already taken, a short random base36 suffix is appended (and a
+ * fully random id is used when the name yields no slug at all). Inserted active.
+ *
+ * Persistence races on the id are handled with onConflictDoNothing + a retry on a
+ * fresh suffixed id, so two concurrent creates of the same name can't 23505; after a
+ * bounded number of attempts a collision surfaces as ID_TAKEN rather than throwing.
+ *
+ * No-DB dev path: validate, synthesize the slug id, return ok so the UI can render.
+ */
+export async function createInstructor(raw: CreateInstructorInput): Promise<CreateInstructorResult> {
+  if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
+
+  const parsed = createInstructorInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
+  const { name, nameTh, tag } = parsed.data;
+
+  const base = slugifyInstructorId(name);
+
+  if (!process.env.DATABASE_URL) {
+    // UI dev against mock data — synthesize the slug id (deterministic for a usable
+    // name, random fallback otherwise). Nothing is persisted.
+    return { ok: true, id: base || randomSuffix() };
+  }
+
+  const db = getDb();
+
+  // Try the clean slug first, then up to a few suffixed candidates on conflict.
+  const candidates: string[] = [];
+  if (base) candidates.push(base);
+  for (let i = 0; i < 3; i++) {
+    candidates.push(base ? `${base}-${randomSuffix()}` : randomSuffix());
+  }
+
+  for (const id of candidates) {
+    const [made] = await db
+      .insert(instructors)
+      .values({ id, name, nameTh, tag: tag ?? null, active: true })
+      .onConflictDoNothing()
+      .returning({ id: instructors.id });
+    if (made) {
+      revalidatePath("/admin/instructors");
+      return { ok: true, id: made.id };
+    }
+  }
+  // Exhausted candidates without a clean insert — the id space collided repeatedly.
+  return { ok: false, code: "ID_TAKEN" };
+}
+
+const updateInstructorInput = z.object({
+  id: z.string().min(1),
+  name: nameField,
+  nameTh: nameField,
+  tag: tagField,
+});
+export type UpdateInstructorInput = z.infer<typeof updateInstructorInput>;
+
+export type UpdateInstructorResult =
+  | { ok: true; id: string }
+  | { ok: false; code: InstructorCrudFailureCode };
+
+/**
+ * Rename an existing instructor (name / nameTh / tag). The id and the active flag are
+ * NEVER changed here (the id is FK-referenced; active is toggled via
+ * setInstructorActive). A missing instructor → UNKNOWN_INSTRUCTOR.
+ *
+ * No-DB dev path: validate, return ok with the id.
+ */
+export async function updateInstructor(raw: UpdateInstructorInput): Promise<UpdateInstructorResult> {
+  if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
+
+  const parsed = updateInstructorInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
+  const { id, name, nameTh, tag } = parsed.data;
+
+  if (!process.env.DATABASE_URL) {
+    return { ok: true, id };
+  }
+
+  const db = getDb();
+  const updated = await db
+    .update(instructors)
+    .set({ name, nameTh, tag: tag ?? null })
+    .where(eq(instructors.id, id))
+    .returning({ id: instructors.id });
+
+  if (updated.length === 0) return { ok: false, code: "UNKNOWN_INSTRUCTOR" };
+
+  revalidatePath("/admin/instructors");
+  return { ok: true, id };
+}
+
+const setInstructorActiveInput = z.object({
+  id: z.string().min(1),
+  active: z.boolean(),
+});
+export type SetInstructorActiveInput = z.infer<typeof setInstructorActiveInput>;
+
+export type SetInstructorActiveResult =
+  | { ok: true; id: string; active: boolean }
+  | { ok: false; code: InstructorCrudFailureCode };
+
+/**
+ * Soft remove / restore an instructor by toggling `active`. This is the "remove"
+ * action (active=false): a SOFT deactivate that drops the instructor from the
+ * active-only Instructors list while PRESERVING the row and every FK that references
+ * it (class_instances / class_templates / instructor_availability). Restoring sets
+ * active=true again. A missing instructor → UNKNOWN_INSTRUCTOR.
+ *
+ * No-DB dev path: validate, return ok echoing the requested state.
+ */
+export async function setInstructorActive(
+  raw: SetInstructorActiveInput,
+): Promise<SetInstructorActiveResult> {
+  if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
+
+  const parsed = setInstructorActiveInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
+  const { id, active } = parsed.data;
+
+  if (!process.env.DATABASE_URL) {
+    return { ok: true, id, active };
+  }
+
+  const db = getDb();
+  const updated = await db
+    .update(instructors)
+    .set({ active })
+    .where(eq(instructors.id, id))
+    .returning({ id: instructors.id });
+
+  if (updated.length === 0) return { ok: false, code: "UNKNOWN_INSTRUCTOR" };
+
+  revalidatePath("/admin/instructors");
+  return { ok: true, id, active };
 }

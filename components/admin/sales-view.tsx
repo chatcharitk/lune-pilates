@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 import { useAdminLang } from "./admin-context";
 import { Avatar, Badge, type BadgeTone } from "./ui";
 import type { SalesRow, PaymentMethod, PaymentStatus } from "@/lib/admin/sales";
+import { presetRange, type SalesRangePreset } from "@/lib/admin/period";
 import { thb, type StrKey } from "@/lib/i18n";
 
 // ───────────────────────── shared conventions (mirror payments-view.tsx) ─────────────────────────
@@ -32,6 +33,14 @@ const METHOD_LABEL: Record<PaymentMethod, StrKey> = {
   promptpay: "pos_method_promptpay",
   cash: "pos_method_cash",
 };
+
+/** The quick-pick presets, in display order, with their keyed labels. */
+const RANGE_PRESETS: { preset: SalesRangePreset; key: StrKey }[] = [
+  { preset: "today", key: "range_today" },
+  { preset: "week", key: "range_week" },
+  { preset: "month", key: "range_month" },
+  { preset: "year", key: "range_year" },
+];
 
 // ───────────────────────── default range (mirrors rangeBounds) ─────────────────────────
 
@@ -82,6 +91,22 @@ export function SalesView({
     router.push(`/admin/sales?${params.toString()}`);
   }
 
+  // Jump to a quick-pick preset: compute its from/to days and push them (the server
+  // re-fetches, same mechanism as the date inputs).
+  function applyPreset(preset: SalesRangePreset) {
+    const { fromDay, toDay } = presetRange(preset);
+    setRange(fromDay, toDay);
+  }
+
+  // Highlight the preset whose computed from/to matches the active window (if any).
+  const activePreset = useMemo<SalesRangePreset | null>(() => {
+    for (const { preset } of RANGE_PRESETS) {
+      const { fromDay, toDay } = presetRange(preset);
+      if (fromDay === fromValue && toDay === toValue) return preset;
+    }
+    return null;
+  }, [fromValue, toValue]);
+
   // The CSV export streams the SAME explicit window (owner-gated, no-store route).
   const exportHref = useMemo(() => {
     const params = new URLSearchParams({ from: fromValue, to: toValue });
@@ -112,6 +137,28 @@ export function SalesView({
           <DownloadIcon />
           {t("sales_download_csv")}
         </a>
+      </div>
+
+      {/* quick-pick range presets */}
+      <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label={t("sales_history")}>
+        {RANGE_PRESETS.map(({ preset, key }) => {
+          const on = activePreset === preset;
+          return (
+            <button
+              key={preset}
+              type="button"
+              onClick={() => applyPreset(preset)}
+              aria-pressed={on}
+              className={`h-9 rounded-full border px-4 font-body text-[13px] font-semibold transition-colors ${
+                on
+                  ? "border-taupe bg-ink text-cream"
+                  : "border-line-strong bg-surface-2 text-ink-soft hover:bg-cream-2"
+              }`}
+            >
+              {t(key)}
+            </button>
+          );
+        })}
       </div>
 
       {/* date-range picker */}

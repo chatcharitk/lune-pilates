@@ -18,10 +18,11 @@ import { createCustomer } from "@/app/actions/admin-members";
 import {
   adjustCredits,
   getAdjustablePackages,
+  getCustomerLedger,
   type AdjustablePackage,
   type AdjustFailureCode,
 } from "@/app/actions/admin-credits";
-import type { AdminCustomer } from "@/lib/admin/members";
+import type { AdminCustomer, CustomerLedgerEntry, LedgerReason } from "@/lib/admin/members";
 import type { StrKey } from "@/lib/i18n";
 
 
@@ -305,6 +306,9 @@ function CustomerDrawer({
               }}
             />
           )}
+
+          {/* credit-transaction history (read model via the owner-gated action) */}
+          <LedgerSection customerId={customer.id} />
 
           {/* sharing group */}
           <div>
@@ -621,6 +625,105 @@ function CoinIcon() {
       <circle cx="12" cy="12" r="9" />
       <path d="M12 7v10M9.5 9.2a2.4 2.4 0 0 1 2.5-1.2c1.4 0 2.3.8 2.3 1.8 0 2.2-4.8 1.2-4.8 3.4 0 1 .9 1.8 2.3 1.8a2.4 2.4 0 0 0 2.5-1.2" />
     </svg>
+  );
+}
+
+// ───────────────────────── credit-transaction history ─────────────────────────
+
+/** Reason → keyed label for a ledger row. */
+const LEDGER_REASON_KEY: Record<LedgerReason, StrKey> = {
+  booking: "ledger_booking",
+  cancel_refund: "ledger_cancel_refund",
+  purchase: "ledger_purchase",
+  adjustment: "ledger_adjustment",
+};
+
+/** Localised date + time for a ledger row (th-TH → Buddhist era, like the other
+ *  admin date displays). */
+function fmtLedgerDate(iso: string, lang: "en" | "th"): string {
+  return new Intl.DateTimeFormat(lang === "th" ? "th-TH" : "en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(iso));
+}
+
+/**
+ * The customer's credit-transaction history (newest-first), fetched on open via the
+ * owner-gated getCustomerLedger action. The ledger is the server's source of truth
+ * (invariants 1/2) — this only renders it. Loading / empty / error states; each row
+ * shows the date, a keyed reason label, the signed delta (green +/rose −) and the
+ * running balanceAfter.
+ */
+function LedgerSection({ customerId }: { customerId: string }) {
+  const { t, lang } = useAdminLang();
+  const [pending, startTransition] = useTransition();
+  const [entries, setEntries] = useState<CustomerLedgerEntry[] | null>(null);
+
+  // (Re)fetch whenever the drawer targets a different customer. The drawer remounts
+  // this section per-customer (keyed on customerId via the parent), so this runs on open.
+  useEffect(() => {
+    setEntries(null);
+    startTransition(async () => {
+      const rows = await getCustomerLedger(customerId);
+      setEntries(rows);
+    });
+  }, [customerId]);
+
+  const loading = pending || entries === null;
+
+  return (
+    <div>
+      <p className="mb-2.5 font-body text-[11.5px] font-semibold uppercase tracking-[0.06em] text-muted">
+        {t("ledger_title")}
+      </p>
+
+      {loading ? (
+        <p className="rounded-[13px] border border-line bg-surface-2 px-3.5 py-4 font-body text-[13px] text-muted">
+          {t("ledger_loading")}
+        </p>
+      ) : entries.length === 0 ? (
+        <p className="rounded-[13px] border border-line bg-surface-2 px-3.5 py-4 text-center font-body text-[13px] text-muted">
+          {t("ledger_empty")}
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {entries.map((e) => {
+            const positive = e.delta >= 0;
+            return (
+              <li
+                key={e.id}
+                className="flex items-center gap-3 rounded-[13px] border border-line px-3.5 py-2.5"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-body text-[13.5px] font-semibold text-ink">
+                    {t(LEDGER_REASON_KEY[e.reason])}
+                  </p>
+                  <p className="font-body text-[11.5px] text-muted">
+                    {fmtLedgerDate(e.createdAt, lang)}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <span
+                    className="font-head text-[14.5px] font-bold tabular-nums"
+                    style={{ color: positive ? "var(--color-sage-deep)" : "#a56a52" }}
+                  >
+                    {positive ? "+" : "−"}
+                    {Math.abs(e.delta)}
+                  </span>
+                  <span className="block font-body text-[11px] text-muted tabular-nums">
+                    {t("ledger_running_balance").replace("{n}", String(e.balanceAfter))}
+                  </span>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
   );
 }
 

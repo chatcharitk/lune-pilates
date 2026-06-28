@@ -28,6 +28,7 @@ import { creditLedger, packages } from "@/lib/db/schema";
 import { loadPoolOwner } from "@/lib/credits/selectPackage";
 import { ownerForPool, type CreditOwner } from "@/lib/credits/creditPackage";
 import { packageLabelFor } from "@/lib/admin/payments";
+import { getCustomerLedger as readCustomerLedger, type CustomerLedgerEntry } from "@/lib/admin/members";
 import { emit } from "@/lib/events/bus";
 import type { Bilingual } from "@/lib/i18n";
 import type { PackageCategory } from "@/lib/domain/types";
@@ -292,6 +293,22 @@ export async function adjustCredits(raw: AdjustCreditsInput): Promise<AdjustCred
   }
 
   return { ok: true, outcome: applied.outcome };
+}
+
+/**
+ * Owner-gated thin wrapper over the lib/admin/members getCustomerLedger READ MODEL,
+ * so the Members drawer (a client component) can fetch a customer's credit-transaction
+ * history (the read model imports the DB and can't be called from the client directly).
+ * requireOwner() is line 1 (an instructor / unauth gets []); the pool is recomputed
+ * server-side from the customer id (member → household pool, guest → own; invariants
+ * 2 & 3) — no client value is trusted. Returns [] on a bad id or unknown customer.
+ *
+ * No-DB path: the underlying read model already returns a believable mock ledger.
+ */
+export async function getCustomerLedger(customerId: string): Promise<CustomerLedgerEntry[]> {
+  if (!(await requireOwner())) return [];
+  if (!z.string().uuid().safeParse(customerId).success) return [];
+  return readCustomerLedger(customerId);
 }
 
 // ───────────────────────── no-DB mock fallback ─────────────────────────

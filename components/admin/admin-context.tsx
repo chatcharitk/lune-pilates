@@ -3,8 +3,8 @@
 // Shared admin language context. The admin shell (admin-shell.tsx) holds the
 // EN/TH toggle; every admin screen reads the active language from here so the
 // nav, chrome and page content switch together — mirroring the prototype's
-// AdminCtx (admin-shell.jsx). Customer i18n defaults to EN with no toggle; the
-// admin app is internal, so a live toggle is worth the small client context.
+// AdminCtx (admin-shell.jsx). Defaults to TH (Bangkok studio); the customer app
+// has its own matching provider + header toggle (customer-context.tsx).
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { makeT, type Lang, type Translator } from "@/lib/i18n";
@@ -17,7 +17,7 @@ const AdminLangContext = createContext<AdminLangValue | null>(null);
 
 export function AdminLangProvider({
   children,
-  initialLang = "en",
+  initialLang = "th",
 }: {
   children: React.ReactNode;
   initialLang?: Lang;

@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   EXPIRING_SOON_DAYS,
   getCustomerDetail,
+  getCustomerLedger,
   listCustomers,
   matchesQuery,
   mid,
@@ -174,6 +175,34 @@ describe("getCustomerDetail (no-DB mock)", () => {
     expect(d.tier).toBe("guest");
     expect(d.sharing).toBeNull();
     expect(d.balance).toBe(5); // own package only — no household pool leak
+  });
+});
+
+describe("getCustomerLedger (no-DB mock)", () => {
+  it("returns the believable rows newest-first with correct running balanceAfter", async () => {
+    const rows = await getCustomerLedger(mid(1), now);
+    expect(rows.length).toBe(4);
+
+    // Newest-first ordering by createdAt (descending).
+    for (let i = 1; i < rows.length; i++) {
+      expect(rows[i - 1]!.createdAt >= rows[i]!.createdAt).toBe(true);
+    }
+
+    // Reasons present (one of each kind).
+    expect(rows.map((r) => r.reason).sort()).toEqual(
+      ["adjustment", "booking", "cancel_refund", "purchase"].sort(),
+    );
+
+    // The NEWEST row's balanceAfter = Σ all deltas (ledger reconciles to balance).
+    const sumDeltas = rows.reduce((s, r) => s + r.delta, 0);
+    expect(rows[0]!.balanceAfter).toBe(sumDeltas);
+    expect(rows[0]!.balanceAfter).toBe(12); // 10 - 1 + 1 + 2
+
+    // Running balances down the newest-first list: 12, 10, 9, 10 (oldest is purchase +10).
+    expect(rows.map((r) => r.balanceAfter)).toEqual([12, 10, 9, 10]);
+
+    // Deltas are signed integers.
+    for (const r of rows) expect(Number.isInteger(r.delta)).toBe(true);
   });
 });
 

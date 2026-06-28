@@ -61,6 +61,18 @@ export interface AdminInstructor {
   id: string;
   name: Bilingual;
   tag: Bilingual | null;
+  /**
+   * Raw EN name as stored on the row (= name.en) — the value the owner edit form
+   * binds to and submits back to updateInstructor. Exposed explicitly so the form
+   * never has to reach through the resolved Bilingual/meta wrapping.
+   */
+  nameEn: string;
+  /** Raw TH name as stored on the row (= name.th) — the edit form's TH field. */
+  nameRawTh: string;
+  /** Raw editable tag text (the stored instructors.tag, or "" when null). */
+  tagRaw: string;
+  /** Whether this instructor is active (always true in this active-only list). */
+  active: boolean;
   /** Avatar initial (e.g. "M" / "P" / "N"), derived from the name. */
   initials: string;
   todaysClasses: AdminInstructorClass[];
@@ -233,6 +245,12 @@ export async function getAdminInstructors(now: Date = new Date()): Promise<Admin
       id: ins.id,
       name,
       tag: meta?.tag ?? (ins.tag ? { en: ins.tag, th: ins.tag } : null),
+      // Raw editable fields come from the DB ROW (never the static catalog meta), so
+      // the owner edit form binds to what is actually persisted.
+      nameEn: ins.name,
+      nameRawTh: ins.nameTh,
+      tagRaw: ins.tag ?? "",
+      active: true, // this query is active-only (where active = true)
       initials: initialsFor(name),
       todaysClasses,
       classCount: todaysClasses.length,
@@ -336,6 +354,10 @@ function mockAdminInstructors(dayStart: Date): AdminInstructor[] {
       id,
       name: meta.name,
       tag: meta.tag,
+      nameEn: meta.name.en,
+      nameRawTh: meta.name.th,
+      tagRaw: meta.tag?.en ?? "",
+      active: true,
       initials: initialsFor(meta.name),
       todaysClasses,
       classCount: todaysClasses.length,

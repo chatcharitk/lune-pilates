@@ -189,8 +189,8 @@ export function BookingPanel({
   // waitlist_title/waitlist_sub copy (which already mentions the 30-min window).
   if (wlPhase === "joined") {
     return (
-      <div className="px-[22px] pb-10 pt-2" aria-live="polite">
-        <div className="rounded-lune border border-line bg-surface-2 p-7 text-center shadow-soft">
+      <div className="px-[18px] pb-10 pt-2" aria-live="polite">
+        <div className="rounded-lune border border-line bg-surface-2 p-6 text-center shadow-soft">
           <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full bg-cream-2 text-taupe-deep">
             <Bell size={30} />
           </div>
@@ -225,7 +225,7 @@ export function BookingPanel({
           <button
             type="button"
             onClick={() => router.push("/bookings")}
-            className="mt-5 flex h-14 w-full items-center justify-center rounded-lune-sm bg-ink font-body text-base font-semibold text-cream shadow-lift"
+            className="mt-5 flex h-12 w-full items-center justify-center rounded-lune-sm bg-ink font-body text-base font-semibold text-cream shadow-lift"
           >
             {t("done")}
           </button>
@@ -237,8 +237,8 @@ export function BookingPanel({
   // ───────── booked confirmation state ─────────
   if (phase === "booked") {
     return (
-      <div className="px-[22px] pb-10 pt-2" aria-live="polite">
-        <div className="rounded-lune border border-line bg-surface-2 p-7 text-center shadow-soft">
+      <div className="px-[18px] pb-10 pt-2" aria-live="polite">
+        <div className="rounded-lune border border-line bg-surface-2 p-6 text-center shadow-soft">
           <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full bg-sage/20 text-sage-deep">
             <Check size={30} />
           </div>
@@ -292,7 +292,7 @@ export function BookingPanel({
           <button
             type="button"
             onClick={() => router.push("/bookings")}
-            className="mt-5 flex h-14 w-full items-center justify-center rounded-lune-sm bg-ink font-body text-base font-semibold text-cream shadow-lift"
+            className="mt-5 flex h-12 w-full items-center justify-center rounded-lune-sm bg-ink font-body text-base font-semibold text-cream shadow-lift"
           >
             {t("done")}
           </button>
@@ -303,11 +303,11 @@ export function BookingPanel({
 
   // ───────── seat picker + CTA (idle / submitting / error) ─────────
   return (
-    <div className="px-[22px] pb-10">
+    <div className="px-[18px] pb-10">
       {/* reformer position picker */}
       {usesPositions && (
-        <div className="mt-4 rounded-lune-sm border border-line bg-surface-2 px-[18px] pb-[18px] pt-4 shadow-soft">
-          <div className="mb-3.5 flex items-center justify-between">
+        <div className="mt-4 rounded-lune-sm border border-line bg-surface-2 px-4 pb-4 pt-3.5 shadow-soft">
+          <div className="mb-3 flex items-center justify-between">
             <span className="font-body text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
               {full ? t("spots_remaining") : t("choose_position")}
             </span>
@@ -391,10 +391,10 @@ export function BookingPanel({
       )}
 
       {/* sticky cost + CTA */}
-      <div className="mt-5 flex items-center gap-3.5 rounded-lune-sm border border-line bg-surface-2 px-4 py-4 shadow-soft">
+      <div className="mt-4 flex items-center gap-3.5 rounded-lune-sm border border-line bg-surface-2 px-4 py-3.5 shadow-soft">
         <div className="shrink-0">
           <div className="font-body text-[11px] tracking-[0.02em] text-muted">{t("costs")}</div>
-          <div className="font-head text-[22px] font-semibold leading-[1.1] text-ink">
+          <div className="font-head text-[20px] font-semibold leading-[1.1] text-ink">
             {cost}{" "}
             <span className="font-body text-[13px] font-medium text-taupe">
               {cost === 1 ? t("hour") : t("hours")}
@@ -408,7 +408,7 @@ export function BookingPanel({
               type="button"
               onClick={joinWl}
               disabled={wlPhase === "joining"}
-              className="flex h-14 w-full items-center justify-center gap-2.5 rounded-lune-sm border-[1.5px] border-line-strong bg-transparent font-body text-base font-semibold text-ink transition-transform active:scale-[0.985] disabled:border-line disabled:text-muted"
+              className="flex h-12 w-full items-center justify-center gap-2.5 rounded-lune-sm border-[1.5px] border-line-strong bg-transparent font-body text-base font-semibold text-ink transition-transform active:scale-[0.985] disabled:border-line disabled:text-muted"
             >
               {wlPhase === "joining" ? t("join_waitlist") + "…" : t("join_waitlist")}
               {wlPhase !== "joining" && <Bell size={18} />}
@@ -418,7 +418,7 @@ export function BookingPanel({
               type="button"
               onClick={submit}
               disabled={phase === "submitting"}
-              className="flex h-14 w-full items-center justify-center gap-2.5 rounded-lune-sm bg-ink font-body text-base font-semibold text-cream shadow-lift transition-transform active:scale-[0.985] disabled:bg-cream-2 disabled:text-muted disabled:shadow-none"
+              className="flex h-12 w-full items-center justify-center gap-2.5 rounded-lune-sm bg-ink font-body text-base font-semibold text-cream shadow-lift transition-transform active:scale-[0.985] disabled:bg-cream-2 disabled:text-muted disabled:shadow-none"
             >
               {phase === "submitting" ? t("confirm") + "…" : t("book_now")}
               {phase !== "submitting" && <ArrowRight size={18} />}

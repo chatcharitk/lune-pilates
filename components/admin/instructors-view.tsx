@@ -23,7 +23,11 @@ import { useRouter } from "next/navigation";
 import { useAdminLang } from "./admin-context";
 import { Avatar, Badge, Dot, Drawer } from "./ui";
 import {
+  createInstructor,
+  setInstructorActive,
   setInstructorAvailability,
+  updateInstructor,
+  type InstructorCrudFailureCode,
   type SetInstructorAvailabilityFailureCode,
 } from "@/app/actions/instructors";
 import {
@@ -59,6 +63,20 @@ function saveErrorKey(code: SetInstructorAvailabilityFailureCode): StrKey {
       return "err_avail_overlap";
     default:
       return "err_avail_save";
+  }
+}
+
+/** Map an instructor CRUD failure code to keyed copy. */
+function crudErrorKey(code: InstructorCrudFailureCode): StrKey {
+  switch (code) {
+    case "ID_TAKEN":
+      return "err_instr_id_taken";
+    case "INVALID_INPUT":
+      return "err_instr_invalid";
+    case "UNKNOWN_INSTRUCTOR":
+      return "err_unknown_instructor";
+    default:
+      return "err_instr_save";
   }
 }
 
@@ -115,23 +133,61 @@ function cloneWeek(week: WeekAvailability): WeekAvailability {
 export function InstructorsView({ instructors }: { instructors: AdminInstructor[] }) {
   const { t } = useAdminLang();
   const [editId, setEditId] = useState<string | null>(null);
+  // The instructor whose name/tag form is open: "new" = the add form, or an id =
+  // edit prefilled, or null = closed. (Distinct from editId, which is availability.)
+  const [formFor, setFormFor] = useState<"new" | string | null>(null);
+  // The instructor pending a remove confirmation, or null.
+  const [removing, setRemoving] = useState<AdminInstructor | null>(null);
+  const [toast, setToast] = useState<StrKey | null>(null);
 
   const editing = instructors.find((i) => i.id === editId) ?? null;
+  const formInstructor =
+    formFor && formFor !== "new" ? (instructors.find((i) => i.id === formFor) ?? null) : null;
+
+  function flash(key: StrKey) {
+    setToast(key);
+    window.setTimeout(() => setToast(null), 3200);
+  }
 
   return (
     <div>
       {/* header */}
-      <div className="mb-5">
-        <h1 className="font-head text-2xl font-semibold tracking-tight text-ink">
-          {t("admin_instructors")}
-        </h1>
-        <p className="mt-1 font-body text-[13.5px] text-muted">{t("instr_today_long")}</p>
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-head text-2xl font-semibold tracking-tight text-ink">
+            {t("admin_instructors")}
+          </h1>
+          <p className="mt-1 font-body text-[13.5px] text-muted">{t("instr_today_long")}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setFormFor("new")}
+          className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-ink px-4 font-body text-[13.5px] font-semibold text-cream"
+        >
+          <PlusSmall />
+          {t("add_instructor")}
+        </button>
       </div>
+
+      {toast && (
+        <div
+          role="status"
+          className="mb-4 rounded-xl bg-sage/15 px-4 py-2.5 font-body text-[13px] font-semibold text-sage-deep"
+        >
+          {t(toast)}
+        </div>
+      )}
 
       {/* responsive card grid (1 col mobile → 2/3 cols wider) */}
       <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-3">
         {instructors.map((ins) => (
-          <InstructorCard key={ins.id} ins={ins} onEdit={() => setEditId(ins.id)} />
+          <InstructorCard
+            key={ins.id}
+            ins={ins}
+            onEditAvail={() => setEditId(ins.id)}
+            onEditDetails={() => setFormFor(ins.id)}
+            onRemove={() => setRemoving(ins)}
+          />
         ))}
       </div>
 
@@ -141,13 +197,44 @@ export function InstructorsView({ instructors }: { instructors: AdminInstructor[
         instructor={editing}
         onClose={() => setEditId(null)}
       />
+
+      {/* add / edit details form */}
+      <InstructorFormDrawer
+        open={formFor !== null}
+        instructor={formInstructor}
+        onClose={() => setFormFor(null)}
+        onSaved={(key) => {
+          setFormFor(null);
+          flash(key);
+        }}
+      />
+
+      {/* remove confirmation */}
+      <RemoveInstructorDrawer
+        instructor={removing}
+        onClose={() => setRemoving(null)}
+        onRemoved={() => {
+          setRemoving(null);
+          flash("toast_instructor_removed");
+        }}
+      />
     </div>
   );
 }
 
 // ───────────────────────── instructor card ─────────────────────────
 
-function InstructorCard({ ins, onEdit }: { ins: AdminInstructor; onEdit: () => void }) {
+function InstructorCard({
+  ins,
+  onEditAvail,
+  onEditDetails,
+  onRemove,
+}: {
+  ins: AdminInstructor;
+  onEditAvail: () => void;
+  onEditDetails: () => void;
+  onRemove: () => void;
+}) {
   const { t, tt } = useAdminLang();
 
   return (
@@ -163,6 +250,29 @@ function InstructorCard({ ins, onEdit }: { ins: AdminInstructor; onEdit: () => v
               .replace("{attendees}", String(ins.attendees))}
           </p>
         </div>
+        {/* edit details + remove (icon controls), then the availability badge */}
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onEditDetails}
+            aria-label={t("edit_instructor_a11y").replace("{name}", tt(ins.name))}
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-ink-soft transition-colors hover:bg-cream-2"
+          >
+            <PencilIcon />
+          </button>
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label={t("remove_instructor_a11y").replace("{name}", tt(ins.name))}
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-[#a56a52] transition-colors hover:bg-rose/10"
+          >
+            <TrashIcon />
+          </button>
+        </div>
+      </div>
+
+      {/* availability badge */}
+      <div className="mb-3.5">
         <Badge tone={ins.offToday ? "rose" : "green"}>
           {t(ins.offToday ? "day_off" : "available")}
         </Badge>
@@ -208,7 +318,7 @@ function InstructorCard({ ins, onEdit }: { ins: AdminInstructor; onEdit: () => v
       {/* edit availability */}
       <button
         type="button"
-        onClick={onEdit}
+        onClick={onEditAvail}
         className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-line-strong font-body text-[13.5px] font-semibold text-ink transition-colors hover:bg-cream-2"
       >
         <CalendarIcon />
@@ -444,7 +554,243 @@ function DayToggle({
   );
 }
 
+// ───────────────────────── add / edit details drawer ─────────────────────────
+
+/** Add a new instructor (instructor === null) or rename an existing one. Shares one
+ *  form: name (EN), nameTh (TH), optional tag. On success refreshes + toasts. */
+function InstructorFormDrawer({
+  open,
+  instructor,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  instructor: AdminInstructor | null;
+  onClose: () => void;
+  onSaved: (toastKey: StrKey) => void;
+}) {
+  const { t } = useAdminLang();
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [name, setName] = useState("");
+  const [nameTh, setNameTh] = useState("");
+  const [tag, setTag] = useState("");
+  const [errorKey, setErrorKey] = useState<StrKey | null>(null);
+
+  const isEdit = instructor !== null;
+
+  // Prefill from the target instructor's RAW editable fields when (re)opening; clear
+  // for the add form. Reset the error each time.
+  useEffect(() => {
+    if (!open) return;
+    setName(instructor?.nameEn ?? "");
+    setNameTh(instructor?.nameRawTh ?? "");
+    setTag(instructor?.tagRaw ?? "");
+    setErrorKey(null);
+  }, [open, instructor]);
+
+  const canSave = !pending && name.trim().length > 0 && nameTh.trim().length > 0;
+
+  function save() {
+    if (!canSave) return;
+    setErrorKey(null);
+    const tagValue = tag.trim() ? tag.trim() : undefined;
+    startTransition(async () => {
+      const res = isEdit
+        ? await updateInstructor({ id: instructor!.id, name: name.trim(), nameTh: nameTh.trim(), tag: tagValue })
+        : await createInstructor({ name: name.trim(), nameTh: nameTh.trim(), tag: tagValue });
+      if (res.ok) {
+        onSaved(isEdit ? "toast_instructor_updated" : "toast_instructor_added");
+        router.refresh();
+      } else {
+        setErrorKey(crudErrorKey(res.code));
+      }
+    });
+  }
+
+  const footer = (
+    <>
+      <button
+        type="button"
+        onClick={onClose}
+        className="inline-flex h-11 items-center rounded-xl border border-line-strong px-4 font-body text-sm font-semibold text-ink"
+      >
+        {t("cancel")}
+      </button>
+      <div className="flex-1" />
+      <button
+        type="button"
+        onClick={save}
+        disabled={!canSave}
+        className="inline-flex h-11 items-center gap-1.5 rounded-xl bg-ink px-5 font-body text-sm font-semibold text-cream disabled:opacity-50"
+      >
+        {t("save_instructor")}
+      </button>
+    </>
+  );
+
+  return (
+    <Drawer
+      open={open}
+      onClose={onClose}
+      title={t(isEdit ? "edit_instructor" : "add_instructor_title")}
+      footer={footer}
+    >
+      <div className="flex flex-col gap-4">
+        {errorKey && (
+          <div
+            role="alert"
+            className="rounded-xl bg-rose/15 px-3.5 py-2.5 font-body text-[13px] font-medium text-[#a56a52]"
+          >
+            {t(errorKey)}
+          </div>
+        )}
+
+        <Field label={t("instr_name_en")}>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={t("ph_instr_name_en")}
+            className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink placeholder:text-muted"
+          />
+        </Field>
+
+        <Field label={t("instr_name_th")}>
+          <input
+            value={nameTh}
+            onChange={(e) => setNameTh(e.target.value)}
+            placeholder={t("ph_instr_name_th")}
+            className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink placeholder:text-muted"
+          />
+        </Field>
+
+        <Field label={t("instr_tag")}>
+          <input
+            value={tag}
+            onChange={(e) => setTag(e.target.value)}
+            placeholder={t("ph_instr_tag")}
+            className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink placeholder:text-muted"
+          />
+        </Field>
+      </div>
+    </Drawer>
+  );
+}
+
+// ───────────────────────── remove confirmation drawer ─────────────────────────
+
+/** Confirm a SOFT remove (setInstructorActive active=false): the card drops out of
+ *  the active list; past classes & availability are kept (server-side). */
+function RemoveInstructorDrawer({
+  instructor,
+  onClose,
+  onRemoved,
+}: {
+  instructor: AdminInstructor | null;
+  onClose: () => void;
+  onRemoved: () => void;
+}) {
+  const { t, tt } = useAdminLang();
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [errorKey, setErrorKey] = useState<StrKey | null>(null);
+
+  useEffect(() => {
+    if (instructor) setErrorKey(null);
+  }, [instructor]);
+
+  function confirm() {
+    if (!instructor) return;
+    setErrorKey(null);
+    startTransition(async () => {
+      const res = await setInstructorActive({ id: instructor.id, active: false });
+      if (res.ok) {
+        onRemoved();
+        router.refresh();
+      } else {
+        setErrorKey(res.code === "UNKNOWN_INSTRUCTOR" ? "err_unknown_instructor" : "err_instr_remove");
+      }
+    });
+  }
+
+  const footer = (
+    <>
+      <button
+        type="button"
+        onClick={onClose}
+        className="inline-flex h-11 items-center rounded-xl border border-line-strong px-4 font-body text-sm font-semibold text-ink"
+      >
+        {t("cancel")}
+      </button>
+      <div className="flex-1" />
+      <button
+        type="button"
+        onClick={confirm}
+        disabled={pending}
+        className="inline-flex h-11 items-center gap-1.5 rounded-xl bg-[#a56a52] px-5 font-body text-sm font-semibold text-cream disabled:opacity-50"
+      >
+        <TrashIcon />
+        {t("confirm_remove")}
+      </button>
+    </>
+  );
+
+  return (
+    <Drawer
+      open={instructor !== null}
+      onClose={onClose}
+      title={t("remove_instructor")}
+      footer={footer}
+    >
+      {instructor && (
+        <div className="flex flex-col gap-4">
+          <p className="font-body text-[14px] leading-relaxed text-ink">
+            {t("remove_instructor_confirm").replace("{name}", tt(instructor.name))}
+          </p>
+          {errorKey && (
+            <p
+              role="alert"
+              className="rounded-xl bg-rose/15 px-3.5 py-2.5 font-body text-[13px] font-medium text-[#a56a52]"
+            >
+              {t(errorKey)}
+            </p>
+          )}
+        </div>
+      )}
+    </Drawer>
+  );
+}
+
+/** A labelled form field wrapper (mirrors members-view.tsx Field). */
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-2 block font-body text-xs font-semibold tracking-wide text-ink-soft">
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
+
 // ───────────────────────── icons ─────────────────────────
+
+function PencilIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  );
+}
+function TrashIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6" />
+      <path d="M10 11v6M14 11v6" />
+    </svg>
+  );
+}
 
 function ClockIcon() {
   return (

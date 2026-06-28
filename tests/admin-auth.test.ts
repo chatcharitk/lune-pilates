@@ -22,8 +22,13 @@ import {
 import { createCustomer } from "@/app/actions/admin-members";
 import { posConfirmPayment, posSellPackage } from "@/app/actions/admin-pos";
 import { approveSlip, getSlip, rejectSlip } from "@/app/actions/admin-payments";
-import { setInstructorAvailability } from "@/app/actions/instructors";
-import { adjustCredits, getAdjustablePackages } from "@/app/actions/admin-credits";
+import {
+  createInstructor,
+  setInstructorActive,
+  setInstructorAvailability,
+  updateInstructor,
+} from "@/app/actions/instructors";
+import { adjustCredits, getAdjustablePackages, getCustomerLedger } from "@/app/actions/admin-credits";
 
 const ORIGINAL_DB_URL = process.env.DATABASE_URL;
 const ORIGINAL_ADMIN_AUTH = process.env.ADMIN_AUTH;
@@ -89,6 +94,11 @@ const GATED_ACTIONS: { name: string; call: () => Promise<{ ok: boolean; code?: s
         week: { Mon: [["bad", "bad"]] },
       }),
   },
+  // Instructor CRUD (Owner-only): malformed input (empty names/id) — UNAUTHORIZED beats it.
+  { name: "createInstructor", call: () => createInstructor({ name: "", nameTh: "" }) },
+  { name: "updateInstructor", call: () => updateInstructor({ id: "", name: "", nameTh: "" }) },
+  // @ts-expect-error malformed active on purpose — the gate must run before parse
+  { name: "setInstructorActive", call: () => setInstructorActive({ id: "", active: "nope" }) },
   // Admin reschedule (#7, Owner-only): malformed uuids — UNAUTHORIZED beats it.
   {
     name: "adminReschedule",
@@ -201,5 +211,25 @@ describe("requireOwner — default (no ADMIN_ROLE) is an owner", () => {
     expect(owner).not.toBeNull();
     expect(owner?.role).toBe("owner");
     expect(owner?.instructorId).toBeNull();
+  });
+});
+
+// getCustomerLedger is owner-gated PII (a customer's whole credit history) but
+// returns CustomerLedgerEntry[] (not the {ok,code} shape GATED_ACTIONS asserts),
+// so it gets its own gate test: a non-owner (deny) and an instructor must read [].
+describe("getCustomerLedger — owner-only PII read returns [] for non-owners", () => {
+  const VALID_ID = "00000000-0000-4000-8000-000000000001";
+  beforeEach(() => delete process.env.DATABASE_URL);
+  afterEach(restoreEnv);
+
+  it("→ [] under ADMIN_AUTH=deny", async () => {
+    process.env.ADMIN_AUTH = "deny";
+    expect(await getCustomerLedger(VALID_ID)).toEqual([]);
+  });
+
+  it("→ [] for an instructor (requireOwner rejects)", async () => {
+    delete process.env.ADMIN_AUTH;
+    process.env.ADMIN_ROLE = "instructor";
+    expect(await getCustomerLedger(VALID_ID)).toEqual([]);
   });
 });

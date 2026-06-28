@@ -26,10 +26,11 @@
 // mirroring admin-data.jsx (MEMBERS), so the screen renders without a database. The
 // DB path is the real one.
 
-import { and, asc, eq, gt, isNull, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull, sql, type SQL } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
-import { households, packages, users } from "@/lib/db/schema";
+import { creditLedger, households, packages, users } from "@/lib/db/schema";
 import type { PackageCategory, UserTier } from "@/lib/domain/types";
+import { loadPoolOwner } from "@/lib/credits/selectPackage";
 
 // ───────────────────────── tunables ─────────────────────────
 
@@ -95,6 +96,30 @@ export interface AdminCustomerDetail extends AdminCustomer {
    *   - "guest"  → cream note "non-transferable, cannot be shared"
    */
   sharingNote: "member" | "guest";
+}
+
+/** The reason a credit-ledger row was written (mirrors creditLedger.reason). */
+export type LedgerReason = "booking" | "cancel_refund" | "purchase" | "adjustment";
+
+/**
+ * One row of a customer's credit-ledger history for the admin customer drawer. The
+ * ledger is the source of truth (invariant 1/2); this is a READ MODEL over the rows
+ * of every package in the customer's POOL (member→household, guest→own — invariant
+ * 3), newest-first for display, each carrying a RUNNING balance.
+ */
+export interface CustomerLedgerEntry {
+  id: string;
+  /** When the row was written (ISO). */
+  createdAt: string;
+  /** Signed integer credit delta (−cost on book, +cost on refund, +N on purchase). */
+  delta: number;
+  reason: LedgerReason;
+  /**
+   * The pool balance AFTER this row, i.e. the running sum of all deltas up to AND
+   * including this row (computed ascending by createdAt, then surfaced newest-first).
+   * The newest row's balanceAfter reconciles to the pool's current hours_left.
+   */
+  balanceAfter: number;
 }
 
 /** Optional filter for the customers list. */
@@ -332,6 +357,87 @@ export async function getCustomerDetail(
   };
 }
 
+/**
+ * The credit-ledger history for one customer's POOL, newest-first, each row carrying
+ * a RUNNING balance. Resolves the customer's pool via loadPoolOwner (member→household
+ * pool, guest→own packages — invariant 3), finds every package owned by that pool,
+ * and reads all creditLedger rows for those packages.
+ *
+ * The running `balanceAfter` is computed ASCENDING by createdAt (start 0, accumulate
+ * each delta), so the newest row's balanceAfter equals the sum of every delta — which
+ * reconciles to the pool's current `hours_left` (the ledger is the source of truth,
+ * invariant 1/2). The list is then returned newest-first for display.
+ *
+ * Returns [] (never throws) for an unknown customer or a customer with no pool/
+ * packages — the drawer renders an empty history.
+ *
+ * OWNER-CONTEXT: this is a READ MODEL with no gate of its own; it MUST only be
+ * reached from the owner-gated Members page (the same convention as the rest of
+ * lib/admin/*). No client value is trusted — the pool is recomputed server-side.
+ *
+ * No-DB dev fallback: returns a few believable rows with correct running balances.
+ */
+export async function getCustomerLedger(
+  customerId: string,
+  now: Date = new Date(),
+): Promise<CustomerLedgerEntry[]> {
+  if (!process.env.DATABASE_URL) {
+    return mockCustomerLedger();
+  }
+
+  const owner = await loadPoolOwner(customerId);
+  if (!owner) return []; // unknown customer → empty history
+
+  const db = getDb();
+
+  // Packages in this customer's pool (invariant 3 via poolOwnerWhere).
+  const pkgRows = await db
+    .select({ id: packages.id })
+    .from(packages)
+    .where(poolOwnerWhere(owner));
+  if (pkgRows.length === 0) return [];
+  const pkgIds = pkgRows.map((p) => p.id);
+
+  // Every ledger row for those packages, OLDEST-first so we can accumulate the
+  // running balance in one pass (the ledger is append-only).
+  const rows = await db
+    .select({
+      id: creditLedger.id,
+      createdAt: creditLedger.createdAt,
+      delta: creditLedger.delta,
+      reason: creditLedger.reason,
+    })
+    .from(creditLedger)
+    .where(inArray(creditLedger.packageId, pkgIds))
+    .orderBy(asc(creditLedger.createdAt), asc(creditLedger.id));
+
+  return toLedgerEntries(rows);
+}
+
+/**
+ * Turn append-only ledger rows (OLDEST-first) into newest-first entries with a
+ * running balanceAfter. Pure so both the DB and mock paths share it. `now` is unused
+ * here but kept off the signature — balances are pure delta sums.
+ */
+function toLedgerEntries(
+  rows: readonly { id: string; createdAt: Date; delta: number; reason: string }[],
+): CustomerLedgerEntry[] {
+  let running = 0;
+  // Accumulate ascending, stamping each row's post-balance.
+  const ascending = rows.map((r) => {
+    running += r.delta;
+    return {
+      id: r.id,
+      createdAt: r.createdAt.toISOString(),
+      delta: r.delta,
+      reason: r.reason as LedgerReason,
+      balanceAfter: running,
+    };
+  });
+  // Return newest-first for display (reverse the ascending list).
+  return ascending.reverse();
+}
+
 // ───────────────────────── shaping ─────────────────────────
 
 /** Build the `AdminCustomer` row from the resolved identity + credit summary. */
@@ -451,6 +557,25 @@ function mockListCustomers(filter: ListCustomersFilter, now: Date): AdminCustome
   return MOCK_CUSTOMERS.map((c) => mockShapeCustomer(c, now))
     .filter((c) => matchesQuery(c, filter.query))
     .sort(byNameThenId);
+}
+
+/**
+ * A believable mock ledger history (newest-first) with correct running balances. The
+ * append-only rows OLDEST→newest are: purchase +10, booking −1, cancel_refund +1,
+ * adjustment +2 → running 10, 9, 10, 12. Reusing toLedgerEntries guarantees the
+ * mock's running math is computed the SAME way as the DB path, and the newest row's
+ * balanceAfter (12) equals the sum of every delta.
+ */
+function mockCustomerLedger(): CustomerLedgerEntry[] {
+  const base = new Date("2026-06-01T03:00:00.000Z").getTime();
+  const hour = 3_600_000;
+  const rows = [
+    { id: "ml-1", createdAt: new Date(base + 0 * hour), delta: 10, reason: "purchase" },
+    { id: "ml-2", createdAt: new Date(base + 24 * hour), delta: -1, reason: "booking" },
+    { id: "ml-3", createdAt: new Date(base + 48 * hour), delta: 1, reason: "cancel_refund" },
+    { id: "ml-4", createdAt: new Date(base + 72 * hour), delta: 2, reason: "adjustment" },
+  ];
+  return toLedgerEntries(rows);
 }
 
 function mockCustomerDetail(userId: string, now: Date): AdminCustomerDetail | null {

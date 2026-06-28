@@ -7,10 +7,10 @@
 // useLune() (lune-ui.jsx).
 //
 // Customer state is client-only (v1 has no per-user locale persistence on the
-// server). We default to EN, but remember the last choice in localStorage so a
-// reload keeps the reader's language, and we reflect the active language on the
-// <html lang> attribute for assistive tech and the correct font fallback
-// (finding I2).
+// server). We default to TH (the studio is Bangkok/LINE-native), but remember the
+// last choice in localStorage so a reload keeps the reader's language, and we
+// reflect the active language on the <html lang> attribute for assistive tech and
+// the correct font fallback (finding I2).
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { makeT, type Lang, type Translator } from "@/lib/i18n";
@@ -30,7 +30,7 @@ function parseLang(value: string | null): Lang | null {
 
 export function CustomerLangProvider({
   children,
-  initialLang = "en",
+  initialLang = "th",
 }: {
   children: React.ReactNode;
   initialLang?: Lang;

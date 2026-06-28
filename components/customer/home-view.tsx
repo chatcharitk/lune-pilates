@@ -56,26 +56,26 @@ export function HomeView({ viewer, overview, next, hasOffer, week }: HomeViewPro
     : null;
 
   return (
-    <div className="px-[22px] pt-1.5">
+    <div className="px-[18px] pt-1.5">
       {/* greeting — date-aware time-of-day line, long localized date, and the
           LINE avatar with the green "L" presence badge (lune-home.jsx). */}
-      <header className="mb-[22px] mt-1.5 flex items-center justify-between gap-3.5">
+      <header className="mb-[18px] mt-1 flex items-center justify-between gap-3.5">
         <div className="min-w-0">
           <p className="font-body text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
             {tt(longDateLabel())}
           </p>
-          <h1 className="mt-2 font-head text-[34px] font-medium leading-[1.08] tracking-[0.01em] text-ink">
+          <h1 className="mt-1.5 font-head text-[28px] font-medium leading-[1.1] tracking-[0.01em] text-ink">
             {t(greetingKey())}
             <br />
             <span className="text-taupe-deep">{viewer.name}</span>
           </h1>
         </div>
         <div className="relative shrink-0">
-          <span className="grid h-[60px] w-[60px] place-items-center rounded-full border-2 border-surface-2 bg-taupe font-head text-2xl font-semibold text-surface-2 shadow-md">
+          <span className="grid h-[52px] w-[52px] place-items-center rounded-full border-2 border-surface-2 bg-taupe font-head text-xl font-semibold text-surface-2 shadow-md">
             {avatarInitial}
           </span>
           <span
-            className="absolute -bottom-0.5 -right-0.5 grid h-[22px] w-[22px] place-items-center rounded-full border-[2.5px] border-cream font-body text-[9px] font-extrabold tracking-[-0.5px] text-white"
+            className="absolute -bottom-0.5 -right-0.5 grid h-[20px] w-[20px] place-items-center rounded-full border-[2.5px] border-cream font-body text-[9px] font-extrabold tracking-[-0.5px] text-white"
             style={{ background: "#06C755" }}
             aria-hidden="true"
           >
@@ -89,7 +89,7 @@ export function HomeView({ viewer, overview, next, hasOffer, week }: HomeViewPro
       <Link
         href="/buy"
         aria-label={t("buy_credits")}
-        className="relative block overflow-hidden rounded-lune border border-line p-[22px] shadow-md transition-transform active:scale-[0.99]"
+        className="relative block overflow-hidden rounded-lune border border-line p-[18px] shadow-md transition-transform active:scale-[0.99]"
         style={{ background: "linear-gradient(150deg, var(--color-surface-2), var(--color-surface))" }}
       >
         <Sparkle
@@ -110,11 +110,11 @@ export function HomeView({ viewer, overview, next, hasOffer, week }: HomeViewPro
         </div>
 
         <div className="mb-0.5 mt-1.5 flex items-baseline gap-2">
-          <span className="font-head text-[60px] font-semibold leading-none text-ink">{overview.hours}</span>
-          <span className="font-body text-lg font-medium text-taupe">{hoursLabel}</span>
+          <span className="font-head text-[48px] font-semibold leading-none text-ink">{overview.hours}</span>
+          <span className="font-body text-base font-medium text-taupe">{hoursLabel}</span>
         </div>
 
-        <div className="mt-3 flex items-center justify-between gap-4 border-t border-line pt-3.5">
+        <div className="mt-2.5 flex items-center justify-between gap-4 border-t border-line pt-3">
           <span className="min-w-0 font-body text-[13px] text-ink-soft">
             {overview.isHouseholdPool && viewer.houseNumber ? (
               <>
@@ -160,7 +160,7 @@ export function HomeView({ viewer, overview, next, hasOffer, week }: HomeViewPro
           The "starts in {time}" countdown uses the server-computed
           cancellation.hoursUntilStart (never recomputed here). */}
       {next && (
-        <section className="mt-6">
+        <section className="mt-5">
           <div className="mb-3 flex items-baseline justify-between">
             <h2 className="font-body text-xs font-semibold uppercase tracking-[0.14em] text-muted">
               {t("next_class")}
@@ -179,10 +179,10 @@ export function HomeView({ viewer, overview, next, hasOffer, week }: HomeViewPro
                 asset is wired in (lune-home.jsx uses a studio-equipment image). */}
             <span
               aria-hidden="true"
-              className="h-[92px] w-[88px] shrink-0"
+              className="h-[82px] w-[80px] shrink-0"
               style={{ background: "linear-gradient(150deg, var(--color-cream-2), var(--color-taupe))" }}
             />
-            <div className="min-w-0 flex-1 px-4 py-3.5">
+            <div className="min-w-0 flex-1 px-4 py-3">
               <div className="mb-1.5 flex items-center gap-1.5">
                 <span
                   className="inline-block h-[7px] w-[7px] shrink-0 rounded-full"
@@ -193,7 +193,7 @@ export function HomeView({ viewer, overview, next, hasOffer, week }: HomeViewPro
                   {tt(next.typeMeta.short)}
                 </span>
               </div>
-              <p className="font-head text-[19px] font-semibold leading-[1.1] text-ink">
+              <p className="font-head text-[17px] font-semibold leading-[1.1] text-ink">
                 {tt(next.typeMeta.label)}
               </p>
               <p className="mt-1.5 flex items-center gap-1.5 font-body text-[13px] text-ink-soft">
@@ -211,15 +211,15 @@ export function HomeView({ viewer, overview, next, hasOffer, week }: HomeViewPro
       {/* primary action — the only hero CTA */}
       <Link
         href="/schedule"
-        className="mt-5 flex items-center justify-center gap-2 rounded-lune bg-taupe px-6 py-4 font-head text-base font-semibold text-cream shadow-soft transition-colors hover:bg-taupe-deep"
+        className="mt-5 flex items-center justify-center gap-2 rounded-lune bg-taupe px-6 py-3.5 font-head text-base font-semibold text-cream shadow-soft transition-colors hover:bg-taupe-deep"
       >
         {t("book_a_class")}
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
       </Link>
 
       {/* this week — horizontal-scroll strip of bookable cards (lune-home.jsx). */}
-      <section className="mt-7">
-        <div className="mb-3.5 flex items-baseline justify-between">
+      <section className="mt-6">
+        <div className="mb-3 flex items-baseline justify-between">
           <h2 className="font-body text-xs font-semibold uppercase tracking-[0.14em] text-muted">
             {t("this_week")}
           </h2>
@@ -230,7 +230,7 @@ export function HomeView({ viewer, overview, next, hasOffer, week }: HomeViewPro
         {week.length > 0 ? (
           // Bleed the row to the screen edges so cards can scroll past the gutter,
           // then re-pad the inner content (mirrors lune-home.jsx's -22px margin).
-          <ul className="-mx-[22px] flex gap-3 overflow-x-auto px-[22px] pb-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <ul className="-mx-[18px] flex gap-2.5 overflow-x-auto px-[18px] pb-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {week.map((c) => (
               <li key={c.id} className="shrink-0">
                 <ThisWeekCard cls={c} dateLabel={tt(classDateLabel(c.startsAt))} />
@@ -245,7 +245,7 @@ export function HomeView({ viewer, overview, next, hasOffer, week }: HomeViewPro
       </section>
 
       {/* policy clarity */}
-      <p className="mt-6 rounded-lune-sm border-l-2 border-taupe bg-surface px-4 py-3 font-body text-[12.5px] leading-relaxed text-ink-soft">
+      <p className="mt-5 rounded-lune-sm border-l-2 border-taupe bg-surface px-4 py-3 font-body text-[12.5px] leading-relaxed text-ink-soft">
         {t("policy_body")}
       </p>
       <p className="mt-3 text-center font-body text-[11px] text-muted">{t("open_hours")}</p>
@@ -261,13 +261,13 @@ function ThisWeekCard({ cls, dateLabel }: { cls: BookableClass; dateLabel: strin
   return (
     <Link
       href={`/schedule/${cls.id}`}
-      className="block w-[150px] rounded-lune-sm border border-line bg-surface-2 px-3.5 py-3.5 shadow-soft transition-transform active:scale-[0.98]"
+      className="block w-[144px] rounded-lune-sm border border-line bg-surface-2 px-3.5 py-3 shadow-soft transition-transform active:scale-[0.98]"
     >
-      <p className="mb-2.5 font-body text-xs font-semibold uppercase tracking-[0.04em] text-taupe-deep">
+      <p className="mb-2 font-body text-xs font-semibold uppercase tracking-[0.04em] text-taupe-deep">
         {dateLabel}
       </p>
       <p className="font-head text-lg font-semibold leading-[1.1] text-ink">{hhmm(cls.startsAt)}</p>
-      <div className="mb-3 mt-1 flex items-center gap-1.5">
+      <div className="mb-2.5 mt-1 flex items-center gap-1.5">
         <span
           className="inline-block h-[7px] w-[7px] shrink-0 rounded-full"
           style={{ background: TYPE_DOT[cls.type] }}

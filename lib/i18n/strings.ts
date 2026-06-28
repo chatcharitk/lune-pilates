@@ -721,6 +721,19 @@ export const STR = {
     th: "เพิ่มลูกค้าไม่สำเร็จ กรุณาตรวจสอบข้อมูลแล้วลองใหม่",
   },
 
+  // ───────────────────────── admin customer credit-transaction history (Members drawer) ─────────────────────────
+  // section heading below the credits + adjust-credits control
+  ledger_title: { en: "Credit transactions", th: "ประวัติเครดิต" },
+  // reason labels (mirror lib/admin/members.ts LedgerReason)
+  ledger_booking: { en: "Class booking", th: "จองคลาส" },
+  ledger_cancel_refund: { en: "Cancellation refund", th: "คืนเครดิตจากการยกเลิก" },
+  ledger_purchase: { en: "Package purchase", th: "ซื้อแพ็กเกจ" },
+  ledger_adjustment: { en: "Manual adjustment", th: "ปรับด้วยตนเอง" },
+  // running-balance caption + empty state + loading
+  ledger_running_balance: { en: "Balance: {n}", th: "คงเหลือ: {n}" },
+  ledger_empty: { en: "No transactions yet", th: "ยังไม่มีรายการ" },
+  ledger_loading: { en: "Loading transactions…", th: "กำลังโหลดรายการ…" },
+
   // ───────────────────────── admin Payments & POS (admin-more.jsx PaymentsScreen + admin-mobile-pos.jsx) ─────────────────────────
   // stat tiles
   revenue_mtd: { en: "Revenue · month", th: "รายได้ · เดือนนี้" },
@@ -812,6 +825,47 @@ export const STR = {
     th: "ช่วงเวลาซ้อนกันใน:",
   },
 
+  // instructor CRUD (add / edit / remove) — Owner-only
+  add_instructor: { en: "Add instructor", th: "เพิ่มผู้สอน" },
+  edit_instructor: { en: "Edit instructor", th: "แก้ไขผู้สอน" },
+  edit_instructor_a11y: { en: "Edit {name}", th: "แก้ไข {name}" },
+  add_instructor_title: { en: "Add instructor", th: "เพิ่มผู้สอน" },
+  instr_name_en: { en: "Name (English)", th: "ชื่อ (อังกฤษ)" },
+  instr_name_th: { en: "Name (Thai)", th: "ชื่อ (ไทย)" },
+  instr_tag: { en: "Tag (optional)", th: "ป้ายกำกับ (ไม่บังคับ)" },
+  ph_instr_name_en: { en: "e.g. Kru Mai", th: "เช่น Kru Mai" },
+  ph_instr_name_th: { en: "e.g. ครูใหม่", th: "เช่น ครูใหม่" },
+  ph_instr_tag: { en: "e.g. Reformer specialist", th: "เช่น ผู้เชี่ยวชาญรีฟอร์มเมอร์" },
+  save_instructor: { en: "Save instructor", th: "บันทึกผู้สอน" },
+  remove_instructor: { en: "Remove", th: "ลบ" },
+  remove_instructor_a11y: { en: "Remove {name}", th: "ลบ {name}" },
+  remove_instructor_confirm: {
+    en: "Remove {name}? Their past classes & availability are kept.",
+    th: "ลบ {name} ใช่ไหม คลาสที่ผ่านมาและตารางว่างจะยังถูกเก็บไว้",
+  },
+  confirm_remove: { en: "Remove", th: "ลบ" },
+  // toasts
+  toast_instructor_added: { en: "Instructor added", th: "เพิ่มผู้สอนแล้ว" },
+  toast_instructor_updated: { en: "Instructor updated", th: "อัปเดตผู้สอนแล้ว" },
+  toast_instructor_removed: { en: "Instructor removed", th: "ลบผู้สอนแล้ว" },
+  // CRUD errors
+  err_instr_id_taken: {
+    en: "That name is already taken. Please use a different one.",
+    th: "ชื่อนี้ถูกใช้ไปแล้ว กรุณาใช้ชื่ออื่น",
+  },
+  err_instr_invalid: {
+    en: "Please check the details and try again.",
+    th: "กรุณาตรวจสอบข้อมูลแล้วลองใหม่",
+  },
+  err_instr_save: {
+    en: "Couldn’t save this instructor. Please try again.",
+    th: "บันทึกผู้สอนไม่สำเร็จ กรุณาลองใหม่",
+  },
+  err_instr_remove: {
+    en: "Couldn’t remove this instructor. Please try again.",
+    th: "ลบผู้สอนไม่สำเร็จ กรุณาลองใหม่",
+  },
+
   // full weekday names for the availability editor (EN short Mon..Sun; TH from DAYS_TH)
   day_mon: { en: "Mon", th: "จันทร์" },
   day_tue: { en: "Tue", th: "อังคาร" },
@@ -836,6 +890,11 @@ export const STR = {
     en: "No sales in this date range",
     th: "ไม่มีการขายในช่วงวันที่นี้",
   },
+  // quick-pick range presets
+  range_today: { en: "Today", th: "วันนี้" },
+  range_week: { en: "This week", th: "สัปดาห์นี้" },
+  range_month: { en: "This month", th: "เดือนนี้" },
+  range_year: { en: "This year", th: "ปีนี้" },
 
   // ───────────────────────── admin Adjust credits (Group D #8, Owner-only, in the Members drawer) ─────────────────────────
   adjust_credits: { en: "Adjust credits", th: "ปรับเครดิต" },

@@ -261,7 +261,7 @@ function CancelContent({
         onClick={onConfirm}
         disabled={submitting || late}
         aria-disabled={submitting || late}
-        className="mt-[18px] flex h-14 w-full items-center justify-center rounded-lune-sm bg-ink font-body text-base font-semibold text-cream shadow-lift transition-transform active:scale-[0.985] disabled:cursor-not-allowed disabled:bg-cream-2 disabled:text-muted disabled:shadow-none"
+        className="mt-[18px] flex h-12 w-full items-center justify-center rounded-lune-sm bg-ink font-body text-base font-semibold text-cream shadow-lift transition-transform active:scale-[0.985] disabled:cursor-not-allowed disabled:bg-cream-2 disabled:text-muted disabled:shadow-none"
       >
         {submitting ? `${t("cancel_class")}…` : t("cancel_class")}
       </button>
@@ -320,7 +320,7 @@ function CancelledDone({
       <button
         type="button"
         onClick={onDone}
-        className="flex h-14 w-full items-center justify-center rounded-lune-sm bg-ink font-body text-base font-semibold text-cream shadow-lift transition-transform active:scale-[0.985]"
+        className="flex h-12 w-full items-center justify-center rounded-lune-sm bg-ink font-body text-base font-semibold text-cream shadow-lift transition-transform active:scale-[0.985]"
       >
         {t("done")}
       </button>
@@ -427,7 +427,7 @@ function Sheet({
         <div className="flex shrink-0 justify-center pb-1 pt-3">
           <span className="h-[5px] w-10 rounded-full bg-line-strong" />
         </div>
-        <div className="overflow-y-auto px-[22px] pb-[30px] pt-2">
+        <div className="overflow-y-auto px-[18px] pb-[30px] pt-2">
           <SheetTitleContext.Provider value={titleId}>{children}</SheetTitleContext.Provider>
         </div>
       </div>

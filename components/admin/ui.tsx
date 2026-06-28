@@ -22,13 +22,13 @@ export function Stat({
   accent?: string;
 }) {
   return (
-    <div className="min-w-0 rounded-2xl border border-line bg-surface-2 p-4 shadow-soft">
+    <div className="min-w-0 rounded-2xl border border-line bg-surface-2 p-3.5 shadow-soft md:p-4">
       <p className="truncate font-body text-[11.5px] font-semibold uppercase tracking-[0.05em] text-muted">
         {label}
       </p>
       <p className="mt-1.5 flex items-baseline gap-1.5">
         <span
-          className="font-head text-3xl font-bold leading-none"
+          className="font-head text-2xl font-bold leading-none md:text-3xl"
           style={{ color: accent ?? "var(--color-ink)" }}
         >
           {value}

@@ -70,8 +70,8 @@ export function BookingsView({
   }
 
   return (
-    <div className="px-[22px] pb-7 pt-1.5">
-      <h1 className="mb-3.5 mt-1 font-head text-3xl font-medium tracking-[0.01em] text-ink">
+    <div className="px-[18px] pb-7 pt-1.5">
+      <h1 className="mb-3 mt-1 font-head text-[26px] font-medium tracking-[0.01em] text-ink">
         {t("my_bookings")}
       </h1>
 
@@ -80,7 +80,7 @@ export function BookingsView({
         role="tablist"
         aria-label={t("my_bookings")}
         onKeyDown={onTabKeyDown}
-        className="mb-5 flex gap-1 rounded-full bg-cream-2 p-1"
+        className="mb-4 flex gap-1 rounded-full bg-cream-2 p-1"
       >
         {TABS.map((k) => {
           const on = tab === k;
@@ -94,7 +94,7 @@ export function BookingsView({
               aria-controls={panelId(k)}
               tabIndex={on ? 0 : -1}
               onClick={() => setTab(k)}
-              className={`flex-1 rounded-full px-2.5 py-2.5 font-body text-[13.5px] font-semibold transition-all ${
+              className={`flex-1 rounded-full px-2.5 py-2 font-body text-[13.5px] font-semibold transition-all ${
                 on ? "bg-surface-2 text-ink shadow-soft" : "bg-transparent text-muted"
               }`}
             >
@@ -182,7 +182,7 @@ function BookingCard({
 
   return (
     <div
-      className={`rounded-lune border border-line bg-surface-2 px-[18px] py-4 shadow-soft ${
+      className={`rounded-lune border border-line bg-surface-2 px-4 py-3.5 shadow-soft ${
         past ? "opacity-[0.82]" : ""
       }`}
     >
@@ -198,7 +198,7 @@ function BookingCard({
               {tt(booking.typeMeta.short)}
             </span>
           </div>
-          <div className="font-head text-[21px] font-semibold leading-[1.1] text-ink">
+          <div className="font-head text-[18px] font-semibold leading-[1.1] text-ink">
             {tt(booking.typeMeta.label)}
           </div>
           <div className="mt-[7px] flex items-center gap-1.5 font-body text-[13px] text-ink-soft">

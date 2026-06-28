@@ -63,7 +63,7 @@ export function Header() {
   if (isHidden(pathname)) return null;
 
   return (
-    <header className="flex shrink-0 items-center justify-between bg-cream px-[22px] pb-3 pt-7">
+    <header className="flex shrink-0 items-center justify-between bg-cream px-[18px] pb-2.5 pt-6">
       <BrandLockup />
       <div className="flex items-center gap-2">
         <LangToggle />

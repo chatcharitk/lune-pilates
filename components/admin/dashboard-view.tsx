@@ -253,7 +253,7 @@ function SalesCard({ sales, period }: { sales: DashboardOverview["sales"]; perio
   const sparkAria = `${t("daily_revenue_14d")}: ${sparkValues.map((v) => thb(v)).join(", ")}`;
 
   return (
-    <div className="flex flex-col rounded-[18px] bg-admin-ink p-6 text-cream lg:row-span-2">
+    <div className="flex flex-col rounded-[18px] bg-admin-ink p-4 md:p-6 text-cream lg:row-span-2">
       <div className="flex flex-col gap-5 sm:flex-row sm:gap-8">
         <div className="flex-1">
           <Eyebrow dark>{primary.eyebrow}</Eyebrow>
@@ -291,7 +291,7 @@ function RevenueMixDonut({ sales }: { sales: DashboardOverview["sales"] }) {
     .map((m) => `${t(MIX_META[m.category]?.key ?? "mix_group")} ${m.pct}% ${thb(m.amount)}`)
     .join(", ")}`;
   return (
-    <Card className="flex flex-col p-5">
+    <Card className="flex flex-col p-4 md:p-5">
       <Eyebrow>{t("revenue_mix")}</Eyebrow>
       <div className="mt-3.5 flex items-center gap-4">
         <Donut
@@ -328,7 +328,7 @@ function TrialConversionGauge({ sales }: { sales: DashboardOverview["sales"] }) 
   const { converted, total, pct } = sales.trialConversion;
   const aria = `${t("trial_conversion")}: ${pct}% — ${converted} ${t("trial_of")} ${total}`;
   return (
-    <Card className="flex flex-col p-5">
+    <Card className="flex flex-col p-4 md:p-5">
       <Eyebrow>{t("trial_conversion")}</Eyebrow>
       <p className="mt-0.5 font-body text-[12.5px] text-muted">{t("b1g1_note")}</p>
       <div className="mt-3.5 flex items-center gap-4">
@@ -352,7 +352,7 @@ function PackageLiabilityCard({ sales }: { sales: DashboardOverview["sales"] }) 
   const { t } = useAdminLang();
   const { thb: amount, hoursOutstanding, pctOfSold } = sales.packageLiability;
   return (
-    <Card className="flex flex-col p-5">
+    <Card className="flex flex-col p-4 md:p-5">
       <Eyebrow>{t("package_liability")}</Eyebrow>
       <p className="mt-0.5 font-body text-[12.5px] text-muted">{t("liability_note")}</p>
       <p className="mt-3 font-head text-[27px] font-bold tracking-[-0.5px] text-taupe-deep">
@@ -378,7 +378,7 @@ function PerInstructorPanel({ sales }: { sales: DashboardOverview["sales"] }) {
   const { t, tt } = useAdminLang();
   const maxRev = Math.max(1, ...sales.perInstructor.map((r) => r.revenue));
   return (
-    <Card className="mt-4 p-6">
+    <Card className="mt-4 p-4 md:p-6">
       <div className="mb-1 flex items-baseline justify-between gap-3">
         <h3 className="font-head text-[16.5px] font-semibold text-ink">{t("revenue_per_instructor")}</h3>
         <span className="font-body text-[12.5px] text-muted">{t("per_instructor_basis")}</span>
@@ -418,7 +418,7 @@ function PerInstructorPanel({ sales }: { sales: DashboardOverview["sales"] }) {
 function FillRatePanel({ capacity }: { capacity: CapacitySection }) {
   const { t } = useAdminLang();
   return (
-    <Card className="p-6">
+    <Card className="p-4 md:p-6">
       <h3 className="font-head text-[16.5px] font-semibold text-ink">{t("class_fill_rate")}</h3>
       <p className="mb-1 mt-0.5 font-body text-[12.5px] text-muted">{t("avg_group_30d")}</p>
       <div className="mb-1 flex items-baseline gap-2.5">
@@ -453,7 +453,7 @@ function FillRatePanel({ capacity }: { capacity: CapacitySection }) {
 function AlertsPanel({ alerts }: { alerts: CapacitySection["alerts"] }) {
   const { t, tt } = useAdminLang();
   return (
-    <Card className="p-6">
+    <Card className="p-4 md:p-6">
       <h3 className="font-head text-[16.5px] font-semibold text-ink">{t("actionable_alerts")}</h3>
       <p className="mb-[18px] mt-0.5 font-body text-[12.5px] text-muted">{t("next_24_48h")}</p>
       <ul className="flex flex-col gap-2.5">
@@ -597,7 +597,7 @@ function ExpiringPanel({ rows }: { rows: RetentionSection["expiringSoon"] }) {
     });
 
   return (
-    <Card className="p-6">
+    <Card className="p-4 md:p-6">
       <h3 className="font-head text-[16.5px] font-semibold text-ink">{t("expiring_7d")}</h3>
       <p className="mb-1 mt-0.5 font-body text-[12.5px] text-muted">{t("tap_to_nudge")}</p>
       <ul>
@@ -668,7 +668,7 @@ function LinePill({ sent, onClick }: { sent: boolean; onClick: () => void }) {
 function HouseUsagePanel({ houses }: { houses: RetentionSection["houseUsage"] }) {
   const { t, tt } = useAdminLang();
   return (
-    <Card className="p-6">
+    <Card className="p-4 md:p-6">
       <h3 className="font-head text-[16.5px] font-semibold text-ink">{t("house_usage")}</h3>
       <p className="mb-[18px] mt-0.5 font-body text-[12.5px] text-muted">{t("shared_burn_rate")}</p>
       <ul className="flex flex-col gap-2.5">

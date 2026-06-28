@@ -33,18 +33,18 @@ export function ProfileView({ overview }: { overview: ProfileOverview }) {
   const avatarInitial = identity.name.trim().charAt(0).toUpperCase() || "·";
 
   return (
-    <div className="px-[22px] pb-7 pt-1.5">
-      <h1 className="mb-[18px] mt-1 font-head text-3xl font-medium tracking-[0.01em] text-ink">
+    <div className="px-[18px] pb-7 pt-1.5">
+      <h1 className="mb-4 mt-1 font-head text-[26px] font-medium tracking-[0.01em] text-ink">
         {t("nav_profile")}
       </h1>
 
       {/* identity */}
-      <div className="mb-[22px] flex items-center gap-[15px]">
-        <span className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-taupe font-head text-[28px] font-semibold text-surface-2">
+      <div className="mb-[18px] flex items-center gap-3.5">
+        <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-taupe font-head text-[24px] font-semibold text-surface-2">
           {avatarInitial}
         </span>
         <div className="min-w-0">
-          <div className="font-head text-2xl font-semibold text-ink">{identity.name}</div>
+          <div className="font-head text-xl font-semibold text-ink">{identity.name}</div>
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             <span
               className={`inline-flex items-center gap-1 rounded-full px-[9px] py-[3px] font-body text-[11px] font-semibold ${
@@ -67,7 +67,7 @@ export function ProfileView({ overview }: { overview: ProfileOverview }) {
       <Link
         href="/buy"
         aria-label={t("buy_credits")}
-        className="relative mb-5 block overflow-hidden rounded-lune border border-line p-5 shadow-md transition-transform active:scale-[0.99]"
+        className="relative mb-4 block overflow-hidden rounded-lune border border-line p-4 shadow-md transition-transform active:scale-[0.99]"
         style={{ background: "linear-gradient(150deg, var(--color-surface-2), var(--color-surface))" }}
       >
         <Sparkle
@@ -78,9 +78,9 @@ export function ProfileView({ overview }: { overview: ProfileOverview }) {
         <p className="m-0 font-body text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
           {t("credits_remaining")}
         </p>
-        <div className="mb-2.5 mt-1 flex items-baseline gap-[7px]">
-          <span className="font-head text-5xl font-semibold leading-none text-ink">{balance.hours}</span>
-          <span className="font-body text-base font-medium text-taupe">{hoursLabel}</span>
+        <div className="mb-2 mt-1 flex items-baseline gap-[7px]">
+          <span className="font-head text-[40px] font-semibold leading-none text-ink">{balance.hours}</span>
+          <span className="font-body text-[15px] font-medium text-taupe">{hoursLabel}</span>
         </div>
         <div className="flex items-center justify-between gap-3 border-t border-line pt-3">
           <span className="font-body text-[12.5px] text-ink-soft">
@@ -108,7 +108,7 @@ export function ProfileView({ overview }: { overview: ProfileOverview }) {
       </Link>
 
       {/* household sharing surface (H1) — who shares the house pool */}
-      <section className="mb-5">
+      <section className="mb-4">
         <h2 className="mx-0.5 mb-3 font-body text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
           {t("shared_with")}
         </h2>
@@ -118,7 +118,7 @@ export function ProfileView({ overview }: { overview: ProfileOverview }) {
               {housemates.map((m, i) => (
                 <li
                   key={m.id}
-                  className={`flex items-center gap-3 px-[18px] py-3.5 ${
+                  className={`flex items-center gap-3 px-4 py-3 ${
                     i < housemates.length - 1 ? "border-b border-line" : ""
                   }`}
                 >
@@ -142,7 +142,7 @@ export function ProfileView({ overview }: { overview: ProfileOverview }) {
           </div>
         ) : (
           // Guest (no household — invariant 3) or member without a household.
-          <div className="rounded-lune border border-line bg-surface-2 px-[18px] py-4 font-body text-[13px] leading-relaxed text-ink-soft">
+          <div className="rounded-lune border border-line bg-surface-2 px-4 py-3.5 font-body text-[13px] leading-relaxed text-ink-soft">
             {t("guest_no_household")}
           </div>
         )}
@@ -159,12 +159,12 @@ export function ProfileView({ overview }: { overview: ProfileOverview }) {
               {purchaseHistory.map((p, i) => (
                 <li
                   key={p.id}
-                  className={`flex items-center justify-between gap-3 px-[18px] py-[15px] ${
+                  className={`flex items-center justify-between gap-3 px-4 py-3 ${
                     i < purchaseHistory.length - 1 ? "border-b border-line" : ""
                   }`}
                 >
                   <div className="min-w-0">
-                    <div className="font-head text-[18px] font-semibold text-ink">
+                    <div className="font-head text-[17px] font-semibold text-ink">
                       {tt(p.label)}
                     </div>
                     <div className="mt-0.5 font-body text-xs text-muted">
@@ -183,7 +183,7 @@ export function ProfileView({ overview }: { overview: ProfileOverview }) {
             </ul>
           </div>
         ) : (
-          <div className="rounded-lune border border-line bg-surface-2 px-[18px] py-4 font-body text-[13px] text-ink-soft">
+          <div className="rounded-lune border border-line bg-surface-2 px-4 py-3.5 font-body text-[13px] text-ink-soft">
             {t("no_purchases")}
           </div>
         )}

@@ -42,7 +42,7 @@ export function BuyView({ catalog, hours, nearestExpiryIso, isMember, house }: B
   return (
     <div className="flex min-h-dvh flex-col bg-cream">
       {/* header */}
-      <header className="flex shrink-0 items-center gap-2 bg-cream px-4 pb-2 pt-7">
+      <header className="flex shrink-0 items-center gap-2 bg-cream px-4 pb-2 pt-6">
         <Link
           href="/home"
           aria-label={t("nav_home")}
@@ -50,19 +50,19 @@ export function BuyView({ catalog, hours, nearestExpiryIso, isMember, house }: B
         >
           <ChevronLeft size={20} />
         </Link>
-        <h1 className="m-0 font-head text-[26px] font-medium tracking-[0.01em] text-ink">
+        <h1 className="m-0 font-head text-[24px] font-medium tracking-[0.01em] text-ink">
           {t("packages")}
         </h1>
       </header>
 
       <div className="pt-2">
         {/* balance recap */}
-        <div className="mx-[22px] mb-[18px] flex items-center justify-between rounded-lune-sm border border-line bg-surface-2 px-[18px] py-3.5 shadow-soft">
+        <div className="mx-[18px] mb-4 flex items-center justify-between rounded-lune-sm border border-line bg-surface-2 px-4 py-3 shadow-soft">
           <div>
             <p className="m-0 font-body text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
               {t("credits_remaining")}
             </p>
-            <div className="mt-0.5 font-head text-[26px] font-semibold text-ink">
+            <div className="mt-0.5 font-head text-[22px] font-semibold text-ink">
               {hours}{" "}
               <span className="font-body text-sm font-medium text-taupe">{hoursLabel}</span>
             </div>

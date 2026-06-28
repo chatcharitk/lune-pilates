@@ -98,7 +98,7 @@ export function TodayView({ overview }: { overview: AdminTodayOverview }) {
       </header>
 
       {/* stat tiles */}
-      <section className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <section className="mb-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-5">
         <Stat label={t("classes_today")} value={overview.stats.classes} />
         <Stat
           label={t("attendees")}

@@ -340,7 +340,7 @@ export function CheckoutPanel({ catalog, isMember, house }: CheckoutPanelProps) 
 
   return (
     <>
-      <div className="px-[22px] pb-[150px]">
+      <div className="px-[18px] pb-[150px]">
         {/* under-review banner — a slip submitted this session is awaiting verification.
             Session-scoped (no customer charge-status read model exists yet). */}
         {submittedLabel && (
@@ -483,13 +483,13 @@ export function CheckoutPanel({ catalog, isMember, house }: CheckoutPanelProps) 
 
       {/* sticky checkout bar */}
       <div
-        className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-[440px] border-t border-line bg-surface-2 px-[22px] pb-[calc(30px+env(safe-area-inset-bottom))] pt-3.5"
+        className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-[440px] border-t border-line bg-surface-2 px-[18px] pb-[calc(22px+env(safe-area-inset-bottom))] pt-3"
         style={{ boxShadow: "0 -10px 30px rgba(72,58,40,0.06)" }}
       >
         <div className="flex items-center gap-3.5">
           <div className="shrink-0">
             <div className="font-body text-[11px] text-muted">{t("total")}</div>
-            <div className="font-head text-2xl font-semibold leading-[1.1] text-ink">
+            <div className="font-head text-xl font-semibold leading-[1.1] text-ink">
               {selected ? thb(selected.price) : "—"}
             </div>
           </div>
@@ -497,7 +497,7 @@ export function CheckoutPanel({ catalog, isMember, house }: CheckoutPanelProps) 
             type="button"
             onClick={startCheckout}
             disabled={!selected || phase !== "idle"}
-            className="flex h-14 flex-1 items-center justify-center gap-2.5 rounded-lune-sm bg-ink font-body text-base font-semibold text-cream shadow-lift transition-transform active:scale-[0.985] disabled:bg-cream-2 disabled:text-muted disabled:shadow-none"
+            className="flex h-12 flex-1 items-center justify-center gap-2.5 rounded-lune-sm bg-ink font-body text-base font-semibold text-cream shadow-lift transition-transform active:scale-[0.985] disabled:bg-cream-2 disabled:text-muted disabled:shadow-none"
           >
             {t("pay_promptpay")}
             <Qr size={19} />
@@ -565,7 +565,7 @@ function PackageCard({
       role="radio"
       aria-checked={selected}
       onClick={onSelect}
-      className={`relative flex w-full items-center gap-3.5 rounded-lune border-[1.5px] px-[18px] py-4 text-left transition-all ${
+      className={`relative flex w-full items-center gap-3 rounded-lune border-[1.5px] px-4 py-3.5 text-left transition-all ${
         selected
           ? "border-taupe bg-surface-2 shadow-lift"
           : "border-line bg-surface shadow-soft"
@@ -582,7 +582,7 @@ function PackageCard({
 
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-1.5">
-          <span className="whitespace-nowrap font-head text-[21px] font-semibold leading-[1.3] text-ink">
+          <span className="whitespace-nowrap font-head text-[19px] font-semibold leading-[1.3] text-ink">
             {tt(item.label)}
           </span>
           {item.tag && (
@@ -608,7 +608,7 @@ function PackageCard({
       </div>
 
       <div className="shrink-0 text-right">
-        <div className="font-head text-[22px] font-semibold text-ink">{thb(item.price)}</div>
+        <div className="font-head text-[20px] font-semibold text-ink">{thb(item.price)}</div>
       </div>
     </button>
   );
@@ -710,7 +710,7 @@ function CheckoutSheet({
         <div className="flex shrink-0 justify-center pb-1 pt-3">
           <span className="h-[5px] w-10 rounded-full bg-line-strong" />
         </div>
-        <div className="overflow-y-auto px-[22px] pb-[30px] pt-2">
+        <div className="overflow-y-auto px-[18px] pb-[30px] pt-2">
           {/* The step heading uses titleId so the dialog is labelled by it. */}
           <SheetTitleContext.Provider value={titleId}>{children}</SheetTitleContext.Provider>
         </div>
@@ -805,7 +805,7 @@ function PromptPayStep({
         type="button"
         onClick={onAttach}
         disabled={loading}
-        className="mt-[18px] flex h-14 w-full items-center justify-center gap-2.5 rounded-lune-sm bg-ink font-body text-base font-semibold text-cream shadow-lift transition-transform active:scale-[0.985] disabled:bg-cream-2 disabled:text-muted disabled:shadow-none"
+        className="mt-[18px] flex h-12 w-full items-center justify-center gap-2.5 rounded-lune-sm bg-ink font-body text-base font-semibold text-cream shadow-lift transition-transform active:scale-[0.985] disabled:bg-cream-2 disabled:text-muted disabled:shadow-none"
       >
         {t("slip_attach")}
         <Upload size={19} />
@@ -931,7 +931,7 @@ function SlipUploadStep({
         type="button"
         onClick={() => dataUrl && onSubmit(dataUrl)}
         disabled={!dataUrl || submitting}
-        className="mt-[18px] flex h-14 w-full items-center justify-center gap-2.5 rounded-lune-sm bg-ink font-body text-base font-semibold text-cream shadow-lift transition-transform active:scale-[0.985] disabled:bg-cream-2 disabled:text-muted disabled:shadow-none"
+        className="mt-[18px] flex h-12 w-full items-center justify-center gap-2.5 rounded-lune-sm bg-ink font-body text-base font-semibold text-cream shadow-lift transition-transform active:scale-[0.985] disabled:bg-cream-2 disabled:text-muted disabled:shadow-none"
       >
         {submitting ? `${t("slip_submit")}…` : t("slip_submit")}
         {!submitting && <Check size={19} />}
@@ -999,7 +999,7 @@ function SlipSubmittedStep({
       <button
         type="button"
         onClick={onDone}
-        className="flex h-14 w-full items-center justify-center gap-2 rounded-lune-sm bg-ink font-body text-base font-semibold text-cream shadow-lift transition-transform active:scale-[0.985]"
+        className="flex h-12 w-full items-center justify-center gap-2 rounded-lune-sm bg-ink font-body text-base font-semibold text-cream shadow-lift transition-transform active:scale-[0.985]"
       >
         {t("done")}
         <ArrowRight size={18} />
@@ -1066,7 +1066,7 @@ function PaymentPaidStep({
       <button
         type="button"
         onClick={onDone}
-        className="flex h-14 w-full items-center justify-center gap-2 rounded-lune-sm bg-ink font-body text-base font-semibold text-cream shadow-lift transition-transform active:scale-[0.985]"
+        className="flex h-12 w-full items-center justify-center gap-2 rounded-lune-sm bg-ink font-body text-base font-semibold text-cream shadow-lift transition-transform active:scale-[0.985]"
       >
         {t("done")}
         <ArrowRight size={18} />
@@ -1134,7 +1134,7 @@ function SlipRejectedStep({
       <button
         type="button"
         onClick={onRetry}
-        className="flex h-14 w-full items-center justify-center gap-2.5 rounded-lune-sm bg-ink font-body text-base font-semibold text-cream shadow-lift transition-transform active:scale-[0.985]"
+        className="flex h-12 w-full items-center justify-center gap-2.5 rounded-lune-sm bg-ink font-body text-base font-semibold text-cream shadow-lift transition-transform active:scale-[0.985]"
       >
         {t("slip_upload_again")}
         <Upload size={19} />
