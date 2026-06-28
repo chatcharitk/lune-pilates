@@ -6,9 +6,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
-  index,
   integer,
-  numeric,
   pgEnum,
   pgTable,
   text,
@@ -43,37 +41,6 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-// ───────────────────────── household invites ─────────────────────────
-// "เชิญคนในบ้าน" — a member invites someone to JOIN their household pool (Feature 2).
-// The link carries ONLY the token (no household id, no identity), so the token must be
-// unguessable (>=128-bit crypto-random base64url), single-use, and short-lived (7 days).
-// Multiple concurrent pending invites per household are allowed. Accepting promotes the
-// joiner to tier='member' and links them to the household; their existing user-owned
-// packages stay user-owned (invariant 3 preserved — never pooled cross-owner).
-export const householdInvites = pgTable(
-  "household_invites",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    // The opaque single-use credential carried by the join link. UNIQUE so a token
-    // resolves to exactly one invite.
-    token: text("token").notNull().unique(),
-    householdId: uuid("household_id")
-      .notNull()
-      .references(() => households.id),
-    inviterUserId: uuid("inviter_user_id")
-      .notNull()
-      .references(() => users.id),
-    // 'pending' → 'accepted' (single use) | 'revoked' | 'expired' (lazily on read).
-    status: text("status").notNull().default("pending"),
-    // The user who accepted (null until accepted).
-    acceptedByUserId: uuid("accepted_by_user_id").references(() => users.id),
-    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
-  },
-  (t) => [index("household_invites_household_status").on(t.householdId, t.status)],
-);
-
 // ───────────────────────── packages (balance holders) ─────────────────────────
 // Exactly one owner: household_id (member, sharable) XOR user_id (guest, non-transferable).
 export const packages = pgTable(
@@ -82,10 +49,9 @@ export const packages = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     type: text("type").notNull(), // catalog item id, e.g. "p10", "pv8"
     category: packageCategory("category").notNull(),
-    // Credit balances are half-hour granular (numeric(4,1)); { mode: "number" }
-    // makes Drizzle read them back as JS numbers, not strings (CLAUDE.md §8).
-    hoursTotal: numeric("hours_total", { precision: 4, scale: 1, mode: "number" }).notNull(),
-    hoursLeft: numeric("hours_left", { precision: 4, scale: 1, mode: "number" }).notNull(),
+    // Credit balances are whole integer credits (1 group/rental, 2 private/duo/trio).
+    hoursTotal: integer("hours_total").notNull(),
+    hoursLeft: integer("hours_left").notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     ownerHouseholdId: uuid("owner_household_id").references(() => households.id),
     ownerUserId: uuid("owner_user_id").references(() => users.id),
@@ -191,21 +157,33 @@ export const paymentSlips = pgTable("payment_slips", {
 });
 
 // ───────────────────────── credit ledger (append-only) ─────────────────────────
-export const creditLedger = pgTable("credit_ledger", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  packageId: uuid("package_id")
-    .notNull()
-    .references(() => packages.id),
-  // −cost on book, +cost on free cancel, +N on purchase. numeric(4,1) so a 1.5
-  // private/duo/trio debit is representable; { mode: "number" } round-trips as JS number.
-  delta: numeric("delta", { precision: 4, scale: 1, mode: "number" }).notNull(),
-  actorUserId: uuid("actor_user_id")
-    .notNull()
-    .references(() => users.id),
-  bookingId: uuid("booking_id"),
-  reason: text("reason").notNull(), // "booking" | "cancel_refund" | "purchase" | "adjustment"
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const creditLedger = pgTable(
+  "credit_ledger",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    packageId: uuid("package_id")
+      .notNull()
+      .references(() => packages.id),
+    // −cost on book, +cost on free cancel, +N on purchase. Integer credits
+    // (1 group/rental, 2 private/duo/trio) — whole numbers only.
+    delta: integer("delta").notNull(),
+    actorUserId: uuid("actor_user_id")
+      .notNull()
+      .references(() => users.id),
+    bookingId: uuid("booking_id"),
+    reason: text("reason").notNull(), // "booking" | "cancel_refund" | "purchase" | "adjustment"
+    // Client-supplied retry token for manual owner adjustments (reason="adjustment")
+    // so a dropped-response retry can't double-apply. Null for every other row; the
+    // partial unique index dedupes only the non-null adjustment keys.
+    idempotencyKey: text("idempotency_key"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("credit_ledger_idem_key")
+      .on(t.idempotencyKey)
+      .where(sql`${t.idempotencyKey} is not null`),
+  ],
+);
 
 // ───────────────────────── instructors ─────────────────────────
 export const instructors = pgTable("instructors", {
@@ -281,12 +259,15 @@ export const bookings = pgTable(
       .notNull()
       .references(() => packages.id),
     position: reformerPosition("position"),
-    // Credits actually debited for this booking (1.0 group / 1.5 private·duo·trio).
-    // This is the exact amount a free cancellation refunds (CLAUDE.md §5 inv 7).
-    creditCost: numeric("credit_cost", { precision: 3, scale: 1, mode: "number" }).notNull(),
-    // The free cancel/reschedule window (hours before start), LOCKED at booking
-    // time by the booking's lead time (5 if booked ≥5h ahead, else 1) — CLAUDE.md
-    // §5 invariant 7. A cancel/reschedule is free when hoursUntilStart >= this.
+    // Credits actually debited for this booking (1 group/rental · 2 private·duo·trio).
+    // Whole integer credits. This is the exact amount a free cancellation refunds
+    // (CLAUDE.md §5 inv 7).
+    creditCost: integer("credit_cost").notNull(),
+    // The free cancellation window (hours before start). AUDIT STAMP only: the
+    // policy is now a single FIXED window (FREE_CANCEL_HOURS = 5) for every booking
+    // (CLAUDE.md §5 invariant 7, decided 2026-06-28), so this is always stamped 5 at
+    // booking time and read back for the record — it is no longer a live per-booking
+    // input. A cancel is free (and only allowed) when hoursUntilStart >= 5.
     freeCancelHours: integer("free_cancel_hours").notNull().default(5),
     status: bookingStatus("status").notNull().default("booked"),
     // Front-desk roster check-in (admin Today screen). Null = not yet checked in;
@@ -337,4 +318,3 @@ export type DbBooking = typeof bookings.$inferSelect;
 export type DbUser = typeof users.$inferSelect;
 export type DbCharge = typeof charges.$inferSelect;
 export type DbPaymentSlip = typeof paymentSlips.$inferSelect;
-export type DbHouseholdInvite = typeof householdInvites.$inferSelect;

@@ -2,10 +2,12 @@
 
 // The customer cancel-booking sheet: a focus-trapped, Escape-dismissable dialog
 // opened from an upcoming booking on the My Bookings screen. It renders the
-// SERVER-computed cancellation policy (`booking.cancellation`) — free (outside
-// the 5-hour window, credit refunded) vs within-5h (credit kept) — then, on
-// confirm, calls `cancelBookingAction` and surfaces the cancelled confirmation,
-// refreshing the list via router.refresh() so the booking drops out.
+// SERVER-computed cancellation policy (`booking.cancellation`): a self-cancel is
+// allowed ONLY ≥5h before class and is then ALWAYS free/refunded; within the
+// fixed 5h window the cancel is BLOCKED entirely (CLAUDE.md §5 inv 7, decided
+// 2026-06-28) — the verdict reads "too late to cancel" and confirm is disabled.
+// On confirm, it calls `cancelBookingAction` and surfaces the (always-free)
+// cancelled confirmation, refreshing the list via router.refresh().
 //
 // Mirrors lune-pilates/project/lune-extra.jsx (CancelContent + ActionDone) and
 // lune-sheets.jsx (SummaryCard + Sheet chrome). It never recomputes the policy
@@ -34,7 +36,6 @@ import {
   hhmm,
   hoursUntilLabel,
   TYPE_DOT,
-  windowHoursLabel,
 } from "./schedule-helpers";
 import { Check, Clock, Info } from "./icons";
 
@@ -50,6 +51,8 @@ function cancelErrorKey(code: CancelActionFailureCode): StrKey {
       return "err_cancel_not_found";
     case "NOT_LIVE":
       return "err_cancel_not_live";
+    case "TOO_LATE_TO_CANCEL":
+      return "err_cancel_too_late";
     case "FORBIDDEN":
     case "INVALID_INPUT":
     default:
@@ -71,9 +74,6 @@ export function CancelSheet({
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("idle");
   const [failCode, setFailCode] = useState<CancelActionFailureCode | null>(null);
-  // Whether the completed cancel actually refunded — taken from the action
-  // outcome (server truth), not the pre-cancel `booking.cancellation`.
-  const [refunded, setRefunded] = useState(false);
 
   // Reset the flow whenever a fresh booking is opened, so a previous cancel's
   // "done" state never leaks into the next sheet.
@@ -81,7 +81,6 @@ export function CancelSheet({
     if (open) {
       setPhase("idle");
       setFailCode(null);
-      setRefunded(false);
     }
   }, [open, booking?.bookingId]);
 
@@ -91,7 +90,8 @@ export function CancelSheet({
     setFailCode(null);
     const res = await cancelBookingAction({ bookingId: booking.bookingId });
     if (res.ok) {
-      setRefunded(res.outcome.refunded);
+      // A successful self-cancel is ALWAYS free/refunded (it can only happen ≥5h
+      // before class), so the done screen has no "kept" branch.
       setPhase("done");
       // Re-fetch the server component so the cancelled booking leaves the list.
       router.refresh();
@@ -107,7 +107,6 @@ export function CancelSheet({
         (phase === "done" ? (
           <CancelledDone
             lang={lang}
-            refunded={refunded}
             credits={booking.creditCost}
             onDone={onClose}
           />
@@ -123,11 +122,6 @@ export function CancelSheet({
         ))}
     </Sheet>
   );
-}
-
-/** Format a credit cost for copy: 1 → "1", 1.5 → "1.5" (drops the trailing .0). */
-function fmtCredits(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
 // ───────────────────────── cancel content (policy verdict + actions) ─────────────────────────
@@ -159,6 +153,8 @@ function CancelContent({
     if (phase === "error") errorRef.current?.focus();
   }, [phase]);
 
+  // A self-cancel is free iff ≥5h before class (server verdict). Otherwise it is
+  // BLOCKED — the verdict reads "too late" and confirm is disabled (no kept path).
   const free = booking.cancellation.free;
   const late = !free;
   const dateStr = tt(classDateLabel(booking.startsAt));
@@ -167,12 +163,9 @@ function CancelContent({
     booking.durationMin,
   )}`;
   const untilStr = tt(hoursUntilLabel(booking.cancellation.hoursUntilStart));
-  // The exact cost kept/refunded, in the app's "hours" unit (e.g. "1.5 hours") —
-  // interpolated into the policy copy so it never misstates a 1.5-credit class.
-  const costLabel = `${fmtCredits(booking.creditCost)} ${booking.creditCost === 1 ? t("hour") : t("hours")}`;
-  // This booking's OWN free-cancel window (server-locked, 5 | 1) as a localized
-  // "5 hours" / "1 hour" phrase, interpolated into the verdict + sub-copy.
-  const windowLabel = windowHoursLabel(booking.cancellation.freeCancelHours, t);
+  // The exact cost refunded, in the app's "hours" unit (e.g. "2 hours") —
+  // interpolated into the free-cancel copy so it never misstates a 2-credit class.
+  const costLabel = `${String(booking.creditCost)} ${booking.creditCost === 1 ? t("hour") : t("hours")}`;
   const submitting = phase === "submitting";
 
   return (
@@ -234,12 +227,12 @@ function CancelContent({
               late ? "text-rose" : "text-sage-deep"
             }`}
           >
-            {late ? t("late_cancel").replace("{hours}", windowLabel) : t("free_cancel")}
+            {late ? t("too_late_to_cancel") : t("free_cancel")}
           </div>
           <div className="font-body text-[12.5px] leading-[1.5] text-ink-soft">
             {late
-              ? t("late_cancel_sub").replace("{hours}", windowLabel).replace("{cost}", costLabel)
-              : t("free_cancel_sub").replace("{hours}", windowLabel).replace("{cost}", costLabel)}
+              ? t("too_late_sub")
+              : t("free_cancel_sub").replace("{cost}", costLabel)}
           </div>
         </div>
       </div>
@@ -261,14 +254,14 @@ function CancelContent({
         </div>
       )}
 
-      {/* cancel action — rose when late (credit kept), ink when free */}
+      {/* cancel action — enabled & ink ONLY when free (≥5h before class). Within the
+          5h window the cancel is BLOCKED, so the button is disabled. */}
       <button
         type="button"
         onClick={onConfirm}
-        disabled={submitting}
-        className={`mt-[18px] flex h-14 w-full items-center justify-center rounded-lune-sm font-body text-base font-semibold text-cream shadow-lift transition-transform active:scale-[0.985] disabled:bg-cream-2 disabled:text-muted disabled:shadow-none ${
-          late ? "bg-rose" : "bg-ink"
-        }`}
+        disabled={submitting || late}
+        aria-disabled={submitting || late}
+        className="mt-[18px] flex h-14 w-full items-center justify-center rounded-lune-sm bg-ink font-body text-base font-semibold text-cream shadow-lift transition-transform active:scale-[0.985] disabled:cursor-not-allowed disabled:bg-cream-2 disabled:text-muted disabled:shadow-none"
       >
         {submitting ? `${t("cancel_class")}…` : t("cancel_class")}
       </button>
@@ -288,17 +281,16 @@ function CancelContent({
 
 function CancelledDone({
   lang,
-  refunded,
   credits,
   onDone,
 }: {
   lang: Lang;
-  refunded: boolean;
   credits: number;
   onDone: () => void;
 }) {
   const { t } = makeT(lang);
-  const costLabel = `${fmtCredits(credits)} ${credits === 1 ? t("hour") : t("hours")}`;
+  // A successful self-cancel is ALWAYS free → the exact cost is refunded.
+  const costLabel = `${String(credits)} ${credits === 1 ? t("hour") : t("hours")}`;
   const titleId = useContext(SheetTitleContext);
   const headingRef = useRef<HTMLHeadingElement>(null);
 
@@ -309,14 +301,8 @@ function CancelledDone({
   return (
     <div className="pt-2 text-center" aria-live="polite">
       <div
-        className={`mx-auto mb-[18px] mt-1 grid h-[76px] w-[76px] place-items-center rounded-full text-white ${
-          refunded ? "bg-sage" : "bg-rose"
-        }`}
-        style={{
-          boxShadow: refunded
-            ? "0 10px 30px rgba(140,154,126,0.4)"
-            : "0 10px 30px rgba(196,154,134,0.4)",
-        }}
+        className="mx-auto mb-[18px] mt-1 grid h-[76px] w-[76px] place-items-center rounded-full bg-sage text-white"
+        style={{ boxShadow: "0 10px 30px rgba(140,154,126,0.4)" }}
       >
         <Check size={34} strokeWidth={2} />
       </div>
@@ -329,7 +315,7 @@ function CancelledDone({
         {t("cancelled_title")}
       </h2>
       <p className="mx-auto mb-[22px] max-w-[290px] font-body text-[14px] leading-[1.55] text-ink-soft">
-        {(refunded ? t("cancelled_free_sub") : t("cancelled_late_sub")).replace("{cost}", costLabel)}
+        {t("cancelled_free_sub").replace("{cost}", costLabel)}
       </p>
       <button
         type="button"

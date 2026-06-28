@@ -1,11 +1,9 @@
-// Credit cost per booking, by class type (CLAUDE.md §5 invariant 1, decided
-// 2026-06-17). Pure and unit-testable — the single place this mapping lives.
+// Credit cost per booking, by class type (CLAUDE.md §5 invariant 1). Pure and
+// unit-testable — the single place this mapping lives.
 //
-// Mirrors lune-pilates/project/lune-detail.jsx (`cost = type === 'private' ? 1.5 : 1`)
-// extended per the 2026-06-17 decision so every 1:1-format class (private, duo,
-// trio) costs the same 1.5 credits, while shared group classes cost 1.0.
-//
-// Costs are half-hour granular (numeric(4,1) in the DB); never floats beyond .5.
+// Costs are whole integer credits (decided 2026-06: credits are integers): shared
+// group classes and studio rentals cost 1; the 1:1-format classes (private, duo,
+// trio) each cost 2.
 
 import type { ClassType } from "@/lib/domain/types";
 
@@ -16,10 +14,8 @@ export function creditCostForClassType(type: ClassType): number {
     case "private":
     case "duo":
     case "trio":
-      return 1.5;
+      return 2;
     case "rental":
-      // review: rental currently settles 1 credit like group; the rate for
-      // studio rentals is not finalised in the spec. Revisit when confirmed.
       return 1;
   }
 }

@@ -38,13 +38,27 @@ export type DomainEvent =
       reason: string | null;
     }
   | {
-      /** A user accepted a household invite and joined the pool (Feature 2). */
-      type: "household.member_joined";
-      householdId: string;
-      /** The user who joined (now tier='member', linked to householdId). */
-      userId: string;
-      /** The member who created the invite — notified that someone joined. */
-      inviterUserId: string;
+      /**
+       * An owner manually adjusted a package's credit balance (Group D #8): a
+       * `+delta` grant or a `−delta` deduction, recorded as a `reason='adjustment'`
+       * ledger row. The CRM listens to notify the affected pool; the model already
+       * holds the truth (the ledger row), so this is never a parallel source.
+       */
+      type: "credit.adjusted";
+      /** The package whose balance was adjusted. */
+      packageId: string;
+      /** The target customer whose pool was adjusted (the ledger actor / recipient). */
+      customerId: string;
+      /** Where the adjusted balance lives (household pool member XOR user guest). */
+      owner: { ownerHouseholdId: string | null; ownerUserId: string | null };
+      /** Signed credits moved (+grant / −deduction). */
+      delta: number;
+      /** Usable balance on the package AFTER the adjustment. */
+      hoursLeft: number;
+      /** The required admin note explaining the adjustment (audit). */
+      note: string;
+      /** The acting admin's session id (rides the EVENT — not the ledger actor). */
+      adminId: string;
     };
 
 export type DomainEventType = DomainEvent["type"];

@@ -48,6 +48,8 @@ export function TodayView({ overview }: { overview: AdminTodayOverview }) {
   // follow-up; the automated offer flow runs via the cron sweep.
   const [notified, setNotified] = useState<Record<string, boolean>>({});
   const [openId, setOpenId] = useState<string | null>(null);
+  // Transient error toast — e.g. an instructor checking in a class that isn't theirs.
+  const [toast, setToast] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   const open = overview.classes.find((c) => c.id === openId) ?? null;
@@ -64,6 +66,12 @@ export function TodayView({ overview }: { overview: AdminTodayOverview }) {
       const res = await setCheckIn({ bookingId, checkedIn: next });
       if (!res.ok) {
         setChecks((prev) => ({ ...prev, [bookingId]: !next })); // revert
+        // An instructor scoped out of this class gets a clear reason; other
+        // failures just revert silently (the toggle snapping back is the signal).
+        if (res.code === "FORBIDDEN") {
+          setToast(t("admin_checkin_forbidden"));
+          setTimeout(() => setToast(null), 2600);
+        }
       }
     });
   }
@@ -73,6 +81,15 @@ export function TodayView({ overview }: { overview: AdminTodayOverview }) {
 
   return (
     <div>
+      {toast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed inset-x-0 bottom-24 z-[70] mx-auto w-fit rounded-full bg-ink px-4 py-2 font-body text-[13px] font-medium text-cream shadow-lift md:bottom-8"
+        >
+          {toast}
+        </div>
+      )}
       <header className="mb-5">
         <h1 className="font-head text-2xl font-semibold tracking-tight text-ink">
           {t("admin_overview")}

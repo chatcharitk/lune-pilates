@@ -11,7 +11,7 @@ import { z } from "zod";
 import { getDb } from "@/lib/db/client";
 import { bookings, classInstances, creditLedger, packages } from "@/lib/db/schema";
 import type { ReformerPosition } from "@/lib/domain/types";
-import { effectiveCapacity, freeCancelHoursFor } from "@/lib/domain/types";
+import { effectiveCapacity, FREE_CANCEL_HOURS } from "@/lib/domain/types";
 import { positionsForCapacity } from "@/lib/schedule/queries";
 import { isBookableForViewer } from "@/lib/schedule/visibility";
 import { creditCostForClassType } from "./cost";
@@ -77,7 +77,7 @@ function uniqueViolationCode(err: unknown): "ALREADY_BOOKED" | "POSITION_TAKEN" 
 
 /**
  * Atomically book `classInstanceId` for `userId`, debiting the class type's
- * credit cost (1 group / 1.5 private·duo·trio) from `packageId`. Returns a typed
+ * credit cost (1 group / 2 private·duo·trio) from `packageId`. Returns a typed
  * result — never throws on a business-rule failure. Enforces tiered visibility
  * under the lock from the server-resolved `viewerTier` (CLAUDE.md §5 inv 4).
  *
@@ -181,17 +181,16 @@ export async function bookClassWithDebit(
 
     if (!pkg) return { ok: false, code: "PACKAGE_NOT_FOUND" } as const;
 
-    // Cost for this class type (1 group / 1.5 private·duo·trio). The guard
+    // Cost for this class type (1 group / 2 private·duo·trio). The guard
     // re-checks the package holds at least `cost` credits and is not expired.
     const cost = creditCostForClassType(cls.type);
     const block = packageDebitBlock(pkg, cost, now);
     if (block) return { ok: false, code: block } as const;
 
-    // Lock the cancellation/reschedule window now, from the booking's lead time:
-    // ≥5h ahead → free until 5h before; last-minute (<5h) → free until 1h before
-    // (CLAUDE.md §5 invariant 7). Stored on the booking so the policy is judged by
-    // the window it was created with, never a later recomputation.
-    const freeCancelHours = freeCancelHoursFor(cls.startsAt, now);
+    // The cancellation window is a single FIXED 5h window for every booking
+    // (CLAUDE.md §5 invariant 7, decided 2026-06-28). Stamp the constant as an
+    // audit record on the booking; it is no longer derived from lead time.
+    const freeCancelHours = FREE_CANCEL_HOURS;
 
     // 6) Write the booking (recording the exact cost debited + the locked window),
     //    the −cost ledger row (stamped with the actor), and decrement the cached
@@ -243,6 +242,11 @@ export const rescheduleInput = z.object({
   // the old booking row, not trusted from the caller.
   newPackageId: z.string().uuid(),
   position: z.enum(["left", "middle", "right"]).optional(),
+  // Bypass the 5h free-window gate on the OLD booking. Set ONLY by the owner-only
+  // admin reschedule path (CLAUDE.md §5 inv 7, decided 2026-06-28): the front desk
+  // can move a client's booking regardless of how close to start it is. The
+  // customer flow never sets this, so it is still bound by the window.
+  skipWindowCheck: z.boolean().optional(),
 });
 export type RescheduleInput = z.infer<typeof rescheduleInput>;
 
@@ -308,10 +312,14 @@ export async function rescheduleWithinTransaction(
     if (!oldCls) return { ok: false, code: "OLD_NOT_FOUND" } as const;
 
     // Reschedule is a FREE move allowed only inside the old booking's free window
-    // (CLAUDE.md §5 inv 7). Past it, only cancel-with-deduction remains.
-    const hoursUntilOldStart = (oldCls.startsAt.getTime() - now.getTime()) / 3_600_000;
-    if (hoursUntilOldStart < oldBk.freeCancelHours) {
-      return { ok: false, code: "RESCHEDULE_WINDOW_CLOSED" } as const;
+    // (CLAUDE.md §5 inv 7) — UNLESS the caller is the owner-only admin path, which
+    // bypasses the 5h gate entirely (skipWindowCheck). The customer flow never sets
+    // the flag, so it stays bound by the window.
+    if (!input.skipWindowCheck) {
+      const hoursUntilOldStart = (oldCls.startsAt.getTime() - now.getTime()) / 3_600_000;
+      if (hoursUntilOldStart < oldBk.freeCancelHours) {
+        return { ok: false, code: "RESCHEDULE_WINDOW_CLOSED" } as const;
+      }
     }
 
     // 2) Lock the NEW class instance and re-validate bookability under the lock —
@@ -413,7 +421,8 @@ export async function rescheduleWithinTransaction(
     );
     if (block) return { ok: false, code: block } as const;
 
-    const freeCancelHours = freeCancelHoursFor(newCls.startsAt, now);
+    // Fixed 5h window stamped on the new booking (audit constant, CLAUDE.md §5 inv 7).
+    const freeCancelHours = FREE_CANCEL_HOURS;
 
     // 5a) Release the OLD booking with a +refundCost ledger row (within the free
     //     window → refund the exact cost it debited, never a hardcoded 1).

@@ -129,17 +129,23 @@ function computeStats(classes: AdminTodayClass[]): AdminTodayStats {
  * No-DB fallback: returns mock data mirroring admin-data.jsx so the screen
  * renders without a database.
  */
-export async function getTodayOverview(now: Date = new Date()): Promise<AdminTodayOverview> {
+export async function getTodayOverview(
+  now: Date = new Date(),
+  opts?: { instructorId?: string },
+): Promise<AdminTodayOverview> {
   const dayStart = startOfDay(now);
+  const scopeInstructorId = opts?.instructorId;
 
   if (!process.env.DATABASE_URL) {
-    return mockTodayOverview(dayStart);
+    return mockTodayOverview(dayStart, scopeInstructorId);
   }
 
   const db = getDb();
   const dayEnd = new Date(dayStart.getTime() + 24 * 3_600_000);
 
-  // 1) Today's classes (all statuses) + instructor.
+  // 1) Today's classes (all statuses) + instructor. When scoped to an instructor
+  // (an instructor session — CLAUDE.md role gating), restrict to THEIR classes so
+  // the screen + stats reflect only their day; an owner passes no scope (all).
   const classRows = await db
     .select({
       id: classInstances.id,
@@ -158,6 +164,7 @@ export async function getTodayOverview(now: Date = new Date()): Promise<AdminTod
       and(
         sql`${classInstances.startsAt} >= ${dayStart}`,
         sql`${classInstances.startsAt} < ${dayEnd}`,
+        ...(scopeInstructorId ? [eq(classInstances.instructorId, scopeInstructorId)] : []),
       ),
     )
     .orderBy(asc(classInstances.startsAt));
@@ -320,8 +327,13 @@ function mockUuid(n: number): string {
   return `00000000-0000-4000-8000-${n.toString(16).padStart(12, "0")}`;
 }
 
-function mockTodayOverview(dayStart: Date): AdminTodayOverview {
-  const classes: AdminTodayClass[] = MOCK_TODAY.map((seed, ci) => {
+function mockTodayOverview(dayStart: Date, scopeInstructorId?: string): AdminTodayOverview {
+  // When scoped to an instructor (instructor session), filter the mock day to
+  // only their classes so the stats reflect the filtered set — same as the DB path.
+  const seeds = scopeInstructorId
+    ? MOCK_TODAY.filter((s) => s.instr === scopeInstructorId)
+    : MOCK_TODAY;
+  const classes: AdminTodayClass[] = seeds.map((seed, ci) => {
     const [h, m] = seed.time.split(":").map((n) => Number.parseInt(n, 10));
     const startsAt = new Date(dayStart);
     startsAt.setHours(h ?? 0, m ?? 0, 0, 0);

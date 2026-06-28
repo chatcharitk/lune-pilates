@@ -411,7 +411,7 @@ async function buildSalesSection(now: Date): Promise<SalesSection> {
   };
 
   // Liability.
-  const hoursOutstanding = round1(liabRow?.outstanding ?? 0);
+  const hoursOutstanding = Math.round(liabRow?.outstanding ?? 0);
   const sold = liabRow?.sold ?? 0;
   const packageLiability = {
     thb: Math.round(hoursOutstanding * LIABILITY_RATE_PER_HOUR),
@@ -445,7 +445,7 @@ async function buildSalesSection(now: Date): Promise<SalesSection> {
         initials: initialsFor(name),
         tag: meta?.tag ?? null,
         revenue: Math.round(acc.revenue),
-        hours: round1(acc.hours),
+        hours: Math.round(acc.hours),
       };
     })
     .sort((a, b) => b.revenue - a.revenue);
@@ -622,7 +622,7 @@ async function buildRetentionSection(now: Date): Promise<RetentionSection> {
         ? { en: "Guest", th: "ทั่วไป" }
         : { en: r.houseNumber ? `Member · House ${r.houseNumber}` : "Member", th: r.houseNumber ? `สมาชิก · บ้าน ${r.houseNumber}` : "สมาชิก" },
       tier: isGuest ? ("guest" as const) : ("member" as const),
-      hoursLeft: round1(r.hoursLeft),
+      hoursLeft: Math.round(r.hoursLeft),
       expiresAt: exp.toISOString(),
       expiresDisplay: expiresDisplay(exp, now),
       userId: r.userId ?? "",
@@ -659,8 +659,8 @@ async function buildRetentionSection(now: Date): Promise<RetentionSection> {
 
   const houseUsage = houseRows
     .map((h) => {
-      const totalHours = round1(h.totalHours);
-      const usedHours = round1(h.totalHours - h.leftHours);
+      const totalHours = Math.round(h.totalHours);
+      const usedHours = Math.round(h.totalHours - h.leftHours);
       const memberIds = membersByHouse.get(h.householdId) ?? [];
       return buildHouseUsage(h.householdId, h.houseNumber, memberIds, usedHours, totalHours);
     })
@@ -688,13 +688,6 @@ export function buildHouseUsage(
       ? { en: "Nearly spent · prompt a renewal soon", th: "ใกล้หมด · ควรเตือนต่ออายุเร็ว ๆ นี้" }
       : { en: `Steady · ${memberIds.length} members · healthy runway`, th: `สม่ำเสมอ · ${memberIds.length} สมาชิก · เหลือใช้ได้อีกพอ` };
   return { householdId, houseNumber, memberIds, usedHours, totalHours, pct, tone, burnNote };
-}
-
-// ═════════════════════════ shared rounding ═════════════════════════
-
-/** Round to one decimal (half-hour-granular hours never accumulate float noise). */
-function round1(n: number): number {
-  return Math.round(n * 10) / 10;
 }
 
 // suppress unused import warning for creditLedger (referenced in the derivation
@@ -791,10 +784,10 @@ function mockRetention(now: Date): RetentionSection {
   };
 
   const expiringSoon: RetentionSection["expiringSoon"] = [
-    expRow("mock-x1", "Mind Arunee", "Guest · 5-hr pack", "ทั่วไป · แพ็ก 5 ชม.", "guest", 0.5, 1, "m6"),
-    expRow("mock-x2", "Title Nattha", "Guest · drop-in credit", "ทั่วไป · เครดิตดรอปอิน", "guest", 1.0, 2, "m9"),
-    expRow("mock-x3", "Nok Charoen", "Member · House B-203", "สมาชิก · บ้าน B-203", "member", 2.0, 4, "m2"),
-    expRow("mock-x4", "June Wattana", "Guest · House A-114", "ทั่วไป · บ้าน A-114", "guest", 1.5, 5, "m3"),
+    expRow("mock-x1", "Mind Arunee", "Guest · 5-hr pack", "ทั่วไป · แพ็ก 5 ชม.", "guest", 1, 1, "m6"),
+    expRow("mock-x2", "Title Nattha", "Guest · drop-in credit", "ทั่วไป · เครดิตดรอปอิน", "guest", 1, 2, "m9"),
+    expRow("mock-x3", "Nok Charoen", "Member · House B-203", "สมาชิก · บ้าน B-203", "member", 2, 4, "m2"),
+    expRow("mock-x4", "June Wattana", "Guest · House A-114", "ทั่วไป · บ้าน A-114", "guest", 2, 5, "m3"),
   ];
 
   const houseUsage: RetentionSection["houseUsage"] = [

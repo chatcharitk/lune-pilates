@@ -57,7 +57,7 @@ async function main() {
   }
   await db.update(households).set({ ownerUserId: pim!.id }).where(eq(households.id, house!.id));
 
-  // Shared household group pool of 7.5h (numeric(4,1) → exact half-hour), valid 2 months.
+  // Shared household group pool of 8h (whole integer credits), valid 2 months.
   const existingPkg = await db
     .select()
     .from(packages)
@@ -69,7 +69,7 @@ async function main() {
       type: "p10",
       category: "group",
       hoursTotal: 10,
-      hoursLeft: 7.5,
+      hoursLeft: 8,
       expiresAt: expires,
       ownerHouseholdId: house!.id,
     });
@@ -140,7 +140,7 @@ async function main() {
   }
 
   console.info(
-    `Seed complete: 3 instructors, household A-114, member Pim, group pool 7.5h, ${created} published group classes, ${availRows} availability rows${future.length ? " (week already existed — skipped)" : ""}.`,
+    `Seed complete: 3 instructors, household A-114, member Pim, group pool 8h, ${created} published group classes, ${availRows} availability rows${future.length ? " (week already existed — skipped)" : ""}.`,
   );
 }
 

@@ -107,7 +107,7 @@ export const STR = {
   remaining_after: { en: "Balance after booking", th: "คงเหลือหลังจอง" },
   policy_title: { en: "Cancellation policy", th: "นโยบายการยกเลิก" },
   // Success-screen policy notice — the window ({hours}) and cost ({cost}) are
-  // interpolated from the bookClass result (freeCancelHours is 5 | 1).
+  // interpolated from the bookClass result (freeCancelHours is always 5).
   booked_policy: {
     en: "Cancel at least {hours} before class, or {cost} will be deducted.",
     th: "ยกเลิกอย่างน้อย {hours} ก่อนเริ่มคลาส มิฉะนั้นจะถูกหัก {cost}",
@@ -159,8 +159,8 @@ export const STR = {
 
   // policy
   policy_body: {
-    en: "Free cancel or reschedule within your booking's cancellation window. After that, the class credit is kept.",
-    th: "ยกเลิกหรือเลื่อนได้ฟรีภายในช่วงเวลายกเลิกของการจอง หลังจากนั้นเครดิตจะถูกหัก",
+    en: "Free cancellation up to 5 hours before class. Within 5 hours, bookings can’t be cancelled.",
+    th: "ยกเลิกได้ฟรีจนถึง 5 ชั่วโมงก่อนคลาส หากเหลือน้อยกว่า 5 ชั่วโมงจะไม่สามารถยกเลิกได้",
   },
   open_hours: { en: "Open daily 8:00–20:00", th: "เปิดทุกวัน 8:00–20:00" },
 
@@ -171,8 +171,6 @@ export const STR = {
   shared_with: { en: "Shared with", th: "แบ่งปันกับ" },
   // marks the viewer in the housemates list ("Pim · You")
   you: { en: "You", th: "คุณ" },
-  // invite affordance — opens the invite sheet (Feature 2: เชิญคนในบ้าน)
-  invite_member: { en: "Invite a housemate", th: "เชิญคนในบ้าน" },
   coming_soon: { en: "Coming soon", th: "เร็ว ๆ นี้" },
   // guest (no household) non-sharing state on Profile
   guest_no_household: {
@@ -226,36 +224,32 @@ export const STR = {
     th: "คุณไม่มีเครดิตที่ใช้ได้สำหรับยืนยันที่นั่งนี้",
   },
 
-  // reschedule / cancel (seeded from lune-data.jsx STR)
-  reschedule: { en: "Reschedule", th: "เลื่อนเวลา" },
+  // cancel (seeded from lune-data.jsx STR). Self-cancel is allowed ONLY ≥5h before
+  // class and is then always free/refunded; within 5h it is blocked entirely.
   cancel_class: { en: "Cancel class", th: "ยกเลิกคลาส" },
   cancel_title: { en: "Cancel this class?", th: "ยกเลิกคลาสนี้?" },
   keep_booking: { en: "Keep my booking", th: "เก็บการจองไว้" },
   free_cancel: { en: "Free cancellation", th: "ยกเลิกได้ฟรี" },
-  // {hours} is the booking's own free window (e.g. "5 hours" / "1 hour"),
-  // interpolated from booking.cancellation.freeCancelHours; {cost} is the
-  // booking's exact credit cost (e.g. "1.5 hours"), refunded on a free cancel.
+  // {cost} is the booking's exact credit cost (e.g. "2 hours"), refunded in full
+  // on a free cancel (always, since self-cancel only happens ≥5h before class).
   free_cancel_sub: {
-    en: "You’re outside the {hours} window — your {cost} will be refunded to your balance.",
-    th: "คุณยกเลิกก่อน {hours} — {cost} จะถูกคืนเข้าบัญชีของคุณ",
+    en: "You’re more than 5 hours before class — your {cost} will be refunded to your balance.",
+    th: "เหลือเวลามากกว่า 5 ชั่วโมงก่อนคลาส — {cost} จะถูกคืนเข้าบัญชีของคุณ",
   },
-  // "Within N hours" verdict label — {hours} from the booking's window.
-  late_cancel: { en: "Within {hours}", th: "ภายใน {hours}" },
-  late_cancel_sub: {
-    en: "You’re inside the {hours} window — your {cost} will be kept (deducted).",
-    th: "คุณอยู่ในช่วง {hours} ก่อนเรียน — {cost} จะถูกหักไว้ (ไม่คืน)",
+  // "too late" verdict shown when the 5h window has closed (cancel is BLOCKED).
+  too_late_to_cancel: { en: "Too late to cancel", th: "เลยกำหนดยกเลิกแล้ว" },
+  too_late_sub: {
+    en: "It’s within 5 hours of class — this booking can no longer be cancelled.",
+    th: "เหลือน้อยกว่า 5 ชั่วโมงก่อนคลาส — ไม่สามารถยกเลิกการจองนี้ได้แล้ว",
   },
-  // The booking's free window expressed as a unit phrase for {hours} above.
+  // The booking's free window expressed as a unit phrase (used by the admin drawer
+  // and the "You're booked" success policy line).
   window_hours: { en: "{n} hours", th: "{n} ชั่วโมง" },
   window_hour: { en: "{n} hour", th: "{n} ชั่วโมง" },
   cancelled_title: { en: "Booking cancelled", th: "ยกเลิกการจองแล้ว" },
   cancelled_free_sub: {
     en: "Returned {cost} to your balance.",
     th: "คืน {cost} เข้าบัญชีของคุณแล้ว",
-  },
-  cancelled_late_sub: {
-    en: "Kept {cost} as per the cancellation policy.",
-    th: "หัก {cost} ไว้ตามนโยบายการยกเลิก",
   },
   time_until_class: { en: "until class", th: "ก่อนเริ่มคลาส" },
 
@@ -268,42 +262,17 @@ export const STR = {
     en: "This booking can no longer be cancelled.",
     th: "ไม่สามารถยกเลิกการจองนี้ได้แล้ว",
   },
-
-  // reschedule flow (seeded from lune-data.jsx STR)
-  resched_title: { en: "Reschedule class", th: "เลื่อนเวลาเรียน" },
-  resched_pick: { en: "Choose a new time", th: "เลือกเวลาใหม่" },
-  current_time: { en: "Currently booked", th: "เวลาที่จองไว้" },
-  keep_time: { en: "Keep current time", th: "ใช้เวลาเดิม" },
-  confirm_resched: { en: "Confirm new time", th: "ยืนยันเวลาใหม่" },
-  resched_done: { en: "Class rescheduled", th: "เลื่อนเวลาเรียบร้อย" },
-  resched_done_sub: {
-    en: "Your new time is confirmed. See you on the reformer.",
-    th: "ยืนยันเวลาใหม่เรียบร้อยแล้ว แล้วพบกันนะคะ",
+  err_cancel_too_late: {
+    en: "It’s within 5 hours of class — this booking can no longer be cancelled.",
+    th: "เหลือเวลาน้อยกว่า 5 ชั่วโมงก่อนคลาส — ไม่สามารถยกเลิกการจองนี้ได้แล้ว",
   },
-  no_other_times: { en: "No other times this week", th: "ไม่มีเวลาอื่นในสัปดาห์นี้" },
-  // hint on a card whose reschedule button is disabled (past the free window).
-  resched_locked_hint: {
-    en: "Past the free window — cancel only.",
-    th: "เลยช่วงเลื่อนฟรีแล้ว — ยกเลิกได้เท่านั้น",
+  // hint on a card whose cancel button is disabled (inside the 5h window).
+  too_late_to_cancel_hint: {
+    en: "Within 5 hours of class — cancellation is closed.",
+    th: "เหลือน้อยกว่า 5 ชั่วโมงก่อนคลาส — ปิดการยกเลิกแล้ว",
   },
-
-  // reschedule error states (keyed off rescheduleBooking failure codes)
-  err_resched_window: {
-    en: "The free reschedule window has closed. You can still cancel this class.",
-    th: "หมดช่วงเวลาเลื่อนฟรีแล้ว คุณยังสามารถยกเลิกคลาสนี้ได้",
-  },
-  err_resched_full: {
-    en: "That time just filled up. Please choose another.",
-    th: "เวลานั้นเพิ่งเต็ม กรุณาเลือกเวลาอื่น",
-  },
-  err_resched_no_package: {
-    en: "You have no active credits to move this booking.",
-    th: "คุณไม่มีเครดิตที่ใช้ได้สำหรับการเลื่อนการจองนี้",
-  },
-  err_resched_already: {
-    en: "You’re already booked at that time.",
-    th: "คุณจองเวลานั้นไว้แล้ว",
-  },
+  // status-badge label on an upcoming booking past the 5h window (cancel closed).
+  too_late_hint: { en: "Cancellation closed", th: "ปิดการยกเลิก" },
 
   // credits / packages (buy-credits screen) — seeded from lune-data.jsx STR
   packages: { en: "Packages", th: "แพ็กเกจ" },
@@ -458,6 +427,8 @@ export const STR = {
   admin_dashboard: { en: "Dashboard", th: "แดชบอร์ด" },
   // 403 fallback when a non-admin reaches an admin-gated page (v1 mock always grants)
   admin_forbidden: { en: "Admins only.", th: "เฉพาะผู้ดูแลระบบเท่านั้น" },
+  // Toast when an instructor tries to check in a booking on a class that isn't theirs
+  admin_checkin_forbidden: { en: "Not your class.", th: "ไม่ใช่คลาสของคุณ" },
   biz_overview: { en: "Business Overview", th: "ภาพรวมธุรกิจ" },
   as_of: { en: "As of", th: "ณ วันที่" },
   period_mtd: { en: "Month to date", th: "เดือนนี้" },
@@ -531,6 +502,7 @@ export const STR = {
   aria_language: { en: "Language", th: "ภาษา" },
   aria_notifications: { en: "Notifications", th: "การแจ้งเตือน" },
   aria_close: { en: "Close", th: "ปิด" },
+  back: { en: "Back", th: "ย้อนกลับ" },
 
   // admin Today overview
   admin_overview: { en: "Today’s overview", th: "ภาพรวมวันนี้" },
@@ -649,6 +621,27 @@ export const STR = {
   refund_override_hint: {
     en: "Override the policy and return the credit cost to the customer.",
     th: "ข้ามนโยบายและคืนเครดิตให้ลูกค้า",
+  },
+
+  // admin reschedule (front desk moves a customer's booking to another time; not
+  // bound by the 5h customer window — atomic refund-old + debit-new server-side)
+  reschedule_booking: { en: "Reschedule", th: "เลื่อนเวลา" },
+  resched_admin_title: { en: "Reschedule booking", th: "เลื่อนการจอง" },
+  resched_admin_pick: {
+    en: "Choose a new time for this customer",
+    th: "เลือกเวลาใหม่ให้ลูกค้ารายนี้",
+  },
+  no_other_times: {
+    en: "No other times available for this class type.",
+    th: "ไม่มีเวลาอื่นสำหรับคลาสประเภทนี้",
+  },
+  toast_reschedule_done: {
+    en: "Booking rescheduled",
+    th: "เลื่อนการจองเรียบร้อยแล้ว",
+  },
+  toast_reschedule_failed: {
+    en: "Couldn’t reschedule this booking. Please try again.",
+    th: "เลื่อนการจองไม่สำเร็จ กรุณาลองใหม่",
   },
   // toasts after an action
   toast_cancel_refunded: {
@@ -828,76 +821,46 @@ export const STR = {
   day_sat: { en: "Sat", th: "เสาร์" },
   day_sun: { en: "Sun", th: "อาทิตย์" },
 
-  // ───────────────────────── household invite (Feature 2: เชิญคนในบ้าน) ─────────────────────────
-  // invite sheet (invite-sheet.tsx) — opened from the Profile "Shared with" tile
-  invite_sheet_title: { en: "Invite a housemate", th: "เชิญคนในบ้าน" },
-  invite_sheet_body: {
-    en: "Share this link with someone in House {house}. They’ll join your shared credit pool when they accept.",
-    th: "ส่งลิงก์นี้ให้คนในบ้านเลขที่ {house} เมื่อพวกเขายอมรับ จะเข้าร่วมกองเครดิตที่แบ่งปันกันทันที",
+  // ───────────────────────── admin Sales history & CSV export (Group D #1, Owner-only) ─────────────────────────
+  admin_sales: { en: "Sales", th: "ยอดขาย" },
+  sales_history: { en: "Sales history", th: "ประวัติการขาย" },
+  sales_range_from: { en: "From", th: "ตั้งแต่" },
+  sales_range_to: { en: "To", th: "ถึง" },
+  sales_download_csv: { en: "Download CSV", th: "ดาวน์โหลด CSV" },
+  sales_col_customer: { en: "Customer", th: "ลูกค้า" },
+  sales_col_package: { en: "Package", th: "แพ็กเกจ" },
+  sales_col_method: { en: "Method", th: "วิธีชำระ" },
+  sales_col_amount: { en: "Amount", th: "จำนวนเงิน" },
+  sales_col_status: { en: "Status", th: "สถานะ" },
+  sales_empty: {
+    en: "No sales in this date range",
+    th: "ไม่มีการขายในช่วงวันที่นี้",
   },
-  invite_share_line: { en: "Share via LINE", th: "แชร์ผ่าน LINE" },
-  invite_copy_link: { en: "Copy link", th: "คัดลอกลิงก์" },
-  invite_copied: { en: "Copied", th: "คัดลอกแล้ว" },
-  invite_expires_in: {
-    en: "Link expires in {days} days",
-    th: "ลิงก์หมดอายุใน {days} วัน",
-  },
-  invite_generating: { en: "Creating your link…", th: "กำลังสร้างลิงก์…" },
-  invite_link_label: { en: "Invite link", th: "ลิงก์คำเชิญ" },
 
-  // join landing (/join/[token]) — opened inside LINE LIFF
-  join_title: { en: "Join the household", th: "เข้าร่วมบ้าน" },
-  join_intro: {
-    en: "You’ve been invited to share a household credit pool. Accept to join and start sharing credits.",
-    th: "คุณได้รับคำเชิญให้ร่วมกองเครดิตของบ้าน ยอมรับเพื่อเข้าร่วมและเริ่มแบ่งปันเครดิต",
+  // ───────────────────────── admin Adjust credits (Group D #8, Owner-only, in the Members drawer) ─────────────────────────
+  adjust_credits: { en: "Adjust credits", th: "ปรับเครดิต" },
+  adjust_amount: { en: "Amount (hrs)", th: "จำนวน (ชม.)" },
+  adjust_add: { en: "Add", th: "เพิ่ม" },
+  adjust_subtract: { en: "Subtract", th: "ลด" },
+  adjust_note: { en: "Note", th: "หมายเหตุ" },
+  adjust_confirm: { en: "Apply adjustment", th: "ยืนยันการปรับ" },
+  adjust_select_package: { en: "Package", th: "แพ็กเกจ" },
+  adjust_no_packages: {
+    en: "This customer has no adjustable packages.",
+    th: "ลูกค้ารายนี้ไม่มีแพ็กเกจที่ปรับได้",
   },
-  join_cta_accept: { en: "Join household", th: "เข้าร่วมบ้าน" },
-  join_accepting: { en: "Joining…", th: "กำลังเข้าร่วม…" },
-  join_success_title: { en: "Welcome to House {house}", th: "ยินดีต้อนรับสู่บ้านเลขที่ {house}" },
-  join_success_body: {
-    en: "You now share the household credit pool. Your existing personal credits stay yours.",
-    th: "ตอนนี้คุณใช้กองเครดิตของบ้านร่วมกันแล้ว เครดิตส่วนตัวที่มีอยู่ยังคงเป็นของคุณ",
+  adjust_note_ph: {
+    en: "e.g. Goodwill credit for a cancelled class",
+    th: "เช่น เครดิตชดเชยจากคลาสที่ยกเลิก",
   },
-  join_cta_home: { en: "Go to home", th: "ไปหน้าแรก" },
-  join_error_title: { en: "Couldn’t join", th: "เข้าร่วมไม่ได้" },
-
-  // create-invite failures (invite sheet)
-  invite_err_not_a_member: {
-    en: "Only household members can invite others.",
-    th: "เฉพาะสมาชิกในบ้านเท่านั้นที่เชิญผู้อื่นได้",
+  toast_credit_adjusted: { en: "Credits adjusted", th: "ปรับเครดิตแล้ว" },
+  err_negative_balance: {
+    en: "That would take the balance below zero.",
+    th: "การปรับนี้จะทำให้ยอดเครดิตติดลบ",
   },
-  invite_err_no_household: {
-    en: "You’re not part of a household yet.",
-    th: "คุณยังไม่ได้อยู่ในบ้านใด",
-  },
-  // accept-invite failures (join landing)
-  invite_err_expired: {
-    en: "This invite has expired. Ask for a new link.",
-    th: "คำเชิญนี้หมดอายุแล้ว กรุณาขอลิงก์ใหม่",
-  },
-  invite_err_used: {
-    en: "This invite has already been used. Ask for a new link.",
-    th: "คำเชิญนี้ถูกใช้ไปแล้ว กรุณาขอลิงก์ใหม่",
-  },
-  invite_err_revoked: {
-    en: "This invite is no longer active. Ask for a new link.",
-    th: "คำเชิญนี้ถูกยกเลิกแล้ว กรุณาขอลิงก์ใหม่",
-  },
-  invite_err_not_found: {
-    en: "We couldn’t find this invite. Check the link and try again.",
-    th: "ไม่พบคำเชิญนี้ กรุณาตรวจสอบลิงก์แล้วลองใหม่",
-  },
-  invite_err_already_this_household: {
-    en: "You’re already a member of this household.",
-    th: "คุณเป็นสมาชิกของบ้านนี้อยู่แล้ว",
-  },
-  invite_err_already_other_household: {
-    en: "You’re already in another household. Please contact the studio for help.",
-    th: "คุณอยู่ในบ้านอื่นอยู่แล้ว กรุณาติดต่อสตูดิโอเพื่อขอความช่วยเหลือ",
-  },
-  invite_err_self: {
-    en: "You can’t accept your own invite.",
-    th: "คุณไม่สามารถยอมรับคำเชิญของตัวเองได้",
+  err_adjust_credits: {
+    en: "Couldn’t adjust credits. Please try again.",
+    th: "ปรับเครดิตไม่สำเร็จ กรุณาลองใหม่",
   },
 } as const;
 

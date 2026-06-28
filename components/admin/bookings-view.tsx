@@ -17,12 +17,17 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminLang } from "./admin-context";
 import { Avatar, Badge, Dot, Drawer, Segmented } from "./ui";
-import { adminCancelBooking, adminOfferWaitlistSeat } from "@/app/actions/admin-bookings";
+import {
+  adminCancelBooking,
+  adminOfferWaitlistSeat,
+  adminReschedule,
+} from "@/app/actions/admin-bookings";
 import type {
   AdminBooking,
   AdminBookingsOverview,
   AdminWaitlistClass,
 } from "@/lib/admin/bookings";
+import type { BookableClass } from "@/lib/schedule/queries";
 import type { StrKey } from "@/lib/i18n";
 
 type Tab = "bookings" | "waitlist";
@@ -50,14 +55,22 @@ function dayTime(iso: string, time: string, lang: "en" | "th"): string {
   return `${day} · ${time}`;
 }
 
-/** Whole-credit display: 1 → "1", 1.5 → "1.5" (no trailing ".0"). */
+/** Whole-credit display: integer credits rendered as-is (e.g. 2 → "2"). */
 function fmtCredits(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+  return String(n);
 }
 
 // ───────────────────────── component ─────────────────────────
 
-export function BookingsView({ overview }: { overview: AdminBookingsOverview }) {
+export function BookingsView({
+  overview,
+  bookable,
+}: {
+  overview: AdminBookingsOverview;
+  /** This week's published classes — the candidate pool for the admin reschedule
+   *  picker. The action re-validates server-side; this only populates the list. */
+  bookable: BookableClass[];
+}) {
   const { t } = useAdminLang();
   const [tab, setTab] = useState<Tab>("bookings");
   const [openId, setOpenId] = useState<string | null>(null);
@@ -114,9 +127,10 @@ export function BookingsView({ overview }: { overview: AdminBookingsOverview }) 
         />
       )}
 
-      {/* booking detail + cancel drawer */}
+      {/* booking detail + cancel/reschedule drawer */}
       <BookingDrawer
         booking={open}
+        bookable={bookable}
         onClose={() => setOpenId(null)}
         onResult={(key, cost) => {
           setOpenId(null);
@@ -376,12 +390,16 @@ function WaitlistCard({
 
 // ───────────────────────── booking detail + cancel drawer ─────────────────────────
 
+type DrawerMode = "detail" | "reschedule";
+
 function BookingDrawer({
   booking,
+  bookable,
   onClose,
   onResult,
 }: {
   booking: AdminBooking | null;
+  bookable: BookableClass[];
   onClose: () => void;
   onResult: (key: StrKey, cost?: string) => void;
 }) {
@@ -389,18 +407,34 @@ function BookingDrawer({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [override, setOverride] = useState(false);
+  const [mode, setMode] = useState<DrawerMode>("detail");
 
-  // Reset the goodwill-refund toggle whenever a DIFFERENT booking opens — the
-  // Drawer stays mounted as the open booking switches, so without this the box
-  // would carry a stale "refund anyway" across bookings (a money-correctness
-  // hazard: an unintended +cost refund on the next out-of-window cancel).
+  // Reset the goodwill-refund toggle AND the drawer step whenever a DIFFERENT
+  // booking opens — the Drawer stays mounted as the open booking switches, so
+  // without this the box would carry a stale "refund anyway" across bookings (a
+  // money-correctness hazard) and the picker step could leak into the next view.
   useEffect(() => {
     setOverride(false);
+    setMode("detail");
   }, [booking?.bookingId]);
 
   const cancellation = booking?.cancellation ?? null;
-  // The cancel button shows only for an upcoming, still-live booking.
+  // Cancel + reschedule both show only for an upcoming, still-live booking. The
+  // admin reschedule is NOT gated by the 5h window (CLAUDE.md §5 inv 7) — the
+  // server skips the window check; here it is offered for any upcoming booking.
   const cancellable = booking?.upcoming === true && booking.status === "booked";
+
+  // Reschedule candidates: same class type, not full, and not the current class —
+  // mirrors the (removed) customer reschedule-sheet filtering. The action
+  // re-validates capacity/seat under lock; this just curates the picker.
+  const candidates = booking
+    ? bookable.filter(
+        (c) =>
+          c.type === booking.class.type &&
+          !c.full &&
+          c.id !== booking.class.classInstanceId,
+      )
+    : [];
 
   function windowPhrase(hours: number): string {
     const key: StrKey = hours === 1 ? "window_hour" : "window_hours";
@@ -429,29 +463,71 @@ function BookingDrawer({
     });
   }
 
+  function reschedule(newClassInstanceId: string) {
+    if (!booking) return;
+    startTransition(async () => {
+      const res = await adminReschedule({
+        bookingId: booking.bookingId,
+        newClassInstanceId,
+      });
+      if (res.ok) {
+        onResult("toast_reschedule_done");
+        router.refresh();
+      } else {
+        onResult("toast_reschedule_failed");
+      }
+    });
+  }
+
   // Remount the drawer body per booking so transient field state can't bleed
-  // across bookings (the override toggle is also reset via the effect above).
+  // across bookings (the override toggle + mode are also reset via the effect).
   const openKey = booking?.bookingId ?? null;
 
   return (
     <Drawer
       open={booking !== null}
       onClose={onClose}
-      title={t("booking_detail")}
+      title={mode === "reschedule" ? t("resched_admin_title") : t("booking_detail")}
       footer={
-        cancellable ? (
+        mode === "reschedule" ? (
           <button
             type="button"
-            onClick={cancel}
+            onClick={() => setMode("detail")}
             disabled={pending}
-            className="inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-ink px-5 font-body text-sm font-semibold text-cream disabled:opacity-50"
+            className="inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-line bg-surface-2 px-5 font-body text-sm font-semibold text-ink disabled:opacity-50"
           >
-            {t("cancel_booking")}
+            {t("back")}
           </button>
+        ) : cancellable ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setMode("reschedule")}
+              disabled={pending}
+              className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-line-strong bg-surface-2 px-5 font-body text-sm font-semibold text-ink disabled:opacity-50"
+            >
+              {t("reschedule_booking")}
+            </button>
+            <button
+              type="button"
+              onClick={cancel}
+              disabled={pending}
+              className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl bg-ink px-5 font-body text-sm font-semibold text-cream disabled:opacity-50"
+            >
+              {t("cancel_booking")}
+            </button>
+          </>
         ) : undefined
       }
     >
-      {booking && (
+      {booking && mode === "reschedule" ? (
+        <RescheduleStep
+          key={openKey ?? "none"}
+          candidates={candidates}
+          pending={pending}
+          onPick={reschedule}
+        />
+      ) : booking ? (
         <div key={openKey ?? "none"} className="flex flex-col gap-5">
           {/* customer */}
           <section>
@@ -570,9 +646,73 @@ function BookingDrawer({
             </section>
           )}
         </div>
-      )}
+      ) : null}
     </Drawer>
   );
+}
+
+// ───────────────────────── reschedule step (admin slot picker) ─────────────────────────
+// Renders the same-type, not-full candidate classes for an admin to move a
+// customer's booking to (CLAUDE.md §5 inv 7 admin path). NOT bound by the 5h
+// window — the action skips that check. Picking a slot fires adminReschedule.
+
+function RescheduleStep({
+  candidates,
+  pending,
+  onPick,
+}: {
+  candidates: BookableClass[];
+  pending: boolean;
+  onPick: (newClassInstanceId: string) => void;
+}) {
+  const { t, tt, lang } = useAdminLang();
+
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="font-body text-[13px] text-ink-soft">{t("resched_admin_pick")}</p>
+
+      {candidates.length === 0 ? (
+        <p className="rounded-2xl border border-line bg-surface-2 p-6 text-center font-body text-sm text-muted">
+          {t("no_other_times")}
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-2.5">
+          {candidates.map((c) => (
+            <li key={c.id}>
+              <button
+                type="button"
+                onClick={() => onPick(c.id)}
+                disabled={pending}
+                className="flex w-full items-center gap-3 rounded-2xl border border-line bg-surface-2 px-3.5 py-3 text-left transition-colors hover:bg-surface disabled:opacity-50"
+              >
+                <Dot type={c.type} size={8} />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-head text-[14.5px] font-semibold text-ink">
+                    {tt(c.typeMeta.short)}
+                  </span>
+                  <span className="block truncate font-body text-xs text-muted">
+                    {dayTime(c.startsAt, hhmmOf(c.startsAt), lang)}
+                    {c.instructor ? ` · ${tt(c.instructor.name)}` : ""}
+                  </span>
+                </span>
+                <span className="shrink-0">
+                  <Badge tone="neutral">
+                    {c.seatsLeft} {c.seatsLeft === 1 ? t("spot_left") : t("spots_left")}
+                  </Badge>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** Local "HH:MM" from a class ISO start (for the candidate row's day · time). */
+function hhmmOf(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 // ───────────────────────── icons ─────────────────────────

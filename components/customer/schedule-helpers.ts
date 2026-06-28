@@ -98,7 +98,7 @@ export const PART_OF_DAY_KEY: Record<PartOfDay, StrKey> = {
 };
 
 /**
- * Format a booking's free-cancel window (hours, server-provided 5 | 1) into a
+ * Format a booking's free-cancel window (hours, server-provided always 5) into a
  * localized "N hours" / "N hour" phrase via the keyed `window_hours`/
  * `window_hour` strings. Pure display derivation — the window value itself is
  * locked server-side on the booking (CLAUDE.md §5 invariant 7), never computed

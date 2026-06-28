@@ -52,6 +52,59 @@ export function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
 }
 
+/**
+ * Parse a `yyyy-mm-dd` calendar day into LOCAL midnight (00:00) of that day, or
+ * null when the string is absent/malformed. Strict: requires exactly four-digit
+ * year, two-digit month, two-digit day, and the resulting Date must round-trip
+ * (so "2026-02-31" — which JS would roll forward — is rejected). The single place
+ * the sales-export date inputs are turned into instants, so a bad client value
+ * fails closed to the default window rather than silently shifting the range.
+ */
+export function parseDay(day: string | undefined | null): Date | null {
+  if (!day) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day.trim());
+  if (!m) return null;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const dom = Number(m[3]);
+  if (month < 1 || month > 12 || dom < 1 || dom > 31) return null;
+  const d = new Date(year, month - 1, dom, 0, 0, 0, 0);
+  // Reject overflow (e.g. 02-31 → Mar 03) by requiring the parts to round-trip.
+  if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== dom) {
+    return null;
+  }
+  return d;
+}
+
+/**
+ * The [start, end) half-open instant range for a sales report bounded by two
+ * INCLUSIVE calendar days (`yyyy-mm-dd`), in the studio's local time:
+ *   - `start` = local midnight of `startDay`, defaulting to the FIRST of the
+ *     current month (matching the Payments period) when absent/malformed;
+ *   - `end`   = local midnight of the day AFTER `endDay` (so `endDay` itself is
+ *     INCLUDED — the half-open upper bound is start-of-(endDay + 1)), defaulting
+ *     to start-of-TOMORROW (so "today" is included) when absent/malformed.
+ * Period math stays single-sourced HERE so the export and any future report can
+ * never drift from the Payments/Dashboard windows.
+ */
+export function rangeBounds(
+  startDay?: string | null,
+  endDay?: string | null,
+  now: Date = new Date(),
+): PeriodBounds {
+  const parsedStart = parseDay(startDay);
+  const start =
+    parsedStart ?? new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+
+  const parsedEnd = parseDay(endDay);
+  // INCLUSIVE end day → exclusive upper bound is the start of the NEXT day.
+  const end = parsedEnd
+    ? new Date(parsedEnd.getFullYear(), parsedEnd.getMonth(), parsedEnd.getDate() + 1, 0, 0, 0, 0)
+    : new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+
+  return { start, end };
+}
+
 /** The [start, end) bounds of the calendar day containing `now`. */
 export function dayBounds(now: Date = new Date()): PeriodBounds {
   const start = startOfDay(now);

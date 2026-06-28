@@ -15,10 +15,9 @@ import { getDb } from "@/lib/db/client";
 import {
   bookClassWithDebit,
   cancelBooking,
-  rescheduleWithinTransaction,
   type BookFailureCode,
 } from "@/lib/credits/debit";
-import { selectUsablePackage, selectPackageForReschedule } from "@/lib/credits/selectPackage";
+import { selectUsablePackage } from "@/lib/credits/selectPackage";
 import { creditCostForClassType } from "@/lib/credits/cost";
 import { evaluateCancellation } from "@/lib/credits/policy";
 import { bookings, classInstances } from "@/lib/db/schema";
@@ -135,15 +134,20 @@ const cancelInput = z.object({
 });
 export type CancelBookingInput = z.infer<typeof cancelInput>;
 
-export type CancelActionFailureCode = "INVALID_INPUT" | "NOT_FOUND" | "NOT_LIVE" | "FORBIDDEN";
+export type CancelActionFailureCode =
+  | "INVALID_INPUT"
+  | "NOT_FOUND"
+  | "NOT_LIVE"
+  | "FORBIDDEN"
+  | "TOO_LATE_TO_CANCEL";
 
 export interface CancelOutcome {
-  /** true ⇒ within the booking's free window ⇒ credit refunded. */
+  /** Always true on ok: a self-cancel is only permitted within the free window. */
   free: boolean;
-  /** Whether the booking's exact credit cost was actually returned to the balance. */
+  /** Always true on ok: a permitted cancel always refunds the booking's cost. */
   refunded: boolean;
   hoursUntilStart: number;
-  /** The free window (hours) this booking was locked to at booking time (5 | 1). */
+  /** The free window (hours before start) — the fixed 5h policy constant. */
   freeCancelHours: number;
 }
 
@@ -152,11 +156,13 @@ export type CancelResult =
   | { ok: false; code: CancelActionFailureCode };
 
 /**
- * Cancel a booking for the current customer. Evaluates the booking's DYNAMIC
- * cancellation policy server-side against the window locked at booking time
- * (`freeCancelHours`, 5 | 1), refunds the credit only when free, then emits
- * `booking.cancelled`. The policy decision is recomputed here — never taken from
- * the client.
+ * Cancel a booking for the current customer. The cancellation policy is a single
+ * FIXED 5h free window (CLAUDE.md §5 invariant 7, decided 2026-06-28): a self-cancel
+ * is allowed ONLY at least 5h before start and is then ALWAYS free (the booking's
+ * exact cost refunded). Within the 5h window the cancel is BLOCKED entirely —
+ * `TOO_LATE_TO_CANCEL` is returned BEFORE any DB mutation, so a blocked cancel never
+ * touches the booking or the ledger. The decision is recomputed server-side here,
+ * never taken from the client.
  */
 export async function cancelBookingAction(raw: CancelBookingInput): Promise<CancelResult> {
   const parsed = cancelInput.safeParse(raw);
@@ -181,13 +187,18 @@ export async function cancelBookingAction(raw: CancelBookingInput): Promise<Canc
     return { ok: false, code: "NOT_LIVE" };
   }
 
-  // Judge against the window LOCKED on this booking, not a fresh recomputation.
-  const policy = evaluateCancellation(loaded.startsAt, now, loaded.freeCancelHours);
+  // Fixed-window policy: a cancel within 5h of start is BLOCKED entirely. Decide
+  // BEFORE any mutation so a too-late cancel never touches the DB.
+  const policy = evaluateCancellation(loaded.startsAt, now);
+  if (!policy.cancellable) {
+    return { ok: false, code: "TOO_LATE_TO_CANCEL" };
+  }
 
+  // A permitted cancel is always free → always refund the booking's exact cost.
   const cancelled = await cancelBooking({
     bookingId,
     actorUserId: viewer.id,
-    refund: policy.free,
+    refund: true,
   });
 
   if (!cancelled.ok) {
@@ -215,183 +226,11 @@ export async function cancelBookingAction(raw: CancelBookingInput): Promise<Canc
   return {
     ok: true,
     outcome: {
-      free: policy.free,
+      free: true,
       refunded: cancelled.refunded,
       hoursUntilStart: policy.hoursUntilStart,
       freeCancelHours: loaded.freeCancelHours,
     },
-  };
-}
-
-// ───────────────────────── reschedule ─────────────────────────
-
-const rescheduleInput = z.object({
-  bookingId: z.string().uuid(),
-  newClassInstanceId: z.string().uuid(),
-  position: z.enum(["left", "middle", "right"]).optional(),
-});
-export type RescheduleBookingInput = z.infer<typeof rescheduleInput>;
-
-/**
- * Why a reschedule could not be completed. Covers loading the old booking
- * (NOT_FOUND / FORBIDDEN / NOT_LIVE), the policy gate
- * (RESCHEDULE_WINDOW_CLOSED — past the booking's free window), and every reason
- * the NEW booking could fail (the full `BookActionFailureCode`).
- */
-export type RescheduleActionFailureCode =
-  | "INVALID_INPUT"
-  | "NOT_FOUND"
-  | "FORBIDDEN"
-  | "NOT_LIVE"
-  | "RESCHEDULE_WINDOW_CLOSED"
-  // The new booking was made but releasing the old one threw; we rolled the new
-  // booking back, so the customer is left exactly as before and can retry.
-  | "RESCHEDULE_FAILED"
-  | BookActionFailureCode;
-
-export type RescheduleResult =
-  | { ok: true; newBookingId: string; hoursLeft: number; freeCancelHours: number }
-  | { ok: false; code: RescheduleActionFailureCode };
-
-/**
- * Move a live booking to a different class instance, free of charge, within the
- * old booking's free window (CLAUDE.md §5 invariant 7: reschedule is only allowed
- * inside the free window — a free move). Net credit effect: refund the old cost +
- * debit the new cost, net-zero for same-cost class types.
- *
- * ATOMIC: both legs (refund-old + debit-new) run in ONE interactive transaction
- * (`rescheduleWithinTransaction`) that locks the old booking, the new class, and
- * the affected package(s) in a fixed order, then commits or rolls back together.
- * There is NO crash window in which the customer could hold both bookings or lose
- * the old refund — the prior two-transaction implementation's only residual risk
- * is gone, so RESCHEDULE_FAILED can no longer occur (the code is retained in the
- * union for backward compatibility but is never returned).
- *
- * The new booking is stamped with its OWN `freeCancelHours`, derived from the new
- * class's lead time (so a move to a last-minute slot correctly inherits the 1h
- * window). The new package is resolved server-side (cost-aware) before the tx;
- * the old package (refund target) is read from the old booking row inside the tx.
- */
-export async function rescheduleBooking(raw: RescheduleBookingInput): Promise<RescheduleResult> {
-  const parsed = rescheduleInput.safeParse(raw);
-  if (!parsed.success) {
-    return { ok: false, code: "INVALID_INPUT" };
-  }
-  const input = parsed.data;
-  const now = new Date();
-
-  const viewer = await getCurrentUser();
-
-  // 1) Load the OLD booking and gate OWNERSHIP server-side (a non-owner gets
-  //    FORBIDDEN and can never probe a booking they don't own). Liveness and the
-  //    free-window check are re-validated under the lock inside the transaction —
-  //    this pre-read only carries identity + the old class id for the waitlist
-  //    offer afterwards.
-  const old = await loadBookingForCancel(input.bookingId);
-  if (!old) {
-    return { ok: false, code: "NOT_FOUND" };
-  }
-  if (!canCancel(viewer, old.bookingUserId)) {
-    return { ok: false, code: "FORBIDDEN" };
-  }
-  if (old.status !== "booked") {
-    return { ok: false, code: "NOT_LIVE" };
-  }
-
-  // 2) Resolve the NEW class server-side (its type drives package category and
-  //    seat validation) — never trust the client for any of it. The position is
-  //    re-validated under the lock too; this is an early reject.
-  const newCls = await loadClassMeta(input.newClassInstanceId);
-  if (!newCls) {
-    return { ok: false, code: "CLASS_NOT_FOUND" };
-  }
-  if (input.position) {
-    const allowed = positionsForCapacity(Math.min(newCls.capacity, CAPACITY[newCls.type]));
-    if (!allowed.includes(input.position)) {
-      return { ok: false, code: "INVALID_POSITION" };
-    }
-  }
-
-  // 3) Pick the package the NEW leg debits — never a client-supplied id. Reschedule
-  //    is a net-zero free move: the OLD package is refunded first, so the selector
-  //    prefers it when its post-refund balance covers the new cost (making a
-  //    same-cost move work even from a depleted package), else falls back to a
-  //    different package that covers the new cost on its own. This keeps selection
-  //    consistent with the transaction's post-refund debit guard.
-  const newCost = creditCostForClassType(newCls.type);
-  const packageId = await selectPackageForReschedule(
-    viewer,
-    newCls.type,
-    old.packageId,
-    old.creditCost,
-    newCost,
-    now,
-  );
-  if (!packageId) {
-    return { ok: false, code: "NO_USABLE_PACKAGE" };
-  }
-
-  // 4) THE ONE atomic transaction: refund-old + debit-new together, all-or-nothing.
-  //    Liveness, the free window, tiered visibility, capacity, dupe and position
-  //    are all re-checked under the lock.
-  const result = await rescheduleWithinTransaction(
-    {
-      oldBookingId: input.bookingId,
-      newClassInstanceId: input.newClassInstanceId,
-      userId: viewer.id,
-      viewerTier: viewer.tier,
-      newPackageId: packageId,
-      position: input.position,
-    },
-    now,
-  );
-
-  if (!result.ok) {
-    // Map the transaction's old-leg codes to the action-level ones the UI knows.
-    switch (result.code) {
-      case "OLD_NOT_FOUND":
-        return { ok: false, code: "NOT_FOUND" };
-      case "OLD_NOT_LIVE":
-        return { ok: false, code: "NOT_LIVE" };
-      default:
-        // RESCHEDULE_WINDOW_CLOSED and every BookFailureCode pass straight through.
-        return { ok: false, code: result.code };
-    }
-  }
-
-  // CRM is a thin listener — emit the events that already exist in the model.
-  registerNotificationHandlers();
-  await emit({
-    type: "booking.confirmed",
-    bookingId: result.newBookingId,
-    userId: viewer.id,
-    classInstanceId: input.newClassInstanceId,
-  });
-  await emit({
-    type: "booking.cancelled",
-    bookingId: input.bookingId,
-    userId: viewer.id,
-    // The reschedule always refunds the old cost (it is a free in-window move).
-    refunded: true,
-  });
-
-  // The OLD class's seat just freed up → offer it to the head of that class's
-  // waitlist queue (same FIFO head-start as a plain cancel; occupancy untouched).
-  // Best-effort — a failed offer must never undo the committed reschedule.
-  try {
-    await offerNextWaitlistSeat(old.classInstanceId, now);
-  } catch (err) {
-    console.error(
-      `[booking] waitlist offer after reschedule release ${input.bookingId} failed:`,
-      err,
-    );
-  }
-
-  return {
-    ok: true,
-    newBookingId: result.newBookingId,
-    hoursLeft: result.hoursLeft,
-    freeCancelHours: result.freeCancelHours,
   };
 }
 
@@ -419,7 +258,7 @@ interface BookingForCancel {
   householdId: string | null;
   /** The class whose seat is freed on cancel — used to offer the waitlist head. */
   classInstanceId: string;
-  /** The free window (hours) locked on this booking at booking time (5 | 1). */
+  /** The free window (hours) locked on this booking at booking time (always 5). */
   freeCancelHours: number;
   /** The exact credit cost this booking debited (refunded on a free move/cancel). */
   creditCost: number;

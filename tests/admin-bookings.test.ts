@@ -68,11 +68,11 @@ function waitlistRow(over: Partial<AdminWaitlistRow> = {}): AdminWaitlistRow {
 
 describe("toAdminBooking (pure)", () => {
   it("an upcoming booking well outside the window is a free cancel (refunds the cost)", () => {
-    const b = toAdminBooking(bookingRow({ creditCost: 1.5, type: "private" }), now);
+    const b = toAdminBooking(bookingRow({ creditCost: 2, type: "private" }), now);
     expect(b.upcoming).toBe(true);
     expect(b.cancellation).not.toBeNull();
     expect(b.cancellation!.free).toBe(true);
-    expect(b.cancellation!.refundCredits).toBe(1.5); // the exact cost, not a hardcoded 1
+    expect(b.cancellation!.refundCredits).toBe(2); // the exact cost, not a hardcoded 1
     expect(b.cancellation!.freeCancelHours).toBe(5);
   });
 
@@ -96,14 +96,15 @@ describe("toAdminBooking (pure)", () => {
     expect(b.cancellation!.refundCredits).toBe(0); // cost kept
   });
 
-  it("respects a last-minute booking's 1h locked window", () => {
-    // 2h out with a 1h window → still free.
+  it("a 2h-out booking is NOT free under the fixed 5h window", () => {
+    // The fixed-window policy ignores the stamped freeCancelHours for the verdict:
+    // 2h out (< 5h) is always inside the window → not free, cost kept.
     const b = toAdminBooking(
-      bookingRow({ startsAt: new Date(now.getTime() + 2 * 3_600_000), freeCancelHours: 1 }),
+      bookingRow({ startsAt: new Date(now.getTime() + 2 * 3_600_000) }),
       now,
     );
-    expect(b.cancellation!.free).toBe(true);
-    expect(b.cancellation!.freeCancelHours).toBe(1);
+    expect(b.cancellation!.free).toBe(false);
+    expect(b.cancellation!.refundCredits).toBe(0);
   });
 
   it("a past booking carries no cancellation (nothing to cancel)", () => {

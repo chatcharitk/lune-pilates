@@ -4,7 +4,7 @@
 // past those branches. Also confirms the v1 default (mock) leaves the gate a no-op.
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireAdmin, requireOwner } from "@/lib/auth/admin";
 import { setCheckIn } from "@/app/actions/admin";
 import {
   createClass,
@@ -17,20 +17,30 @@ import {
   adminBookForCustomer,
   adminCancelBooking,
   adminOfferWaitlistSeat,
+  adminReschedule,
 } from "@/app/actions/admin-bookings";
 import { createCustomer } from "@/app/actions/admin-members";
 import { posConfirmPayment, posSellPackage } from "@/app/actions/admin-pos";
 import { approveSlip, getSlip, rejectSlip } from "@/app/actions/admin-payments";
 import { setInstructorAvailability } from "@/app/actions/instructors";
+import { adjustCredits, getAdjustablePackages } from "@/app/actions/admin-credits";
 
 const ORIGINAL_DB_URL = process.env.DATABASE_URL;
 const ORIGINAL_ADMIN_AUTH = process.env.ADMIN_AUTH;
+const ORIGINAL_ADMIN_ROLE = process.env.ADMIN_ROLE;
+const ORIGINAL_ADMIN_INSTRUCTOR_ID = process.env.ADMIN_INSTRUCTOR_ID;
 
 function restoreEnv() {
   if (ORIGINAL_DB_URL === undefined) delete process.env.DATABASE_URL;
   else process.env.DATABASE_URL = ORIGINAL_DB_URL;
   if (ORIGINAL_ADMIN_AUTH === undefined) delete process.env.ADMIN_AUTH;
   else process.env.ADMIN_AUTH = ORIGINAL_ADMIN_AUTH;
+  // Save/restore the role state too so a block setting ADMIN_ROLE can't leak into
+  // the next describe (and flip the default-owner expectations).
+  if (ORIGINAL_ADMIN_ROLE === undefined) delete process.env.ADMIN_ROLE;
+  else process.env.ADMIN_ROLE = ORIGINAL_ADMIN_ROLE;
+  if (ORIGINAL_ADMIN_INSTRUCTOR_ID === undefined) delete process.env.ADMIN_INSTRUCTOR_ID;
+  else process.env.ADMIN_INSTRUCTOR_ID = ORIGINAL_ADMIN_INSTRUCTOR_ID;
 }
 
 // Each admin action invoked with input that is EITHER malformed (uuid actions) or
@@ -79,7 +89,23 @@ const GATED_ACTIONS: { name: string; call: () => Promise<{ ok: boolean; code?: s
         week: { Mon: [["bad", "bad"]] },
       }),
   },
+  // Admin reschedule (#7, Owner-only): malformed uuids — UNAUTHORIZED beats it.
+  {
+    name: "adminReschedule",
+    call: () => adminReschedule({ bookingId: "not-a-uuid", newClassInstanceId: "not-a-uuid" }),
+  },
+  // Manual credit adjustment (#8, Owner-only): malformed input — UNAUTHORIZED beats it.
+  {
+    name: "adjustCredits",
+    call: () =>
+      adjustCredits({ customerId: "bad", packageId: "bad", deltaHours: 0, note: "", idempotencyKey: "bad" }),
+  },
+  { name: "getAdjustablePackages", call: () => getAdjustablePackages("not-a-uuid") },
 ];
+
+// Owner-only actions = every gated action EXCEPT setCheckIn (which is
+// instructor-allowed). An instructor hitting any of these is rejected like unauth.
+const OWNER_ONLY_ACTIONS = GATED_ACTIONS.filter((a) => a.name !== "setCheckIn");
 
 describe("admin auth gate — ADMIN_AUTH=deny rejects every admin action first", () => {
   beforeEach(() => {
@@ -120,5 +146,60 @@ describe("admin auth gate — v1 default (mock) is a no-op", () => {
       checkedIn: true,
     });
     expect(res.ok).toBe(true);
+  });
+});
+
+describe("ADMIN_ROLE=instructor — least-privilege: owner-only actions rejected, check-in allowed", () => {
+  beforeEach(() => {
+    process.env.ADMIN_ROLE = "instructor";
+    delete process.env.ADMIN_AUTH; // not deny — exercise the instructor mock, not reject
+    delete process.env.DATABASE_URL; // no-DB path (check-in is owner-equivalent here)
+  });
+  afterEach(restoreEnv);
+
+  // (a) Every owner-only action rejects an instructor exactly like unauth — the
+  // requireOwner() gate returns null for a non-owner → UNAUTHORIZED.
+  for (const { name, call } of OWNER_ONLY_ACTIONS) {
+    it(`${name} → UNAUTHORIZED for an instructor (requireOwner rejects)`, async () => {
+      const res = await call();
+      expect(res.ok).toBe(false);
+      expect(res.code).toBe("UNAUTHORIZED");
+    });
+  }
+
+  // (b) Check-in is instructor-allowed: the no-DB path returns ok for the instructor.
+  it("setCheckIn → ok for an instructor (instructor-allowed)", async () => {
+    const res = await setCheckIn({
+      bookingId: "00000000-0000-4000-8000-000000000001",
+      checkedIn: true,
+    });
+    expect(res.ok).toBe(true);
+  });
+
+  it("requireAdmin() resolves an instructor session with a non-null instructorId", async () => {
+    const session = await requireAdmin();
+    expect(session).not.toBeNull();
+    expect(session?.role).toBe("instructor");
+    expect(session?.instructorId).toBeTruthy();
+  });
+
+  it("requireOwner() is null for an instructor", async () => {
+    expect(await requireOwner()).toBeNull();
+  });
+});
+
+describe("requireOwner — default (no ADMIN_ROLE) is an owner", () => {
+  beforeEach(() => {
+    delete process.env.ADMIN_AUTH;
+    delete process.env.ADMIN_ROLE;
+    delete process.env.DATABASE_URL;
+  });
+  afterEach(restoreEnv);
+
+  it("requireOwner() is non-null when ADMIN_ROLE is unset (owner)", async () => {
+    const owner = await requireOwner();
+    expect(owner).not.toBeNull();
+    expect(owner?.role).toBe("owner");
+    expect(owner?.instructorId).toBeNull();
   });
 });

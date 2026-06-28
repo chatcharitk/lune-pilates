@@ -9,7 +9,7 @@ export type DebitBlockReason = "EXPIRED" | "NO_CREDITS";
  * can. Mirrors the re-check performed inside the booking transaction. Expiry is
  * checked before balance so an expired pack reports EXPIRED regardless of cost.
  *
- * @param cost credits the booking will debit (1 group / 1.5 private·duo·trio).
+ * @param cost credits the booking will debit (1 group / 2 private·duo·trio).
  */
 export function packageDebitBlock(
   pkg: { hoursLeft: number; expiresAt: Date },

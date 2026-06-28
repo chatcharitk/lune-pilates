@@ -9,27 +9,22 @@
 
 import { getCurrentUser } from "@/lib/auth/session";
 import { listMyBookings } from "@/lib/bookings/queries";
-import { listBookableClasses } from "@/lib/schedule/queries";
 import { listMyWaitlist } from "@/lib/waitlist/queries";
 import { BookingsView } from "@/components/customer/bookings-view";
-import { currentWeekStart } from "@/components/customer/schedule-helpers";
 
 // Reads live per-user bookings each request — never statically prerendered.
 export const dynamic = "force-dynamic";
 
 export default async function BookingsPage() {
   const viewer = await getCurrentUser();
-  // Fetch the viewer's own bookings, this week's bookable slots (the latter feeds
-  // the reschedule slot picker), AND their live waitlist entries (waiting/offered,
-  // lazily-expired offers downgraded server-side). Tiered visibility is enforced
-  // inside listBookableClasses — the UI only renders what these queries return.
-  const [bookings, bookable, waitlist] = await Promise.all([
+  // Fetch the viewer's own bookings AND their live waitlist entries (waiting/offered,
+  // lazily-expired offers downgraded server-side). The customer reschedule flow was
+  // removed (CLAUDE.md §5 inv 3, decided 2026-06-28), so no bookable-slot fetch is
+  // needed here — a self-cancel (≥5h, always free) is the only mutation.
+  const [bookings, waitlist] = await Promise.all([
     listMyBookings(viewer),
-    listBookableClasses({ viewer: { tier: viewer.tier }, weekStart: currentWeekStart() }),
     listMyWaitlist(viewer),
   ]);
 
-  return (
-    <BookingsView bookings={bookings} bookable={bookable} waitlist={waitlist} />
-  );
+  return <BookingsView bookings={bookings} waitlist={waitlist} />;
 }

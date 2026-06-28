@@ -5,13 +5,15 @@
 // interactive transactions — provable only against a live Postgres.
 //
 // Coverage:
-//   1. FREE cancel refunds the EXACT booked cost (a 1.5 Private → a +1.5 ledger row,
+//   1. FREE cancel refunds the EXACT booked cost (a 2-credit Private → a +2 ledger row,
 //      never a hardcoded 1); the cached balance returns to its starting value.
-//   2. LATE cancel (inside the window) keeps the cost — NO refund ledger row, balance
-//      stays debited.
-//   3. RESCHEDULE net-zero on a same-cost type: refund(old) + debit(new) sum to 0,
+//   2. CANCEL WITHIN 5h is BLOCKED entirely (TOO_LATE_TO_CANCEL): no ledger change, the
+//      booking stays live (CLAUDE.md §5 inv 7, fixed window decided 2026-06-28).
+//   3. ADMIN RESCHEDULE net-zero on a same-cost type: refund(old) + debit(new) sum to 0,
 //      the pool balance is unchanged, and it is ONE atomic move (old cancelled, new
 //      live, exactly one +cost and one −cost ledger row for the move).
+//   3b. ADMIN RESCHEDULE overrides the 5h rule: a booking 2h out (well inside the window)
+//      can still be moved by the owner-only admin path (skipWindowCheck).
 //   4. WAITLIST confirm-race: two offered heads confirm the same single freed seat →
 //      exactly one books, the other gets OFFER_LOST (CLAUDE.md §5 inv 6).
 //
@@ -41,6 +43,12 @@ vi.mock("@/lib/auth/session", () => ({
   },
 }));
 
+// The admin reschedule action calls revalidatePath, which throws outside a Next
+// request scope. Stub next/cache so the action runs in a plain test process.
+vi.mock("next/cache", () => ({
+  revalidatePath: () => {},
+}));
+
 import { getDb, closeDb } from "@/lib/db/client";
 import {
   bookings,
@@ -51,19 +59,16 @@ import {
   users,
   waitlist,
 } from "@/lib/db/schema";
-import {
-  bookClass,
-  cancelBookingAction,
-  rescheduleBooking,
-} from "@/app/actions/booking";
+import { bookClass, cancelBookingAction } from "@/app/actions/booking";
+import { adminReschedule } from "@/app/actions/admin-bookings";
 import { confirmWaitlistOffer, joinWaitlist } from "@/app/actions/waitlist";
 import { offerNextWaitlistSeat } from "@/lib/waitlist/queries";
 import { creditCostForClassType } from "@/lib/credits/cost";
 import type { ClassType, PackageCategory } from "@/lib/domain/types";
 
 const HAS_DB = !!process.env.DATABASE_URL;
-const PRIVATE_COST = creditCostForClassType("private"); // 1.5
-const GROUP_COST = creditCostForClassType("group"); // 1.0
+const PRIVATE_COST = creditCostForClassType("private"); // 2
+const GROUP_COST = creditCostForClassType("group"); // 1
 
 const future = (h: number) => new Date(Date.now() + h * 3_600_000);
 
@@ -193,9 +198,9 @@ describe.skipIf(!HAS_DB)(
       }
     });
 
-    // ───────────── 1. FREE cancel refunds the EXACT cost (a 1.5 Private) ─────────────
+    // ───────────── 1. FREE cancel refunds the EXACT cost (a 2-credit Private) ─────────────
 
-    it("FREE cancel of a 1.5 Private refunds EXACTLY 1.5 (a +1.5 ledger row, not 1)", async () => {
+    it("FREE cancel of a 2-credit Private refunds EXACTLY 2 (a +2 ledger row, not 1)", async () => {
       const POOL = 5;
       const { members, packageId } = await makeHousehold("free-cancel", 1, "private", POOL);
       // 48h ahead ⇒ booked ≥5h ⇒ free window = 5h; cancelling now (≈48h out) is free.
@@ -214,53 +219,53 @@ describe.skipIf(!HAS_DB)(
       expect(cancelled.outcome.free).toBe(true);
       expect(cancelled.outcome.refunded).toBe(true);
 
-      // The refund ledger row is EXACTLY +1.5 (the booked cost), never a hardcoded 1.
+      // The refund ledger row is EXACTLY +2 (the booked cost), never a hardcoded 1.
       const refunds = await ledgerByReason(packageId, "cancel_refund");
       expect(refunds).toHaveLength(1);
       expect(refunds[0]!.delta).toBe(PRIVATE_COST);
 
-      // Balance restored to the start; ledger nets to 0 (−1.5 then +1.5).
+      // Balance restored to the start; ledger nets to 0 (−2 then +2).
       expect(await hoursLeftOf(packageId)).toBe(POOL);
       expect(await ledgerSum(packageId)).toBe(0);
       expect(await liveBookingsFor(classId)).toHaveLength(0);
     });
 
-    // ───────────── 2. LATE cancel keeps the cost (no refund row) ─────────────
+    // ───────────── 2. CANCEL within 5h is BLOCKED entirely ─────────────
 
-    it("LATE cancel (inside the window) keeps the cost — no refund row, balance stays debited", async () => {
+    it("CANCEL within 5h is BLOCKED (TOO_LATE_TO_CANCEL): no ledger change, booking stays live", async () => {
       const POOL = 5;
       const { members, packageId } = await makeHousehold("late-cancel", 1, "private", POOL);
-      // 0.5h ahead ⇒ booked <5h ⇒ last-minute window = 1h, and 0.5h < 1h ⇒ we are
-      // INSIDE the window now ⇒ a late cancel that KEEPS the cost (no refund).
+      // 0.5h ahead ⇒ well inside the fixed 5h window ⇒ a customer self-cancel is
+      // BLOCKED entirely (CLAUDE.md §5 inv 7, decided 2026-06-28).
       const classId = await makeClass("private", 1, 0.5);
 
       enqueueSession(members[0]!);
       const booked = await bookClass({ classInstanceId: classId });
       expect(booked.ok).toBe(true);
       if (!booked.ok) return;
-      expect(booked.freeCancelHours).toBe(1); // last-minute window
+      expect(booked.freeCancelHours).toBe(5); // fixed window stamp
       expect(await hoursLeftOf(packageId)).toBe(POOL - PRIVATE_COST);
 
       enqueueSession(members[0]!);
       const cancelled = await cancelBookingAction({ bookingId: booked.bookingId });
-      expect(cancelled.ok).toBe(true);
-      if (!cancelled.ok) return;
-      expect(cancelled.outcome.free).toBe(false);
-      expect(cancelled.outcome.refunded).toBe(false);
+      expect(cancelled.ok).toBe(false);
+      if (cancelled.ok) return;
+      expect(cancelled.code).toBe("TOO_LATE_TO_CANCEL");
 
-      // No refund row; balance stays debited; ledger nets to −1.5.
+      // The blocked cancel must NOT touch the DB: no refund row, balance still
+      // debited, ledger still nets to just the original −2, booking STILL live.
       expect(await ledgerByReason(packageId, "cancel_refund")).toHaveLength(0);
       expect(await hoursLeftOf(packageId)).toBe(POOL - PRIVATE_COST);
       expect(await ledgerSum(packageId)).toBe(-PRIVATE_COST);
-      expect(await liveBookingsFor(classId)).toHaveLength(0);
+      expect(await liveBookingsFor(classId)).toHaveLength(1);
     });
 
-    // ───────────── 3. RESCHEDULE net-zero on a same-cost type ─────────────
+    // ───────────── 3. ADMIN RESCHEDULE net-zero on a same-cost type ─────────────
 
-    it("RESCHEDULE Private→Private is net-zero: balance unchanged, old cancelled, new live", async () => {
+    it("ADMIN RESCHEDULE Private→Private is net-zero: balance unchanged, old cancelled, new live", async () => {
       const POOL = 5;
       const { members, packageId } = await makeHousehold("resched", 1, "private", POOL);
-      const oldClass = await makeClass("private", 1, 48); // free window open
+      const oldClass = await makeClass("private", 1, 48);
       const newClass = await makeClass("private", 1, 72);
 
       enqueueSession(members[0]!);
@@ -270,8 +275,9 @@ describe.skipIf(!HAS_DB)(
       const afterBook = await hoursLeftOf(packageId);
       expect(afterBook).toBe(POOL - PRIVATE_COST);
 
-      enqueueSession(members[0]!);
-      const res = await rescheduleBooking({
+      // Admin reschedule resolves the target customer from the booking row — no
+      // session enqueue needed (the v1 mock owner is always signed in).
+      const res = await adminReschedule({
         bookingId: booked.bookingId,
         newClassInstanceId: newClass,
       });
@@ -279,15 +285,47 @@ describe.skipIf(!HAS_DB)(
       if (!res.ok) return;
 
       // Net-zero: the pool balance equals the post-original-booking balance (refund
-      // of 1.5 then debit of 1.5 cancel out).
+      // of 2 then debit of 2 cancel out).
       expect(await hoursLeftOf(packageId)).toBe(afterBook);
-      // Ledger over the whole life: −1.5 (book) +1.5 (refund) −1.5 (new) = −1.5.
+      // Ledger over the whole life: −2 (book) +2 (refund) −2 (new) = −2.
       expect(await ledgerSum(packageId)).toBe(-PRIVATE_COST);
-      // Exactly one move refund (+1.5) and two booking debits (−1.5 each) total.
+      // Exactly one move refund (+2) and two booking debits (−2 each) total.
       expect(await ledgerByReason(packageId, "cancel_refund")).toHaveLength(1);
       expect(await ledgerByReason(packageId, "booking")).toHaveLength(2);
 
       // Old seat freed, new seat held — the move is one atomic swap.
+      expect(await liveBookingsFor(oldClass)).toHaveLength(0);
+      const newLive = await liveBookingsFor(newClass);
+      expect(newLive).toHaveLength(1);
+      expect(newLive[0]!.id).toBe(res.newBookingId);
+    });
+
+    // ───────────── 3b. ADMIN RESCHEDULE overrides the 5h rule ─────────────
+
+    it("ADMIN RESCHEDULE overrides the 5h rule: a booking 2h out can still be moved", async () => {
+      const POOL = 5;
+      const { members, packageId } = await makeHousehold("resched-late", 1, "private", POOL);
+      // 2h out ⇒ well inside the 5h window ⇒ a CUSTOMER could not move it, but the
+      // owner-only admin path bypasses the window (skipWindowCheck).
+      const oldClass = await makeClass("private", 1, 2);
+      const newClass = await makeClass("private", 1, 72);
+
+      enqueueSession(members[0]!);
+      const booked = await bookClass({ classInstanceId: oldClass });
+      expect(booked.ok).toBe(true);
+      if (!booked.ok) return;
+      const afterBook = await hoursLeftOf(packageId);
+
+      const res = await adminReschedule({
+        bookingId: booked.bookingId,
+        newClassInstanceId: newClass,
+      });
+      // The admin move succeeds despite being inside the 5h window.
+      expect(res.ok).toBe(true);
+      if (!res.ok) return;
+
+      // Same net-zero invariant: balance unchanged, old freed, new held.
+      expect(await hoursLeftOf(packageId)).toBe(afterBook);
       expect(await liveBookingsFor(oldClass)).toHaveLength(0);
       const newLive = await liveBookingsFor(newClass);
       expect(newLive).toHaveLength(1);

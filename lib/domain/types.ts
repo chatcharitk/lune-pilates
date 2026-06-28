@@ -30,36 +30,15 @@ export function effectiveCapacity(capacity: number, type: ClassType): number {
   return Math.min(capacity, CAPACITY[type]);
 }
 
-/** Free cancel/reschedule window, in hours, before class start. */
+/**
+ * Free cancellation window, in hours, before class start (CLAUDE.md §5 invariant 7,
+ * fixed window decided 2026-06-28). This is a SINGLE fixed window for EVERY booking:
+ * a customer self-cancel is free (cost refunded) only when made at least this many
+ * hours before start (inclusive at exactly 5h); within the window the cancel is
+ * BLOCKED entirely (there is no customer late-cancel-with-deduction path). Stamped
+ * on the booking as an audit constant, not a per-booking live input.
+ */
 export const FREE_CANCEL_HOURS = 5;
-
-/**
- * Cancellation policy is a DYNAMIC window fixed at booking time (CLAUDE.md §5
- * invariant 7, decided 2026-06-19). The window stored on the booking depends on
- * how far ahead it was booked:
- *   - booked ≥ LAST_MINUTE_BOOKING_HOURS before class  → 5h free window
- *   - booked  < LAST_MINUTE_BOOKING_HOURS before class → 1h free window
- *
- * LAST_MINUTE_BOOKING_HOURS is the lead-time threshold that decides which window
- * applies; LAST_MINUTE_FREE_CANCEL_HOURS is the (smaller) window a last-minute
- * booking gets. Both are tunable here without a schema change.
- */
-export const LAST_MINUTE_BOOKING_HOURS = 5;
-export const LAST_MINUTE_FREE_CANCEL_HOURS = 1;
-
-/**
- * The free cancel/reschedule window (in hours) to lock onto a booking, decided
- * by its lead time at booking. Pure and unit-testable — the single place this
- * decision lives, used at booking time to stamp `bookings.free_cancel_hours`.
- *
- * Returns FREE_CANCEL_HOURS (5) when the booking is made at least
- * LAST_MINUTE_BOOKING_HOURS ahead of start (inclusive at the boundary), else the
- * last-minute window LAST_MINUTE_FREE_CANCEL_HOURS (1).
- */
-export function freeCancelHoursFor(startsAt: Date, bookedAt: Date): number {
-  const leadHours = (startsAt.getTime() - bookedAt.getTime()) / 3_600_000;
-  return leadHours >= LAST_MINUTE_BOOKING_HOURS ? FREE_CANCEL_HOURS : LAST_MINUTE_FREE_CANCEL_HOURS;
-}
 
 /** Waitlist confirm hold, in minutes, once a freed seat is offered. */
 export const WAITLIST_HOLD_MINUTES = 30;
@@ -74,7 +53,9 @@ export const DEFAULT_PUBLIC_LEAD_HOURS: Record<ClassType, number> = {
   private: 24,
   duo: 24,
   trio: 24,
-  rental: 24,
+  // Rentals open to all viewers up to 14 days (336h) before start — a far longer
+  // booking horizon than studio-led classes (CLAUDE.md §5, decided 2026-06-28).
+  rental: 336,
 };
 
 export const STUDIO_OPEN_HOUR = 8; // 08:00

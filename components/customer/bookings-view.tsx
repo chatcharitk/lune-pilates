@@ -10,7 +10,6 @@
 
 import { useId, useState } from "react";
 import type { MyBooking, MyBookings } from "@/lib/bookings/queries";
-import type { BookableClass } from "@/lib/schedule/queries";
 import type { MyWaitlistEntry } from "@/lib/waitlist/queries";
 import { makeT, type Lang } from "@/lib/i18n";
 import { useCustomerLang } from "./customer-context";
@@ -20,23 +19,18 @@ import {
   hhmm,
   POSITION_KEY,
   TYPE_DOT,
-  windowHoursLabel,
 } from "./schedule-helpers";
 import { Check, Clock, Info, Users } from "./icons";
 import { CancelSheet } from "./cancel-sheet";
-import { RescheduleSheet } from "./reschedule-sheet";
 import { WaitlistCard } from "./waitlist-card";
 
 type Tab = "upcoming" | "past";
 
 export function BookingsView({
   bookings,
-  bookable,
   waitlist,
 }: {
   bookings: MyBookings;
-  /** Bookable slots this week, for the reschedule slot picker (server-fetched). */
-  bookable: BookableClass[];
   /**
    * The viewer's live waitlist entries (waiting/offered; stale offers already
    * downgraded to expired server-side). Shown in their own section on the
@@ -48,8 +42,6 @@ export function BookingsView({
   const [tab, setTab] = useState<Tab>("upcoming");
   // The upcoming booking whose cancel sheet is open (null = closed).
   const [cancelling, setCancelling] = useState<MyBooking | null>(null);
-  // The upcoming booking whose reschedule sheet is open (null = closed).
-  const [rescheduling, setRescheduling] = useState<MyBooking | null>(null);
 
   // Stable, unique tab/panel ids so each tab's aria-controls points at its panel
   // and each panel's aria-labelledby points back at its tab (matches the admin
@@ -137,7 +129,6 @@ export function BookingsView({
                 booking={b}
                 past={tab === "past"}
                 onCancel={() => setCancelling(b)}
-                onReschedule={() => setRescheduling(b)}
               />
             ))}
           </div>
@@ -166,13 +157,6 @@ export function BookingsView({
         open={cancelling !== null}
         onClose={() => setCancelling(null)}
       />
-      <RescheduleSheet
-        lang={lang}
-        booking={rescheduling}
-        bookable={bookable}
-        open={rescheduling !== null}
-        onClose={() => setRescheduling(null)}
-      />
     </div>
   );
 }
@@ -184,13 +168,11 @@ function BookingCard({
   booking,
   past,
   onCancel,
-  onReschedule,
 }: {
   lang: Lang;
   booking: MyBooking;
   past: boolean;
   onCancel: () => void;
-  onReschedule: () => void;
 }) {
   const { t, tt } = makeT(lang);
   const cancelled = booking.status === "cancelled";
@@ -239,45 +221,30 @@ function BookingCard({
         </div>
 
         {/* status badge */}
-        <StatusBadge
-          lang={lang}
-          cancelled={cancelled}
-          past={past}
-          free={free}
-          freeCancelHours={booking.cancellation.freeCancelHours}
-        />
+        <StatusBadge lang={lang} cancelled={cancelled} past={past} free={free} />
       </div>
 
-      {/* upcoming actions — reschedule is a FREE move, allowed only within the
-          booking's free window (server-provided cancellation.free). Past the
-          window only a cancel-with-deduction remains. */}
+      {/* upcoming actions — a self-cancel is allowed ONLY within the fixed 5h free
+          window (server-provided cancellation.free) and is then always free. Inside
+          the 5h window the cancel is BLOCKED entirely (CLAUDE.md §5 inv 7). */}
       {!past && !cancelled && (
         <div className="mt-3.5 border-t border-line pt-3.5">
-          <div className="flex gap-2.5">
-            <button
-              type="button"
-              onClick={onReschedule}
-              disabled={!free}
-              aria-disabled={!free}
-              className={`flex-1 rounded-lune-sm border px-3 py-2.5 font-body text-[13.5px] font-semibold transition-colors ${
-                free
-                  ? "border-line bg-transparent text-ink hover:bg-cream-2"
-                  : "cursor-not-allowed border-line bg-transparent text-muted"
-              }`}
-            >
-              {t("reschedule")}
-            </button>
-            <button
-              type="button"
-              onClick={onCancel}
-              className="flex-1 rounded-lune-sm border border-rose/40 bg-transparent px-3 py-2.5 font-body text-[13.5px] font-semibold text-rose transition-colors hover:bg-rose/10"
-            >
-              {t("cancel")}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={!free}
+            aria-disabled={!free}
+            className={`w-full rounded-lune-sm border px-3 py-2.5 font-body text-[13.5px] font-semibold transition-colors ${
+              free
+                ? "border-rose/40 bg-transparent text-rose hover:bg-rose/10"
+                : "cursor-not-allowed border-line bg-transparent text-muted"
+            }`}
+          >
+            {t("cancel")}
+          </button>
           {!free && (
             <p className="mt-2 font-body text-[11.5px] leading-snug text-muted">
-              {t("resched_locked_hint")}
+              {t("too_late_to_cancel_hint")}
             </p>
           )}
         </div>
@@ -291,14 +258,11 @@ function StatusBadge({
   cancelled,
   past,
   free,
-  freeCancelHours,
 }: {
   lang: Lang;
   cancelled: boolean;
   past: boolean;
   free: boolean;
-  /** The booking's own free window (5 | 1), for the "Within N hours" hint. */
-  freeCancelHours: number;
 }) {
   const { t } = makeT(lang);
 
@@ -317,17 +281,15 @@ function StatusBadge({
       </span>
     );
   }
-  // Upcoming: policy hint (free cancel vs within N hours), from server data —
-  // the window N comes from the booking's own freeCancelHours (5 | 1).
+  // Upcoming: free cancel (≥5h before class) vs cancellation closed (within 5h) —
+  // from the server's fixed-window verdict (CLAUDE.md §5 inv 7).
   return (
     <span
       className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-[5px] font-body text-[11px] font-semibold ${
         free ? "bg-sage/15 text-sage-deep" : "bg-rose/12 text-rose"
       }`}
     >
-      {free
-        ? t("free_cancel")
-        : t("late_cancel").replace("{hours}", windowHoursLabel(freeCancelHours, t))}
+      {free ? t("free_cancel") : t("too_late_hint")}
     </span>
   );
 }

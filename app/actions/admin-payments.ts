@@ -3,9 +3,10 @@
 // Server actions for the admin "verify a PromptPay slip" flow (Feature 3). These are
 // the typed contracts the admin frontend imports and calls directly.
 //
-// Every action is gated by `requireAdmin()` (lib/auth/admin.ts) as LINE 1 of the body
-// — BEFORE input parsing and the no-DB branch — so it can never be reordered past
-// them (pinned by tests/admin-auth.test.ts), mirroring app/actions/admin-pos.ts.
+// Every action is OWNER-ONLY: gated by `requireOwner()` (lib/auth/admin.ts) as LINE
+// 1 of the body — BEFORE input parsing — so it can never be reordered past it
+// (pinned by tests/admin-auth.test.ts), mirroring app/actions/admin-pos.ts. An
+// instructor is rejected like unauth (UNAUTHORIZED); slip PII never reaches them.
 //
 // MONEY IS GRANTED ONLY ON APPROVE (CLAUDE.md §5 invariant 1): approveSlip is the
 // ONE place a slip-verified PromptPay purchase becomes credit, via the SAME atomic,
@@ -32,7 +33,7 @@ import { loadPoolOwner } from "@/lib/credits/selectPackage";
 import { creditPackage, ownerForPool, type CreditOwner } from "@/lib/credits/creditPackage";
 import { emit } from "@/lib/events/bus";
 import { registerNotificationHandlers } from "@/lib/events/notifications";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireOwner } from "@/lib/auth/admin";
 
 // ───────────────────────── approve slip ─────────────────────────
 
@@ -83,7 +84,7 @@ export type ApproveSlipResult =
  * review fields + charges.reviewed_at, and emits `credit.purchased`.
  */
 export async function approveSlip(raw: ApproveSlipInput): Promise<ApproveSlipResult> {
-  const admin = await requireAdmin();
+  const admin = await requireOwner();
   if (!admin) return { ok: false, code: "UNAUTHORIZED" };
 
   const parsed = approveSlipInput.safeParse(raw);
@@ -213,7 +214,7 @@ export type RejectSlipResult =
  * `payment.slip_rejected`.
  */
 export async function rejectSlip(raw: RejectSlipInput): Promise<RejectSlipResult> {
-  const admin = await requireAdmin();
+  const admin = await requireOwner();
   if (!admin) return { ok: false, code: "UNAUTHORIZED" };
 
   const parsed = rejectSlipInput.safeParse(raw);
@@ -301,12 +302,12 @@ export type GetSlipResult =
 
 /**
  * Return the uploaded slip image for a charge — ADMIN ONLY. Slip images carry
- * bank/PII, so this is gated behind requireAdmin and never publicly fetchable. The
+ * bank/PII, so this is gated behind requireOwner and never publicly fetchable. The
  * image bytes come from the storage adapter (getSlipStorage().get); the metadata from
  * the slip row.
  */
 export async function getSlip(raw: GetSlipInput): Promise<GetSlipResult> {
-  if (!(await requireAdmin())) return { ok: false, code: "UNAUTHORIZED" };
+  if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
 
   const parsed = getSlipInput.safeParse(raw);
   if (!parsed.success) {

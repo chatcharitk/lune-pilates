@@ -13,12 +13,12 @@ Copy `.env.example` → `.env` (local) or set these in the Vercel project. Requi
 | Var | Required | Notes |
 |-----|----------|-------|
 | `DATABASE_URL` | **yes** | Neon **pooled** connection string (`…-pooler.…neon.tech`). The credit ledger uses interactive transactions over the WebSocket `Pool` driver — the pooled URL is mandatory. |
-| `APP_URL` | **yes (prod)** | Public base URL of the deployed app. Household invite / LINE-share links are built from it (`/join/<token>`). If unset it falls back to `http://localhost:3000`, so production invite links would point at localhost. |
 | `CRON_SECRET` | **yes (prod)** | Shared secret for `/api/cron/waitlist-sweep`. The route **fails closed (503)** if unset. Set it in Vercel and Vercel Cron sends it as `Authorization: Bearer <secret>` automatically. |
 | `PAYMENTS_MODE` | no | `mock` (default) or `live`. `live` **throws at construction** until a real PromptPay provider is wired — production can never silently run on the always-paid mock. |
 | `LINE_MODE` | no | `mock` (default) or `live`. Same fail-closed behavior. |
 | `STORAGE_MODE` | no | `mock` (default) or `live`. The slip-image store for PromptPay verification. `mock` persists the slip as a base64 data-URL in the DB; any other value **throws** until a real object store (Vercel Blob / S3) is wired — a one-file swap in `lib/storage`. |
 | `ADMIN_AUTH` | no | Unset = v1 mock admin (always grants a session). `deny` = reject all (locked-down staging). Swap in a real staff provider before exposing the admin app. |
+| `ADMIN_ROLE` | no | Mock admin role: unset/`owner` = full admin; `instructor` = Today (own classes) + check-in only. `ADMIN_INSTRUCTOR_ID` (default `mai`) is the linked instructor slug when `instructor`. Real staff auth supplies the role later. |
 | `LINE_CHANNEL_ACCESS_TOKEN`, `LINE_CHANNEL_SECRET`, `LIFF_ID` | only if `LINE_MODE=live` | LINE channel credentials. |
 
 ---
@@ -33,9 +33,10 @@ npm run db:push    # create/sync all tables, indexes, constraints from schema.ts
 npm run db:seed    # populate reference + demo data (idempotent — safe to re-run)
 ```
 
-`db:push` reproduces everything, including the `instructor_availability`,
-`household_invites`, and `payment_slips` tables, plus the `bookings`
-one-live-per-(class,user) / per-position partial unique indexes.
+`db:push` reproduces everything from `schema.ts`, including the
+`instructor_availability` and `payment_slips` tables, the integer credit columns,
+the `credit_ledger.idempotency_key` partial-unique index (manual adjustments), and
+the `bookings` one-live-per-(class,user) / per-position partial unique indexes.
 
 > Note: `db:push` is interactive (prompts on ambiguous diffs) and needs a TTY. Run it
 > from a local terminal against the target `DATABASE_URL`, not from CI.

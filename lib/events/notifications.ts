@@ -41,6 +41,14 @@ async function lineIdsForHousehold(householdId: string): Promise<string[]> {
   return rows.map((r) => r.lineUserId).filter((id): id is string => id !== null);
 }
 
+/** Resolve a single user's linked LINE id as a 0-or-1 element array (for fan-out
+ *  parity with `lineIdsForHousehold`). Empty when no DB / unlinked / userId null. */
+async function collectLineId(userId: string | null): Promise<string[]> {
+  if (!userId) return [];
+  const lineId = await lineIdForUser(userId);
+  return lineId ? [lineId] : [];
+}
+
 let registered = false;
 
 export function registerNotificationHandlers(): void {
@@ -74,16 +82,6 @@ export function registerNotificationHandlers(): void {
     );
   });
 
-  on("household.member_joined", async (e) => {
-    // Thin listener — best-effort LINE notice to the inviter that someone joined. The
-    // event carries the inviter's users.id; resolve their linked LINE id first (skip if
-    // they have not linked LINE — pushing a DB UUID would target nobody).
-    const lineId = await lineIdForUser(e.inviterUserId);
-    if (lineId) {
-      await line.push(lineId, `Someone joined your household — they now share your pool.`);
-    }
-  });
-
   on("payment.slip_submitted", async (e) => {
     // Thin listener — best-effort acknowledgement to the customer that their slip is
     // in review. The front desk picks it up from the admin payments queue. e.userId is
@@ -109,6 +107,23 @@ export function registerNotificationHandlers(): void {
         `Your payment slip couldn't be verified${tail}. Please re-upload a clearer slip.`,
       );
     }
+  });
+
+  on("credit.adjusted", async (e) => {
+    // Thin, best-effort notice that an admin adjusted the pool's balance. The owner
+    // is a household pool (notify every member who linked LINE) XOR a single user.
+    const lineIds = e.owner.ownerHouseholdId
+      ? await lineIdsForHousehold(e.owner.ownerHouseholdId)
+      : await collectLineId(e.owner.ownerUserId);
+    const sign = e.delta > 0 ? "+" : "";
+    await Promise.all(
+      lineIds.map((lineId) =>
+        line.push(
+          lineId,
+          `Your credit balance was adjusted by ${sign}${e.delta} hr (now ${e.hoursLeft} hr). ${e.note}`,
+        ),
+      ),
+    );
   });
 
   // booking.confirmed / booking.cancelled / credit.expiring handlers attach the

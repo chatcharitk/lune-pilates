@@ -208,6 +208,36 @@ export async function selectUsablePackageForUser(
 }
 
 /**
+ * The admin/front-desk counterpart to `selectPackageForReschedule`: pick the
+ * package the NEW leg of a reschedule should debit for an ARBITRARY user
+ * (`userId`), recomputing their pool ownership (member→household pool, guest→own
+ * packages) from the DB — never trusting any client-supplied identity, tier,
+ * household, balance, or package id (CLAUDE.md §8). Used when the front desk
+ * reschedules a booking on a customer's behalf (the customer is not the session
+ * user). Returns the package id to debit, or null when the user is unknown or
+ * nothing can cover the move.
+ *
+ * The actual selection (prefer the old package on its post-refund balance, else a
+ * package that covers the new cost on its own) is the SAME
+ * `selectPackageForReschedule` the customer path uses, so the two can't diverge.
+ */
+export async function selectPackageForRescheduleForUser(
+  userId: string,
+  newClassType: ClassType,
+  oldPackageId: string,
+  refundCost: number,
+  newCost: number,
+  now: Date = new Date(),
+): Promise<string | null> {
+  const owner = await loadPoolOwner(userId);
+  if (!owner) return null;
+  // `selectPackageForReschedule` reads only id/tier/householdId via `ownerWhere`;
+  // the remaining SessionUser fields are display-only and irrelevant to selection.
+  const viewer: SessionUser = { ...owner, name: "", houseNumber: null };
+  return selectPackageForReschedule(viewer, newClassType, oldPackageId, refundCost, newCost, now);
+}
+
+/**
  * The viewer's total usable balance (hours) for a class type's pool — the SUM of
  * `hours_left` across every active, non-expired package in the right category and
  * pool (household for members, own for guests). This is the figure the UI should
@@ -235,8 +265,7 @@ export async function getPoolBalance(
         gt(packages.expiresAt, now),
       ),
     );
-  // Sum in JS over numeric(4,1) numbers — every value is a 0.5 multiple, exactly
-  // representable, so the total never drifts.
+  // Sum in JS over whole integer credits — exactly representable, never drifts.
   return rows.reduce((total, r) => total + r.hoursLeft, 0);
 }
 

@@ -49,10 +49,6 @@ type Phase = "idle" | "submitting" | "booked" | "error";
 // joined (the "You're on the list" confirmation) | wlerror (friendly failure).
 type WaitlistPhase = "idle" | "joining" | "joined" | "error";
 
-/** Format a credit cost for copy: 1 → "1", 1.5 → "1.5" (drops the trailing .0). */
-function fmtCredits(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toFixed(1);
-}
 
 /** Map an action failure code to a friendly, keyed message. */
 function errorKey(code: BookActionFailureCode): StrKey {
@@ -121,7 +117,7 @@ export function BookingPanel({
   const [phase, setPhase] = useState<Phase>("idle");
   const [failCode, setFailCode] = useState<BookActionFailureCode | null>(null);
   const [balanceAfter, setBalanceAfter] = useState<number | null>(null);
-  // The free-cancel window (hours, 5 | 1) the server LOCKED for THIS booking,
+  // The free-cancel window (hours, always 5) the server LOCKED for THIS booking,
   // surfaced on the success screen so the policy notice is accurate per booking.
   const [freeCancelHours, setFreeCancelHours] = useState<number | null>(null);
 
@@ -275,7 +271,7 @@ export function BookingPanel({
           </div>
 
           {/* applicable cancellation policy — the window ({hours}) is the
-              freeCancelHours the server locked for THIS booking (5 | 1), and the
+              freeCancelHours the server locked for THIS booking (always 5), and the
               cost is this class's exact credit cost. Never computed client-side. */}
           {freeCancelHours !== null && (
             <div className="mt-3 flex items-start gap-2.5 rounded-lune-sm bg-cream-2 px-4 py-3 text-left">
@@ -287,7 +283,7 @@ export function BookingPanel({
                   .replace("{hours}", windowHoursLabel(freeCancelHours, t))
                   .replace(
                     "{cost}",
-                    `${fmtCredits(cost)} ${cost === 1 ? t("hour") : t("hours")}`,
+                    `${String(cost)} ${cost === 1 ? t("hour") : t("hours")}`,
                   )}
               </p>
             </div>

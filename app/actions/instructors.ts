@@ -4,10 +4,11 @@
 // admin-mobile-more.jsx `MAvailEditor`). The single write here is replacing an
 // instructor's WEEKLY availability template — the editor's Save.
 //
-// Every action is gated by `requireAdmin()` (lib/auth/admin.ts — v1 mock provider;
-// the real staff/LINE provider swaps in at `getAdminAuth()` with no change here).
-// The gate is line 1 of the body, BEFORE input parsing and the no-DB branch, so it
-// can never be reordered past them (see tests/admin-auth.test.ts).
+// OWNER-ONLY: gated by `requireOwner()` (lib/auth/admin.ts — v1 mock provider; the
+// real staff/LINE provider swaps in at `getAdminAuth()`). An instructor is rejected
+// like unauth (UNAUTHORIZED). The gate is line 1 of the body, BEFORE input parsing
+// and the no-DB branch, so it can never be reordered past them (see
+// tests/admin-auth.test.ts).
 //
 // All inputs are validated server-side (CLAUDE.md §8): every range must be "HH:MM"
 // 24h with end > start, and no two ranges within a day may overlap. The week is the
@@ -21,7 +22,7 @@ import { z } from "zod";
 import { getDb } from "@/lib/db/client";
 import { instructorAvailability, instructors } from "@/lib/db/schema";
 import { WEEKDAYS, type Weekday } from "@/lib/admin/instructors";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireOwner } from "@/lib/auth/admin";
 
 /** Sentinel to roll the replace transaction back when the instructor is missing/inactive. */
 class UnknownInstructorError extends Error {}
@@ -100,7 +101,7 @@ export type SetInstructorAvailabilityResult =
 export async function setInstructorAvailability(
   raw: SetInstructorAvailabilityInput,
 ): Promise<SetInstructorAvailabilityResult> {
-  if (!(await requireAdmin())) return { ok: false, code: "UNAUTHORIZED" };
+  if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
 
   const parsed = setAvailabilityInput.safeParse(raw);
   if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };

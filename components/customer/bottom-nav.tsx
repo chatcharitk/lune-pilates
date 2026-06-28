@@ -47,7 +47,7 @@ const NAV: NavItem[] = [
 ];
 
 // Route prefixes that render their own focused flow (no global nav).
-const HIDE_ON: readonly string[] = ["/buy", "/join"];
+const HIDE_ON: readonly string[] = ["/buy"];
 
 function isHidden(pathname: string): boolean {
   if (HIDE_ON.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return true;

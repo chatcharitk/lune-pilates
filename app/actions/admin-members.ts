@@ -4,8 +4,9 @@
 // "add a new customer on the spot"). The typed contract the frontend imports and
 // calls directly.
 //
-// Gated by `requireAdmin()` (lib/auth/admin.ts — v1 mock provider; the real
-// staff/LINE provider swaps in at `getAdminAuth()` with no change here). The gate is
+// OWNER-ONLY: gated by `requireOwner()` (lib/auth/admin.ts — v1 mock provider; the
+// real staff/LINE provider swaps in at `getAdminAuth()`). An instructor is rejected
+// like unauth (UNAUTHORIZED). The gate is
 // line 1 of the body, BEFORE input parsing and the no-DB branch, so it can never be
 // reordered past them (see tests/admin-auth.test.ts).
 //
@@ -26,7 +27,7 @@ import { z } from "zod";
 import { getDb } from "@/lib/db/client";
 import { households, users } from "@/lib/db/schema";
 import type { UserTier } from "@/lib/domain/types";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireOwner } from "@/lib/auth/admin";
 
 // ───────────────────────── input ─────────────────────────
 
@@ -85,7 +86,7 @@ export type CreateCustomerResult =
  * No-DB dev path: returns ok with a synthesized id so the UI works on mock data.
  */
 export async function createCustomer(raw: CreateCustomerInput): Promise<CreateCustomerResult> {
-  if (!(await requireAdmin())) return { ok: false, code: "UNAUTHORIZED" };
+  if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
 
   const parsed = createCustomerInput.safeParse(raw);
   if (!parsed.success) {

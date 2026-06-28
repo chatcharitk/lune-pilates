@@ -5,10 +5,11 @@
 // admin-mobile-pos.jsx `MPos`/`MPayFlow`). These are the typed contracts the
 // frontend imports and calls directly.
 //
-// Every action is gated by `requireAdmin()` (lib/auth/admin.ts — v1 mock provider;
-// the real staff/LINE provider swaps in at `getAdminAuth()` with no change here).
-// The gate is line 1 of the body, BEFORE input parsing and the no-DB branch, so it
-// can never be reordered past them (see tests/admin-auth.test.ts).
+// Every action is OWNER-ONLY: gated by `requireOwner()` (lib/auth/admin.ts — v1
+// mock provider; the real staff/LINE provider swaps in at `getAdminAuth()`). An
+// instructor is rejected like unauth (UNAUTHORIZED). The gate is line 1 of the
+// body, BEFORE input parsing and the no-DB branch, so it can never be reordered
+// past them (see tests/admin-auth.test.ts).
 //
 // MONEY IS RECOMPUTED SERVER-SIDE (CLAUDE.md §8): the client supplies only a
 // customerId, a catalog packageId, and the tender method. The price, the hours, the
@@ -44,7 +45,7 @@ import { loadPoolOwner } from "@/lib/credits/selectPackage";
 import { creditPackage, ownerForPool, type CreditOwner } from "@/lib/credits/creditPackage";
 import { emit } from "@/lib/events/bus";
 import { registerNotificationHandlers } from "@/lib/events/notifications";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireOwner } from "@/lib/auth/admin";
 
 // ───────────────────────── shared owner resolution ─────────────────────────
 
@@ -140,7 +141,7 @@ export type PosSellPackageResult =
  * when the catalog grows beyond packages.
  */
 export async function posSellPackage(raw: PosSellPackageInput): Promise<PosSellPackageResult> {
-  if (!(await requireAdmin())) return { ok: false, code: "UNAUTHORIZED" };
+  if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
 
   const parsed = posSellInput.safeParse(raw);
   if (!parsed.success) {
@@ -346,7 +347,7 @@ export type PosConfirmPaymentResult =
 export async function posConfirmPayment(
   raw: PosConfirmPaymentInput,
 ): Promise<PosConfirmPaymentResult> {
-  if (!(await requireAdmin())) return { ok: false, code: "UNAUTHORIZED" };
+  if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
 
   const parsed = posConfirmInput.safeParse(raw);
   if (!parsed.success) {

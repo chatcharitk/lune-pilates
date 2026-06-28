@@ -30,7 +30,7 @@ export default async function ClassDetailPage({
   if (!detail) notFound();
 
   // Truthful cost + pre-booking balance, both recomputed server-side. The cost
-  // is the per-type credit cost (1 group / 1.5 private·duo·trio / 1 rental) the
+  // is the per-type credit cost (1 group / 2 private·duo·trio / 1 rental) the
   // debit actually charges. The balance is the SINGLE package the debit will
   // actually draw from (cost-aware selection) — NOT the whole-pool sum — so the
   // CTA, the "remaining after" estimate, and the real debit always agree.

@@ -9,8 +9,9 @@
 // week's drafts to `published`, computes the tiered-visibility windows, and emits
 // exactly ONE `schedule.published` broadcast event.
 //
-// Every action is gated by `requireAdmin()` (lib/auth/admin.ts — v1 mock provider,
-// real one swaps in later). All money- and capacity-critical values are recomputed
+// Every action is OWNER-ONLY: gated by `requireOwner()` (lib/auth/admin.ts — v1
+// mock provider, real one swaps in later). An instructor is rejected like unauth
+// (UNAUTHORIZED). All money- and capacity-critical values are recomputed
 // server-side.
 
 import { and, eq, sql } from "drizzle-orm";
@@ -28,7 +29,7 @@ import {
 } from "@/lib/schedule/baseline";
 import { emit } from "@/lib/events/bus";
 import { registerNotificationHandlers } from "@/lib/events/notifications";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireOwner } from "@/lib/auth/admin";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -58,7 +59,7 @@ export type CreateClassResult =
 
 /** Add a single DRAFT class instance to a week. Never touches the baseline. */
 export async function createClass(raw: CreateClassInput): Promise<CreateClassResult> {
-  if (!(await requireAdmin())) return { ok: false, code: "UNAUTHORIZED" };
+  if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
 
   const parsed = createInput.safeParse(raw);
   if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
@@ -115,7 +116,7 @@ export type UpdateClassResult = { ok: true } | { ok: false; code: UpdateClassFai
  * public-visibility window is recomputed from the new start time.
  */
 export async function updateClass(raw: UpdateClassInput): Promise<UpdateClassResult> {
-  if (!(await requireAdmin())) return { ok: false, code: "UNAUTHORIZED" };
+  if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
 
   const parsed = updateInput.safeParse(raw);
   if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
@@ -177,7 +178,7 @@ export type DeleteClassResult = { ok: true } | { ok: false; code: DeleteClassFai
  * — this keeps the ledger/booking history intact.
  */
 export async function deleteClass(raw: DeleteClassInput): Promise<DeleteClassResult> {
-  if (!(await requireAdmin())) return { ok: false, code: "UNAUTHORIZED" };
+  if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
 
   const parsed = deleteInput.safeParse(raw);
   if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
@@ -219,7 +220,7 @@ export type GenerateResult =
  * created, so re-running never duplicates. The baseline itself is never mutated.
  */
 export async function generateWeekFromBaseline(raw: WeekInput): Promise<GenerateResult> {
-  if (!(await requireAdmin())) return { ok: false, code: "UNAUTHORIZED" };
+  if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
 
   const parsed = weekInput.safeParse(raw);
   if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
@@ -279,7 +280,7 @@ export type PublishResult =
  * Idempotent: already-published instances are untouched.
  */
 export async function publishWeek(raw: WeekInput): Promise<PublishResult> {
-  if (!(await requireAdmin())) return { ok: false, code: "UNAUTHORIZED" };
+  if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
 
   const parsed = weekInput.safeParse(raw);
   if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };

@@ -9,30 +9,48 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { AdminLangProvider, useAdminLang } from "./admin-context";
+import type { AdminRole } from "@/lib/auth/admin";
 import type { Lang, StrKey } from "@/lib/i18n";
 
 // Mobile bottom bar fits five primary destinations + a "More" overflow; the
 // overflow sheet holds the rest so nothing 404s or is unreachable on a phone
 // (Feature 4 nav decision: Dashboard + Instructors live behind "More"). Desktop
 // shows every item in the sidebar.
-const MOBILE_OVERFLOW: ReadonlySet<string> = new Set(["/admin/dashboard", "/admin/instructors"]);
+const MOBILE_OVERFLOW: ReadonlySet<string> = new Set([
+  "/admin/dashboard",
+  "/admin/instructors",
+  "/admin/sales",
+]);
 
 interface NavItem {
   href: string;
   key: StrKey;
   icon: React.ReactNode;
+  /**
+   * Owner-only destination — hidden from an instructor (who only sees Today). Only
+   * Today is `false`; every other item is owner-only. Filtering here is a UX/nav
+   * concern; the real authorization is server-side per page (requireOwner).
+   */
+  ownerOnly?: boolean;
 }
 
 const NAV: NavItem[] = [
   {
     href: "/admin/dashboard",
     key: "admin_dashboard",
+    ownerOnly: true,
     icon: <path d="M4 19V5M4 19h16M8 16v-5M12 16V8M16 16v-3" />,
   },
-  { href: "/admin/today", key: "admin_today", icon: <path d="M3 11l9-8 9 8M5 10v10h14V10" /> },
+  {
+    href: "/admin/today",
+    key: "admin_today",
+    ownerOnly: false,
+    icon: <path d="M3 11l9-8 9 8M5 10v10h14V10" />,
+  },
   {
     href: "/admin/schedule",
     key: "admin_schedule",
+    ownerOnly: true,
     icon: (
       <>
         <rect x="3" y="4" width="18" height="17" rx="2" />
@@ -43,6 +61,7 @@ const NAV: NavItem[] = [
   {
     href: "/admin/bookings",
     key: "admin_bookings",
+    ownerOnly: true,
     icon: (
       <>
         <rect x="3" y="5" width="18" height="14" rx="2" />
@@ -53,6 +72,7 @@ const NAV: NavItem[] = [
   {
     href: "/admin/members",
     key: "admin_members",
+    ownerOnly: true,
     icon: (
       <>
         <circle cx="9" cy="8" r="3.5" />
@@ -63,6 +83,7 @@ const NAV: NavItem[] = [
   {
     href: "/admin/payments",
     key: "admin_payments",
+    ownerOnly: true,
     icon: (
       <>
         <rect x="3" y="6" width="18" height="13" rx="2" />
@@ -73,9 +94,26 @@ const NAV: NavItem[] = [
   {
     href: "/admin/instructors",
     key: "admin_instructors",
+    ownerOnly: true,
     icon: <path d="M8 6h12M8 12h12M8 18h12M3 6h.01M3 12h.01M3 18h.01" />,
   },
+  {
+    href: "/admin/sales",
+    key: "admin_sales",
+    ownerOnly: true,
+    icon: (
+      <>
+        <path d="M4 19V5M4 19h16M8 16v-5M12 16V8M16 16v-3" />
+        <path d="m4 13 4-3 4 2 5-5" />
+      </>
+    ),
+  },
 ];
+
+/** Nav items visible to `role`: instructors see only the non-owner-only items. */
+function navForRole(role: AdminRole): NavItem[] {
+  return NAV.filter((item) => !item.ownerOnly || role === "owner");
+}
 
 function NavIcon({ icon, size = 20 }: { icon: React.ReactNode; size?: number }) {
   return (
@@ -114,16 +152,17 @@ function Brand({ light }: { light?: boolean }) {
   );
 }
 
-function Sidebar() {
+function Sidebar({ role }: { role: AdminRole }) {
   const { t } = useAdminLang();
   const pathname = usePathname();
+  const nav = navForRole(role);
   return (
     <aside className="hidden w-60 shrink-0 flex-col bg-admin-ink text-cream md:flex">
       <div className="px-6 py-7">
         <Brand light />
       </div>
       <nav className="flex flex-1 flex-col gap-1 px-3">
-        {NAV.map((n) => {
+        {nav.map((n) => {
           const active = pathname === n.href || pathname.startsWith(n.href + "/");
           return (
             <Link
@@ -207,13 +246,14 @@ function Topbar() {
   );
 }
 
-function MobileNav() {
+function MobileNav({ role }: { role: AdminRole }) {
   const { t } = useAdminLang();
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
 
-  const primary = NAV.filter((n) => !MOBILE_OVERFLOW.has(n.href));
-  const overflow = NAV.filter((n) => MOBILE_OVERFLOW.has(n.href));
+  const nav = navForRole(role);
+  const primary = nav.filter((n) => !MOBILE_OVERFLOW.has(n.href));
+  const overflow = nav.filter((n) => MOBILE_OVERFLOW.has(n.href));
   const overflowActive = overflow.some(
     (n) => pathname === n.href || pathname.startsWith(n.href + "/"),
   );
@@ -238,23 +278,25 @@ function MobileNav() {
             </li>
           );
         })}
-        <li>
-          <button
-            type="button"
-            onClick={() => setMoreOpen(true)}
-            aria-haspopup="dialog"
-            aria-expanded={moreOpen}
-            className={`flex flex-col items-center gap-1 px-2.5 py-1 ${
-              overflowActive ? "text-cream" : "text-cream/60"
-            }`}
-          >
-            <NavIcon
-              icon={<><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></>}
-              size={21}
-            />
-            <span className="font-body text-[10px] font-medium">{t("admin_more")}</span>
-          </button>
-        </li>
+        {overflow.length > 0 && (
+          <li>
+            <button
+              type="button"
+              onClick={() => setMoreOpen(true)}
+              aria-haspopup="dialog"
+              aria-expanded={moreOpen}
+              className={`flex flex-col items-center gap-1 px-2.5 py-1 ${
+                overflowActive ? "text-cream" : "text-cream/60"
+              }`}
+            >
+              <NavIcon
+                icon={<><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></>}
+                size={21}
+              />
+              <span className="font-body text-[10px] font-medium">{t("admin_more")}</span>
+            </button>
+          </li>
+        )}
       </ul>
       {moreOpen && (
         <MoreSheet items={overflow} pathname={pathname} onClose={() => setMoreOpen(false)} />
@@ -362,15 +404,22 @@ function MoreSheet({
   );
 }
 
-export function AdminShell({ children }: { children: React.ReactNode }) {
+export function AdminShell({
+  children,
+  role = "owner",
+}: {
+  children: React.ReactNode;
+  /** The acting admin's role — an instructor's nav collapses to just Today. */
+  role?: AdminRole;
+}) {
   return (
     <AdminLangProvider>
       <div className="flex min-h-dvh bg-cream">
-        <Sidebar />
+        <Sidebar role={role} />
         <div className="flex min-w-0 flex-1 flex-col">
           <Topbar />
           <main className="flex-1 px-5 py-6 md:px-10 md:py-9">{children}</main>
-          <MobileNav />
+          <MobileNav role={role} />
         </div>
       </div>
     </AdminLangProvider>

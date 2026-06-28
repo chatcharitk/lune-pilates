@@ -15,12 +15,4 @@ export interface LineClient {
   broadcast(text: string): Promise<void>;
   /** Rich booking-confirmation flex card. */
   pushBookingCard(lineUserId: string, card: FlexBookingCard): Promise<void>;
-  /**
-   * Build the share surfaces for a household invite (Feature 2 "เชิญคนในบ้าน").
-   * - `url` is the in-app join link the invitee opens (`/join/<token>`).
-   * - `lineShareUrl` is a LINE share-intent URL that pre-fills a bilingual invite
-   *   message + the join link, so the inviter can forward it inside LINE.
-   * The token is the ONLY secret the link carries (no household id, no identity).
-   */
-  createInviteShareLink(token: string): Promise<{ url: string; lineShareUrl: string }>;
 }

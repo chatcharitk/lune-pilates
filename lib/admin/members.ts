@@ -29,7 +29,7 @@
 import { and, asc, eq, gt, isNull, sql, type SQL } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { households, packages, users } from "@/lib/db/schema";
-import type { UserTier } from "@/lib/domain/types";
+import type { PackageCategory, UserTier } from "@/lib/domain/types";
 
 // ───────────────────────── tunables ─────────────────────────
 
@@ -123,8 +123,7 @@ export interface CreditSummary {
  * Roll a customer's usable packages (already filtered to their pool, non-expired,
  * hours_left > 0) into the table summary: the summed balance, the soonest expiry,
  * and the expiring-soon flag. Pure (no I/O) so it is unit-testable and shared by
- * the DB and mock paths. Summing numeric(4,1) JS numbers (each a 0.5 multiple,
- * exactly representable) never drifts (CLAUDE.md §8).
+ * the DB and mock paths. Summing whole integer credits never drifts (CLAUDE.md §8).
  */
 export function summariseCredits(
   pkgs: readonly UsablePackageSummary[],
@@ -408,7 +407,7 @@ const MOCK_CUSTOMERS: MockCustomer[] = [
   { id: mid(3), name: "June Wattana", phone: "062 553 9981", house: "A-114", member: false, ownHours: 5, expiresInDays: 8 },
   { id: mid(4), name: "Best Pongsak", phone: "084 119 2235", house: "C-007", member: true, ownHours: 6, expiresInDays: 23 },
   { id: mid(5), name: "Fah Intira", phone: "090 442 0087", house: "C-007", member: true, ownHours: 6, expiresInDays: 23 },
-  { id: mid(6), name: "Mind Arunee", phone: "081 778 5512", house: "D-051", member: false, ownHours: 0.5, expiresInDays: 1 },
+  { id: mid(6), name: "Mind Arunee", phone: "081 778 5512", house: "D-051", member: false, ownHours: 1, expiresInDays: 1 },
   { id: mid(7), name: "Gus Theerapat", phone: "083 901 7766", house: "A-114", member: true, ownHours: 3, expiresInDays: 2 },
   { id: mid(8), name: "Ann Kanya", phone: "086 220 4419", house: "E-088", member: true, ownHours: 9, expiresInDays: 41 },
 ];

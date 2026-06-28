@@ -76,4 +76,26 @@ describe("getTodayOverview (no-DB mock)", () => {
     expect(queue[0]?.position).toBe(1);
     expect(queue[1]?.offered).toBe(false); // the rest are still waiting
   });
+
+  it("scopes to a single instructor when given instructorId (and stats reflect it)", async () => {
+    // The mock day has two 'mai' classes (t1, t4); an instructor session passes
+    // their slug so they only see — and the stats only count — their own classes.
+    const all = await getTodayOverview(now);
+    const mai = await getTodayOverview(now, { instructorId: "mai" });
+
+    expect(mai.classes.length).toBeGreaterThan(0);
+    expect(mai.classes.length).toBeLessThan(all.classes.length);
+    // Every returned class belongs to the scoped instructor.
+    for (const c of mai.classes) {
+      expect(c.instructor?.id).toBe("mai");
+    }
+
+    // Stats reflect ONLY the filtered set (recomputed from the scoped classes).
+    expect(mai.stats.classes).toBe(mai.classes.length);
+    expect(mai.stats.attendees).toBe(mai.classes.reduce((a, c) => a + c.booked, 0));
+    expect(mai.stats.capacity).toBe(mai.classes.reduce((a, c) => a + c.capacity, 0));
+    expect(mai.stats.waitlisted).toBe(mai.classes.reduce((a, c) => a + c.waitlist.length, 0));
+    // And the scoped set is a strict subset of the full day's counts.
+    expect(mai.stats.attendees).toBeLessThan(all.stats.attendees);
+  });
 });

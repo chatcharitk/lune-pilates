@@ -54,9 +54,9 @@ import { thb, type StrKey } from "@/lib/i18n";
 
 // ───────────────────────── helpers ─────────────────────────
 
-/** Whole-credit display: 1 → "1", 1.5 → "1.5" (no trailing ".0"). */
+/** Whole-credit display: integer credits rendered as-is (e.g. 2 → "2"). */
 function fmtHours(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+  return String(n);
 }
 
 /** Map a POS failure code to keyed copy. */

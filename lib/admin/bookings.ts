@@ -62,7 +62,7 @@ export interface AdminBookingClass {
 
 /**
  * Server-computed cancellation eligibility for an UPCOMING booking, judged against
- * the window LOCKED on that booking (`freeCancelHours`, 5 | 1 — CLAUDE.md §5 inv 7).
+ * the window LOCKED on that booking (`freeCancelHours`, always 5 — CLAUDE.md §5 inv 7).
  * `free` ⇒ within the window ⇒ cancelling refunds the booking's exact cost; outside
  * it the cost is kept. The admin cancel action re-evaluates this server-side — this
  * is purely so the screen can label the cancel affordance. Null for past/cancelled
@@ -75,7 +75,7 @@ export interface AdminBookingCancellation {
   hoursUntilStart: number;
   /** Credits a free cancel would return — the booking's exact debited cost. */
   refundCredits: number;
-  /** The free window (hours before start) locked on this booking (5 | 1). */
+  /** The free window (hours before start) locked on this booking (always 5). */
   freeCancelHours: number;
 }
 
@@ -87,7 +87,7 @@ export interface AdminBooking {
   status: BookingStatus;
   /** Checked in iff the booking carries a check-in timestamp (no separate flag). */
   checkedIn: boolean;
-  /** Credits debited for this booking (1.0 group / 1.5 private·duo·trio). */
+  /** Credits debited for this booking (1 group/rental · 2 private·duo·trio). */
   creditCost: number;
   /** Whether the class is still in the future (and so the booking is cancellable). */
   upcoming: boolean;
@@ -190,7 +190,7 @@ export interface AdminBookingRow {
   status: BookingStatus;
   checkedInAt: Date | null;
   creditCost: number;
-  /** The free window (hours) locked on this booking at booking time (5 | 1). */
+  /** The free window (hours) locked on this booking at booking time (always 5). */
   freeCancelHours: number;
 }
 
@@ -206,7 +206,7 @@ export function toAdminBooking(row: AdminBookingRow, now: Date): AdminBooking {
   const upcoming = row.status === "booked" && row.startsAt.getTime() > now.getTime();
   let cancellation: AdminBookingCancellation | null = null;
   if (upcoming) {
-    const policy = evaluateCancellation(row.startsAt, now, row.freeCancelHours);
+    const policy = evaluateCancellation(row.startsAt, now);
     cancellation = {
       free: policy.free,
       hoursUntilStart: policy.hoursUntilStart,
@@ -595,7 +595,7 @@ function mockAdminBookingsOverview(
       instructorTag: instr?.tag?.en ?? null,
       status: seed.status,
       checkedInAt: seed.checkedIn ? now : null,
-      creditCost: seed.type === "group" || seed.type === "rental" ? 1 : 1.5,
+      creditCost: seed.type === "group" || seed.type === "rental" ? 1 : 2,
       freeCancelHours: 5,
     };
   });

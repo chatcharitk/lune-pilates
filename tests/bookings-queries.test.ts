@@ -56,17 +56,17 @@ function baseRow(overrides: Partial<BookingRow> = {}): BookingRow {
 
 describe("toMyBooking (pure shaping)", () => {
   it("computes a FREE cancellation outside the 5-hour window and refunds the exact cost", () => {
-    // 8 hours before start → free; a 1.5-credit private refunds 1.5, not a hardcoded 1.
+    // 8 hours before start → free; a 2-credit private refunds 2, not a hardcoded 1.
     const row = baseRow({
       type: "private",
-      creditCost: 1.5,
+      creditCost: 2,
       startsAt: new Date(NOW.getTime() + 8 * 3_600_000),
     });
     const b = toMyBooking(row, NOW);
     expect(b.cancellation.free).toBe(true);
     expect(b.cancellation.hoursUntilStart).toBeCloseTo(8, 5);
-    expect(b.cancellation.refundCredits).toBe(1.5);
-    expect(b.creditCost).toBe(1.5);
+    expect(b.cancellation.refundCredits).toBe(2);
+    expect(b.creditCost).toBe(2);
     expect(b.typeMeta.label.en).toBe("Private 1:1");
   });
 
@@ -86,23 +86,20 @@ describe("toMyBooking (pure shaping)", () => {
     expect(b.cancellation.freeCancelHours).toBe(5);
   });
 
-  it("judges a 1h-window (last-minute) booking by ITS window: free 4h out", () => {
-    // A last-minute booking (freeCancelHours = 1) is still FREE 4h out, even though
-    // the same lead would be inside a 5h-window booking. The booking carries its
-    // own locked window (CLAUDE.md §5 invariant 7).
+  it("judges by the FIXED 5h window, ignoring a booking's stamped hours: NOT free 4h out", () => {
+    // The policy is a single fixed 5h window (CLAUDE.md §5 inv 7, decided 2026-06-28):
+    // 4h out is inside the window → not free, regardless of the stamped audit value.
     const row = baseRow({
       freeCancelHours: 1,
       startsAt: new Date(NOW.getTime() + 4 * 3_600_000),
     });
     const b = toMyBooking(row, NOW);
-    expect(b.cancellation.free).toBe(true);
-    expect(b.cancellation.freeCancelHours).toBe(1);
-    expect(b.cancellation.refundCredits).toBe(1);
+    expect(b.cancellation.free).toBe(false);
+    expect(b.cancellation.refundCredits).toBe(0);
   });
 
-  it("a 1h-window booking is NOT free inside its 1h window", () => {
+  it("is NOT free well inside the fixed 5h window (0.5h out)", () => {
     const row = baseRow({
-      freeCancelHours: 1,
       startsAt: new Date(NOW.getTime() + 0.5 * 3_600_000),
     });
     const b = toMyBooking(row, NOW);

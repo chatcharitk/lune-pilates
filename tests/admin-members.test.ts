@@ -43,8 +43,8 @@ function pkg(hoursLeft: number, daysOut: number): UsablePackageSummary {
 
 describe("summariseCredits (pure)", () => {
   it("sums hours_left across packages and picks the soonest expiry", () => {
-    const s = summariseCredits([pkg(5, 20), pkg(2.5, 30), pkg(1, 10)], now);
-    expect(s.balance).toBe(8.5);
+    const s = summariseCredits([pkg(5, 20), pkg(3, 30), pkg(1, 10)], now);
+    expect(s.balance).toBe(9);
     expect(s.expiry).toBe(new Date(now.getTime() + 10 * day).toISOString());
   });
 
@@ -63,9 +63,9 @@ describe("summariseCredits (pure)", () => {
     expect(s.status).toBe("active");
   });
 
-  it("half-hour balances sum without float drift", () => {
-    const s = summariseCredits([pkg(0.5, 5), pkg(0.5, 6), pkg(0.5, 7)], now);
-    expect(s.balance).toBe(1.5);
+  it("integer balances sum without float drift", () => {
+    const s = summariseCredits([pkg(1, 5), pkg(1, 6), pkg(1, 7)], now);
+    expect(s.balance).toBe(3);
   });
 });
 

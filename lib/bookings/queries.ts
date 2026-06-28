@@ -35,9 +35,9 @@ import {
 // ───────────────────────── contract (frontend imports these) ─────────────────────────
 
 /**
- * Server-computed cancellation eligibility for a booking, given the booking's
- * DYNAMIC window locked at booking time (`freeCancelHours`, 5 | 1 — CLAUDE.md §5,
- * invariant 7). `free` ⇒ within that window ⇒ a cancel refunds the booking's
+ * Server-computed cancellation eligibility for a booking, given the fixed free
+ * window (`freeCancelHours`, always 5 — CLAUDE.md §5, invariant 7; the column is a
+ * per-booking audit stamp). `free` ⇒ within that window ⇒ a cancel refunds the booking's
  * credit cost; outside it the cost is kept. The UI uses this purely to label the
  * cancel affordance (and show the right cutoff, "5 hours" vs "1 hour") — the
  * authoritative decision is re-evaluated server-side inside `cancelBookingAction`.
@@ -49,7 +49,7 @@ export interface BookingCancellation {
   hoursUntilStart: number;
   /** Credits a free cancel would return — the booking's exact debited cost. */
   refundCredits: number;
-  /** The free window (hours before start) locked on this booking (5 | 1). */
+  /** The free window (hours before start) locked on this booking (always 5). */
   freeCancelHours: number;
 }
 
@@ -92,7 +92,7 @@ export interface BookingRow {
   position: ReformerPosition | null;
   creditCost: number;
   status: BookingStatus;
-  /** The free window (hours) locked on this booking at booking time (5 | 1). */
+  /** The free window (hours) locked on this booking at booking time (always 5). */
   freeCancelHours: number;
 }
 
@@ -106,7 +106,7 @@ export interface BookingRow {
  * §5 invariant 7 — refund the amount actually debited, not a hardcoded 1).
  */
 export function toMyBooking(row: BookingRow, now: Date): MyBooking {
-  const policy = evaluateCancellation(row.startsAt, now, row.freeCancelHours);
+  const policy = evaluateCancellation(row.startsAt, now);
   return {
     bookingId: row.bookingId,
     classInstanceId: row.classInstanceId,
@@ -266,7 +266,7 @@ interface MockBookingSeed {
   instructorId: string | null;
   position: ReformerPosition | null;
   creditCost: number;
-  /** Window locked at booking time (5 | 1) — mirrors bookings.free_cancel_hours. */
+  /** Window locked at booking time (always 5) — mirrors bookings.free_cancel_hours. */
   freeCancelHours: number;
   status: BookingStatus;
 }
@@ -295,7 +295,7 @@ const MOCK_BOOKINGS: MockBookingSeed[] = [
     durationMin: 50,
     instructorId: "mai",
     position: "middle",
-    creditCost: 1.5,
+    creditCost: 2,
     freeCancelHours: 5,
     status: "booked",
   },

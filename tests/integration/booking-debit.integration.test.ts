@@ -76,7 +76,7 @@ import { joinWaitlist } from "@/app/actions/waitlist";
 import { creditCostForClassType } from "@/lib/credits/cost";
 
 const HAS_DB = !!process.env.DATABASE_URL;
-const GROUP_COST = creditCostForClassType("group"); // 1.0 — the cost the code uses
+const GROUP_COST = creditCostForClassType("group"); // 1 — the cost the code uses
 
 const future = (h: number) => new Date(Date.now() + h * 3_600_000);
 const past = (h: number) => new Date(Date.now() - h * 3_600_000);
@@ -374,7 +374,7 @@ describe.skipIf(!HAS_DB)(
     it("INSUFFICIENT balance: booking fails with no ledger row and no booking written", async () => {
       // Pool holds less than one group cost ⇒ the debit guard must reject and the
       // whole transaction roll back: no booking row, no ledger row, balance unchanged.
-      const SHORT = GROUP_COST - 0.5; // 0.5 < 1.0 — below cost, still a valid numeric(4,1)
+      const SHORT = GROUP_COST - 1; // 0 < 1 — below cost, an integer balance
       const { members, packageId } = await makeHousehold("short", 1, SHORT);
       const classId = await makeGroupClass(3);
 

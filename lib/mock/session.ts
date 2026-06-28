@@ -29,7 +29,7 @@ export function getMockSession(): MockSession {
     name: { en: "Pim", th: "พิม" },
     isMember: true,
     house: "A-114",
-    credits: 7.5,
+    credits: 8,
     isHouseholdPool: true,
     validUntil: { en: "24 Jun 2026", th: "24 มิ.ย. 2569" },
     next: {

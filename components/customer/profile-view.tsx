@@ -11,18 +11,15 @@
 // never trusted from the client (CLAUDE.md §5/§8). `pricePaid` may be null
 // (comped/seeded packages) → render "—", never "฿null".
 
-import { useState } from "react";
 import Link from "next/link";
 import type { ProfileOverview } from "@/lib/customer/profile";
 import { thb } from "@/lib/i18n";
 import { useCustomerLang } from "./customer-context";
 import { ArrowRight, Sparkle } from "./icons";
-import { InviteSheet } from "./invite-sheet";
 
 export function ProfileView({ overview }: { overview: ProfileOverview }) {
   const { t, tt, lang } = useCustomerLang();
   const { identity, balance, housemates, purchaseHistory } = overview;
-  const [inviteOpen, setInviteOpen] = useState(false);
 
   const isMember = identity.tier === "member";
   const hoursLabel = balance.hours === 1 ? t("hour") : t("hours");
@@ -142,20 +139,6 @@ export function ProfileView({ overview }: { overview: ProfileOverview }) {
                 </li>
               ))}
             </ul>
-            {/* invite affordance — opens the invite sheet (Feature 2) */}
-            <button
-              type="button"
-              onClick={() => setInviteOpen(true)}
-              className="flex w-full items-center justify-between gap-3 border-t border-line bg-surface px-[18px] py-3 text-left transition-colors active:bg-cream-2"
-            >
-              <span className="inline-flex items-center gap-2 font-body text-[13.5px] font-semibold text-taupe-deep">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-dashed border-line-strong text-taupe">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
-                </span>
-                {t("invite_member")}
-              </span>
-              <ArrowRight size={16} className="shrink-0 text-taupe" />
-            </button>
           </div>
         ) : (
           // Guest (no household — invariant 3) or member without a household.
@@ -205,14 +188,6 @@ export function ProfileView({ overview }: { overview: ProfileOverview }) {
           </div>
         )}
       </section>
-
-      {/* household invite sheet (only mountable when the member has a household) */}
-      <InviteSheet
-        lang={lang}
-        houseNumber={identity.houseNumber}
-        open={inviteOpen}
-        onClose={() => setInviteOpen(false)}
-      />
     </div>
   );
 }

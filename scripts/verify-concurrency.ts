@@ -62,9 +62,9 @@ async function makeGroupClass(capacity: number) {
   return c!;
 }
 
-// ── Scenario A: shared household pool with only 1.0 credit, two members race ──
+// ── Scenario A: shared household pool with only 1 credit, two members race ──
 // Different users, different seats — only the credit pool constrains. Exactly
-// one booking must succeed; the pool must end at 0.0 with exactly one −1 ledger row.
+// one booking must succeed; the pool must end at 0 with exactly one −1 ledger row.
 async function scenarioCreditOversell() {
   const house = await makeHousehold(`${tag}-A`);
   const u1 = await makeMember(`${tag}-A1`, house.id);
@@ -89,9 +89,9 @@ async function scenarioCreditOversell() {
     .from(bookings)
     .where(and(eq(bookings.classInstanceId, cls.id), eq(bookings.status, "booked")));
 
-  console.info("\n── Scenario A: credit oversell (pool 1.0, 2 racers) ──");
+  console.info("\n── Scenario A: credit oversell (pool 1, 2 racers) ──");
   check("exactly one booking succeeds", ok === 1, `${ok} ok, ${noCredits} NO_CREDITS`);
-  check("pool ends at 0.0 (no over-debit)", pkgAfter?.hoursLeft === 0, `hoursLeft=${pkgAfter?.hoursLeft}`);
+  check("pool ends at 0 (no over-debit)", pkgAfter?.hoursLeft === 0, `hoursLeft=${pkgAfter?.hoursLeft}`);
   check("exactly one −1 ledger row", debitRows.length === 1, `${debitRows.length} debit rows`);
   check("exactly one live booking", live.length === 1, `${live.length} live`);
 }

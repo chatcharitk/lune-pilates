@@ -10,6 +10,12 @@ describe("computePublicVisibleAt", () => {
     const pv = computePublicVisibleAt(starts, "group");
     expect(pv.getTime()).toBe(starts.getTime() - 24 * 3_600_000);
   });
+
+  it("opens a rental 14 days (336h) before start", () => {
+    const starts = future(400);
+    const pv = computePublicVisibleAt(starts, "rental");
+    expect(pv.getTime()).toBe(starts.getTime() - 336 * 3_600_000);
+  });
 });
 
 describe("isBookableForViewer", () => {
@@ -39,5 +45,25 @@ describe("isBookableForViewer", () => {
   it("guests can see a class at/after public_visible_at", () => {
     const inst = { status: "published" as const, startsAt: future(20), publicVisibleAt: future(-4) };
     expect(isBookableForViewer(inst, guest, NOW)).toBe(true);
+  });
+
+  it("a guest can book a rental ~300h out (inside the 336h window) but not a group then", () => {
+    const starts = future(300);
+    // Rental opens 336h before start ⇒ public_visible_at is in the past at 300h out.
+    const rental = {
+      status: "published" as const,
+      startsAt: starts,
+      publicVisibleAt: computePublicVisibleAt(starts, "rental"),
+    };
+    expect(isBookableForViewer(rental, guest, NOW)).toBe(true);
+    // A group at the same start only opens 24h before ⇒ still members-only at 300h out.
+    const group = {
+      status: "published" as const,
+      startsAt: starts,
+      publicVisibleAt: computePublicVisibleAt(starts, "group"),
+    };
+    expect(isBookableForViewer(group, guest, NOW)).toBe(false);
+    // ...but a member sees both immediately.
+    expect(isBookableForViewer(group, member, NOW)).toBe(true);
   });
 });
