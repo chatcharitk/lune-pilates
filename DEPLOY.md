@@ -48,17 +48,20 @@ a 7.5h shared group pool, a published week of group classes, and instructor avai
 
 ## 3. Cron — waitlist hold sweep
 
-`vercel.json` already schedules `/api/cron/waitlist-sweep` every 5 minutes. To activate:
+`vercel.json` schedules `/api/cron/waitlist-sweep`. To activate:
 
 1. Set `CRON_SECRET` in the Vercel project (Vercel Cron auto-sends it as a Bearer token).
 2. Deploy. Vercel registers the cron from `vercel.json`.
 
 Notes:
-- Sub-daily cron frequency requires a **Vercel Pro** plan (Hobby allows daily only).
-- The hold is 30 min and reads **lazily self-expire**, so a brief scheduler outage is
-  self-healing — the sweep just keeps offers fresh and cascades the FIFO queue.
-- An external scheduler works too: `GET`/`POST` the route with the secret as
-  `Authorization: Bearer <CRON_SECRET>`, `x-cron-secret: <secret>`, or `?secret=<secret>`.
+- **Schedule is daily (`0 3 * * *`) for Hobby-plan compatibility** — Hobby rejects any
+  cron that runs more than once/day. On **Vercel Pro**, change it back to `*/5 * * * *`
+  (every 5 min) for fresher waitlist cascades.
+- The hold is 30 min and reads **lazily self-expire**, so a daily sweep is only a
+  backstop — offers still expire on read and the queue still works between runs.
+- An external scheduler works too (e.g. every 5 min on a free cron service): `GET`/`POST`
+  the route with the secret as `Authorization: Bearer <CRON_SECRET>`, `x-cron-secret:
+  <secret>`, or `?secret=<secret>`.
 
 ---
 
