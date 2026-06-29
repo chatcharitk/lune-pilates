@@ -130,9 +130,11 @@ export const paymentSlips = pgTable("payment_slips", {
     .notNull()
     .unique()
     .references(() => charges.chargeId),
-  // The slip image as a `data:<mime>;base64,…` URL (v1 mock store; the column IS the
-  // store). A real object store would leave this empty and resolve via storageKey.
-  dataUrl: text("data_url").notNull(),
+  // The slip image as a `data:<mime>;base64,…` URL. NULLABLE by design: the mock store
+  // persists the image HERE (the column IS its store), but a real object store (Vercel
+  // Blob / S3) holds the bytes itself and leaves this null, resolving via storageKey.
+  // put() tells the caller which: dataUrlToPersist = the URL (mock) or null (real store).
+  dataUrl: text("data_url"),
   // Opaque key the storage adapter returns (the chargeId for the mock). Resolves the
   // image back via getSlipStorage().get — never a public URL.
   storageKey: text("storage_key").notNull(),

@@ -17,8 +17,12 @@ export class MockSlipStorage implements SlipStorage {
    * written to the row by uploadPaymentSlip in the same UPSERT that records this key,
    * so there is no second write here.)
    */
-  async put(params: PutSlipParams): Promise<{ storageKey: string }> {
-    return { storageKey: params.chargeId };
+  async put(
+    params: PutSlipParams,
+  ): Promise<{ storageKey: string; dataUrlToPersist: string | null }> {
+    // The mock has no store of its own: the payment_slips.data_url column IS the store,
+    // so hand the data-URL back for the caller to persist on the row in the same UPSERT.
+    return { storageKey: params.chargeId, dataUrlToPersist: params.dataUrl };
   }
 
   /** Read the persisted data-URL + mime type back from the slip row keyed by chargeId. */
@@ -29,6 +33,9 @@ export class MockSlipStorage implements SlipStorage {
       .from(paymentSlips)
       .where(eq(paymentSlips.storageKey, storageKey))
       .limit(1);
-    return row ?? null;
+    // data_url is now nullable (a real store leaves it null); for the mock a null here
+    // means the image is absent — treat it as not found rather than returning a bad URL.
+    if (!row || row.dataUrl === null) return null;
+    return { dataUrl: row.dataUrl, mimeType: row.mimeType };
   }
 }

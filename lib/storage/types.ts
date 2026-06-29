@@ -26,11 +26,22 @@ export interface StoredSlip {
 
 export interface SlipStorage {
   /**
-   * Persist a slip image and return an OPAQUE key the caller stores on the slip row.
-   * The mock writes nothing of its own — it returns the chargeId as the key, and the
-   * data-URL is persisted on the payment_slips row by the caller (see uploadPaymentSlip).
+   * Persist a slip image and return an OPAQUE key the caller stores on the slip row,
+   * plus whether the caller should also persist the data-URL on that row.
+   *
+   * - The MOCK has no store of its own: the `payment_slips.data_url` column IS its
+   *   store, so it returns `dataUrlToPersist = <the data-URL>` for the caller to write
+   *   on the row (and reads it back from there in get()).
+   * - A REAL object store (Vercel Blob / S3) holds the bytes itself and returns
+   *   `dataUrlToPersist = null` — the DB column stays empty and the image is resolved
+   *   later via the opaque storageKey (get()).
+   *
+   * This decouples the caller from STORAGE_MODE: uploadPaymentSlip always writes
+   * `dataUrl: dataUrlToPersist` without branching on the active store.
    */
-  put(params: PutSlipParams): Promise<{ storageKey: string }>;
+  put(
+    params: PutSlipParams,
+  ): Promise<{ storageKey: string; dataUrlToPersist: string | null }>;
   /** Resolve a stored slip by its opaque key, or null when absent. */
   get(storageKey: string): Promise<StoredSlip | null>;
 }

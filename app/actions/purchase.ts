@@ -235,7 +235,7 @@ export async function uploadPaymentSlip(
   // Persist the image via the storage adapter (mock keeps it in the row) and UPSERT
   // the slip row keyed by chargeId — a re-upload after rejection replaces the prior
   // slip and resets the review fields.
-  const { storageKey } = await getSlipStorage().put({
+  const { storageKey, dataUrlToPersist } = await getSlipStorage().put({
     dataUrl: slipDataUrl,
     mimeType: validated.mimeType,
     chargeId,
@@ -245,7 +245,9 @@ export async function uploadPaymentSlip(
     .insert(paymentSlips)
     .values({
       chargeId,
-      dataUrl: slipDataUrl,
+      // The mock persists the data-URL here (the column IS its store); a real object
+      // store returns null and resolves the image via storageKey. No mode branching.
+      dataUrl: dataUrlToPersist,
       storageKey,
       mimeType: validated.mimeType,
       sizeBytes: validated.sizeBytes,
@@ -254,7 +256,7 @@ export async function uploadPaymentSlip(
     .onConflictDoUpdate({
       target: paymentSlips.chargeId,
       set: {
-        dataUrl: slipDataUrl,
+        dataUrl: dataUrlToPersist,
         storageKey,
         mimeType: validated.mimeType,
         sizeBytes: validated.sizeBytes,
