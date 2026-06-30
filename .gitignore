@@ -34,3 +34,4 @@ yarn-error.log*
 
 # vitest
 /coverage
+.env*.local
