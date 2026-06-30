@@ -31,6 +31,7 @@ import { charges, paymentSlips, users } from "@/lib/db/schema";
 import { getCatalogItem } from "@/lib/catalog/packages";
 import type { Bilingual } from "@/lib/i18n";
 import { PERIOD, periodBounds } from "@/lib/admin/period";
+import { formatStudioDate, studioInstant, studioParts, studioStartOfDay } from "@/lib/time";
 
 // ───────────────────────── period ─────────────────────────
 // The accounting window the stat tiles roll up (CURRENT CALENDAR MONTH) now
@@ -178,16 +179,19 @@ export function summarisePayments(
  * timestamp, not user copy; the frontend may reformat per `lang` from the ISO.
  */
 export function whenDisplay(when: Date, now: Date = new Date()): string {
-  const sameDay = when.toDateString() === now.toDateString();
-  if (sameDay) {
-    return `${String(when.getHours()).padStart(2, "0")}:${String(when.getMinutes()).padStart(2, "0")}`;
+  // Day-bucketing + time-of-day are all pinned to the studio's Bangkok day so the
+  // label is correct regardless of the runtime timezone.
+  const whenDay = studioStartOfDay(when).getTime();
+  const todayDay = studioStartOfDay(now).getTime();
+  const w = studioParts(when);
+  if (whenDay === todayDay) {
+    return `${String(w.hour).padStart(2, "0")}:${String(w.minute).padStart(2, "0")}`;
   }
-  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-  if (when.toDateString() === yesterday.toDateString()) return "Yesterday";
-  const month = when.toLocaleString("en-US", { month: "short" });
-  return when.getFullYear() === now.getFullYear()
-    ? `${when.getDate()} ${month}`
-    : `${when.getDate()} ${month} ${when.getFullYear()}`;
+  if (whenDay === todayDay - 24 * 3_600_000) return "Yesterday";
+  const month = formatStudioDate(when, "en", { month: "short" });
+  return w.year === studioParts(now).year
+    ? `${w.day} ${month}`
+    : `${w.day} ${month} ${w.year}`;
 }
 
 // ───────────────────────── public queries ─────────────────────────
@@ -355,10 +359,11 @@ const MOCK_PAYMENTS: MockPayment[] = [
   { id: "pay_p5", userId: "m6", name: "Mind Arunee", packageId: "drop", amount: 650, method: "promptpay", status: "paid", hasSlip: true, daysAgo: 3, hour: 8, minute: 15 },
 ];
 
-/** The instant a mock payment was opened, relative to `now`. */
+/** The instant a mock payment was opened, relative to `now` (Bangkok-anchored so
+ * the seed's intended hour/minute is what whenDisplay renders under any TZ). */
 function mockWhen(p: MockPayment, now: Date): Date {
-  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - p.daysAgo, p.hour, p.minute, 0, 0);
-  return d;
+  const { year, month0, day } = studioParts(studioStartOfDay(now));
+  return studioInstant(year, month0, day - p.daysAgo, p.hour, p.minute);
 }
 
 function mockListPayments(now: Date): PaymentRow[] {

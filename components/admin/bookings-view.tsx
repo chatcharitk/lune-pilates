@@ -29,28 +29,28 @@ import type {
 } from "@/lib/admin/bookings";
 import type { BookableClass } from "@/lib/schedule/queries";
 import type { StrKey } from "@/lib/i18n";
+import { formatStudioDate, formatStudioTime, studioStartOfDay } from "@/lib/time";
 
 type Tab = "bookings" | "waitlist";
 
 // ───────────────────────── helpers ─────────────────────────
 
-/** Localised "day · time" for a booking row (Today / Tomorrow / weekday + date). */
+/** Localised "day · time" for a booking row (Today / Tomorrow / weekday + date),
+ * with day-bucketing pinned to the studio's Bangkok day. */
 function dayTime(iso: string, time: string, lang: "en" | "th"): string {
   const start = new Date(iso);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const startDay = new Date(start);
-  startDay.setHours(0, 0, 0, 0);
-  const deltaDays = Math.round((startDay.getTime() - today.getTime()) / 86_400_000);
+  const today = studioStartOfDay(new Date()).getTime();
+  const startDay = studioStartOfDay(start).getTime();
+  const deltaDays = Math.round((startDay - today) / 86_400_000);
   let day: string;
   if (deltaDays === 0) day = lang === "th" ? "วันนี้" : "Today";
   else if (deltaDays === 1) day = lang === "th" ? "พรุ่งนี้" : "Tomorrow";
   else {
-    day = new Intl.DateTimeFormat(lang === "th" ? "th-TH" : "en-GB", {
+    day = formatStudioDate(start, lang, {
       weekday: "short",
       day: "numeric",
       month: "short",
-    }).format(start);
+    });
   }
   return `${day} · ${time}`;
 }
@@ -709,10 +709,9 @@ function RescheduleStep({
   );
 }
 
-/** Local "HH:MM" from a class ISO start (for the candidate row's day · time). */
+/** Bangkok "HH:MM" from a class ISO start (for the candidate row's day · time). */
 function hhmmOf(iso: string): string {
-  const d = new Date(iso);
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return formatStudioTime(new Date(iso));
 }
 
 // ───────────────────────── icons ─────────────────────────

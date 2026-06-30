@@ -10,6 +10,7 @@ import {
   startsAtFor,
 } from "@/lib/schedule/baseline";
 import { getWeekSchedule } from "@/lib/admin/schedule";
+import { studioParts } from "@/lib/time";
 
 const ORIGINAL_DB_URL = process.env.DATABASE_URL;
 
@@ -21,31 +22,41 @@ afterEach(() => {
   else process.env.DATABASE_URL = ORIGINAL_DB_URL;
 });
 
+// Bangkok-day anchors (assertions read via studioParts so they are runtime-TZ
+// independent — these MUST hold under both default TZ and TZ=UTC).
+const MON_15 = new Date("2026-06-15T03:00:00Z"); // Mon 15 Jun 10:00 ICT
+const WED_17 = new Date("2026-06-17T05:00:00Z"); // Wed 17 Jun 12:00 ICT
+const SUN_21 = new Date("2026-06-21T03:00:00Z"); // Sun 21 Jun 10:00 ICT
+
 describe("baseline helpers", () => {
-  it("maps JS days to ISO weekdays (Mon=1 … Sun=7)", () => {
-    expect(isoDayOfWeek(new Date("2026-06-15T00:00:00"))).toBe(1); // Monday
-    expect(isoDayOfWeek(new Date("2026-06-21T00:00:00"))).toBe(7); // Sunday
+  it("maps instants to Bangkok ISO weekdays (Mon=1 … Sun=7)", () => {
+    expect(isoDayOfWeek(MON_15)).toBe(1); // Monday
+    expect(isoDayOfWeek(SUN_21)).toBe(7); // Sunday
   });
 
-  it("snaps any date to the Monday of its week", () => {
-    const mon = startOfWeekMonday(new Date("2026-06-17T12:00:00")); // a Wednesday
+  it("snaps any date to the Bangkok Monday of its week", () => {
+    const mon = startOfWeekMonday(WED_17); // a Wednesday
     expect(isoDayOfWeek(mon)).toBe(1);
-    expect(mon.getDate()).toBe(15);
-    expect(mon.getHours()).toBe(0);
+    const parts = studioParts(mon);
+    expect(parts.day).toBe(15);
+    expect(parts.hour).toBe(0);
   });
 
   it("has a group-only baseline of 28 weekly slots, 4 per day", () => {
     expect(BASELINE_SLOTS.length).toBe(28);
     expect(BASELINE_SLOTS.every((s) => s.type === "group")).toBe(true);
-    expect(baselineSlotsForDate(new Date("2026-06-15T00:00:00")).length).toBe(4); // Mon
-    expect(baselineSlotsForDate(new Date("2026-06-21T00:00:00")).length).toBe(4); // Sun
+    expect(baselineSlotsForDate(MON_15).length).toBe(4); // Mon
+    expect(baselineSlotsForDate(SUN_21).length).toBe(4); // Sun
   });
 
-  it("builds the correct local start instant for a slot", () => {
-    const d = startsAtFor(new Date("2026-06-15T00:00:00"), "16:30");
-    expect(d.getHours()).toBe(16);
-    expect(d.getMinutes()).toBe(30);
-    expect(d.getDate()).toBe(15);
+  it("builds the correct Bangkok start instant for a slot", () => {
+    const d = startsAtFor(MON_15, "16:30");
+    const parts = studioParts(d);
+    expect(parts.hour).toBe(16);
+    expect(parts.minute).toBe(30);
+    expect(parts.day).toBe(15);
+    // The stored instant is the ICT wall-clock as UTC (16:30 ICT = 09:30Z).
+    expect(d.toISOString()).toBe("2026-06-15T09:30:00.000Z");
   });
 });
 

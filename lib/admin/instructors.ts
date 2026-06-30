@@ -27,6 +27,7 @@ import type { Bilingual } from "@/lib/i18n";
 import type { ClassType } from "@/lib/domain/types";
 import { effectiveCapacity } from "@/lib/domain/types";
 import { instructorMetaFor, metaFor, type ClassTypeMeta } from "@/lib/schedule/queries";
+import { formatStudioTime, studioIsoDow, studioStartOfDay } from "@/lib/time";
 
 // ───────────────────────── contract (frontend imports these) ─────────────────────────
 
@@ -90,17 +91,14 @@ export interface AdminInstructor {
 
 // ───────────────────────── pure helpers ─────────────────────────
 
-/** Midnight (local) of `d`. */
+/** Bangkok 00:00 (studio day-start) of the day containing `d`. */
 function startOfDay(d: Date): Date {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
+  return studioStartOfDay(d);
 }
 
-/** ISO weekday (1=Mon … 7=Sun) for a Date (JS getDay is 0=Sun … 6=Sat). */
+/** ISO weekday (1=Mon … 7=Sun) of an instant, in Bangkok (studio) time. */
 function isoDayOfWeek(d: Date): number {
-  const js = d.getDay();
-  return js === 0 ? 7 : js;
+  return studioIsoDow(d);
 }
 
 /** Weekday key (Mon…Sun) for an ISO day-of-week (1…7). */
@@ -108,9 +106,9 @@ function weekdayKey(dow: number): Weekday {
   return WEEKDAYS[dow - 1]!;
 }
 
-/** Local "HH:MM" 24h of a Date. */
+/** Bangkok (studio) "HH:MM" 24h of an instant. */
 function hhmm(d: Date): string {
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return formatStudioTime(d);
 }
 
 /** First letter of the last whitespace-separated token of the EN name (e.g. "Kru Mai" → "M"). */

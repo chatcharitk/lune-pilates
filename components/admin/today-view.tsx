@@ -11,23 +11,23 @@ import { useAdminLang } from "./admin-context";
 import { Avatar, Badge, CapBar, Dot, Drawer, Stat } from "./ui";
 import { setCheckIn } from "@/app/actions/admin";
 import type { AdminTodayClass, AdminTodayOverview } from "@/lib/admin/today";
+import { formatStudioDate, formatStudioTime } from "@/lib/time";
 
 // ───────────────────────── formatting helpers ─────────────────────────
 
-/** "HH:MM" in the client's local time from an ISO instant. */
+/** "HH:MM" Bangkok (studio) time from an ISO instant. */
 function hhmm(iso: string): string {
-  const d = new Date(iso);
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return formatStudioTime(new Date(iso));
 }
 
-/** Long, localised date for the header (Buddhist era in Thai via th-TH). */
+/** Long, localised date for the header (Buddhist era in Thai), in Bangkok time. */
 function longDate(iso: string, lang: "en" | "th"): string {
-  return new Intl.DateTimeFormat(lang === "th" ? "th-TH" : "en-GB", {
+  return formatStudioDate(new Date(iso), lang, {
     weekday: "long",
     day: "numeric",
     month: "long",
     year: "numeric",
-  }).format(new Date(iso));
+  });
 }
 
 // ───────────────────────── component ─────────────────────────

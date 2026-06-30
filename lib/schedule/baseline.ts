@@ -11,6 +11,12 @@
 
 import type { ClassType } from "@/lib/domain/types";
 import { CAPACITY } from "@/lib/domain/types";
+import {
+  studioInstant,
+  studioIsoDow,
+  studioParts,
+  studioStartOfWeekMonday,
+} from "@/lib/time";
 
 export interface BaselineSlot {
   /** ISO day of week: 1 = Monday … 7 = Sunday. */
@@ -47,30 +53,32 @@ export const BASELINE_SLOTS: BaselineSlot[] = Object.entries(GROUP_TIMES_BY_DOW)
     ),
 );
 
-/** ISO day of week (1 = Mon … 7 = Sun) for a Date (JS getDay is 0 = Sun). */
+/**
+ * ISO day of week (1 = Mon … 7 = Sun) of an instant, in BANGKOK time (studio time)
+ * — independent of the runtime timezone (CLAUDE.md: all class times are ICT).
+ */
 export function isoDayOfWeek(date: Date): number {
-  const d = date.getDay();
-  return d === 0 ? 7 : d;
+  return studioIsoDow(date);
 }
 
-/** The baseline slots that fall on the given calendar date's weekday. */
+/** The baseline slots that fall on the given date's BANGKOK weekday. */
 export function baselineSlotsForDate(date: Date): BaselineSlot[] {
   const dow = isoDayOfWeek(date);
   return BASELINE_SLOTS.filter((s) => s.dayOfWeek === dow);
 }
 
-/** Monday 00:00 (local) of the week containing `date`. */
+/** The instant of Bangkok Monday 00:00 of the week containing `date`. */
 export function startOfWeekMonday(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() - ((isoDayOfWeek(d) - 1)));
-  return d;
+  return studioStartOfWeekMonday(date);
 }
 
-/** Build the local start Date for `time` ("HH:MM") on calendar day `date`. */
+/**
+ * Build the start instant for `time` ("HH:MM") on the BANGKOK calendar day of
+ * `date`. Pinned to Asia/Bangkok wall-clock so the stored `timestamptz` is the
+ * correct ICT instant regardless of the runtime timezone.
+ */
 export function startsAtFor(date: Date, time: string): Date {
   const [h, m] = time.split(":").map((n) => Number.parseInt(n, 10));
-  const d = new Date(date);
-  d.setHours(h ?? 0, m ?? 0, 0, 0);
-  return d;
+  const { year, month0, day } = studioParts(date);
+  return studioInstant(year, month0, day, h ?? 0, m ?? 0);
 }

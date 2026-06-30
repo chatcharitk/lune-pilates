@@ -30,6 +30,7 @@ import {
   TYPE_DOT,
 } from "./schedule-helpers";
 import { Bell, Clock, Sparkle } from "./icons";
+import { formatStudioDate } from "@/lib/time";
 
 export interface HomeViewProps {
   /** Viewer identity (display only — server-resolved). */
@@ -49,10 +50,11 @@ export function HomeView({ viewer, overview, next, hasOffer, week }: HomeViewPro
   const hoursLabel = overview.hours === 1 ? t("hour") : t("hours");
   const avatarInitial = viewer.name.trim().charAt(0).toUpperCase() || "·";
   const expiryLabel = overview.nearestExpiryIso
-    ? new Date(overview.nearestExpiryIso).toLocaleDateString(
-        lang === "th" ? "th-TH" : "en-US",
-        { day: "numeric", month: "short", year: "numeric" },
-      )
+    ? formatStudioDate(new Date(overview.nearestExpiryIso), lang, {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
     : null;
 
   return (

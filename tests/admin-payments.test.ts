@@ -127,15 +127,26 @@ describe("periodBounds", () => {
   });
 });
 
+// Anchors use explicit-Z instants and assert Bangkok-pinned output, so they hold
+// under both the default TZ and TZ=UTC (the time-of-day + day-bucketing are ICT).
 describe("whenDisplay", () => {
-  it("same day → HH:MM", () => {
-    expect(whenDisplay(new Date("2026-06-22T09:12:00"), new Date("2026-06-22T18:00:00"))).toBe("09:12");
+  it("same Bangkok day → Bangkok HH:MM", () => {
+    // 09:12 ICT and 18:00 ICT, both on 22 Jun (Bangkok).
+    expect(
+      whenDisplay(new Date("2026-06-22T02:12:00Z"), new Date("2026-06-22T11:00:00Z")),
+    ).toBe("09:12");
   });
-  it("yesterday → 'Yesterday'", () => {
-    expect(whenDisplay(new Date("2026-06-21T16:30:00"), new Date("2026-06-22T18:00:00"))).toBe("Yesterday");
+  it("prior Bangkok day → 'Yesterday'", () => {
+    // 16:30 ICT 21 Jun vs 18:00 ICT 22 Jun.
+    expect(
+      whenDisplay(new Date("2026-06-21T09:30:00Z"), new Date("2026-06-22T11:00:00Z")),
+    ).toBe("Yesterday");
   });
   it("earlier this year → 'D MMM'", () => {
-    expect(whenDisplay(new Date("2026-05-31T10:00:00"), new Date("2026-06-22T18:00:00"))).toBe("31 May");
+    // 10:00 ICT 31 May.
+    expect(
+      whenDisplay(new Date("2026-05-31T03:00:00Z"), new Date("2026-06-22T11:00:00Z")),
+    ).toBe("31 May");
   });
 });
 

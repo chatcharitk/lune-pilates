@@ -1,5 +1,6 @@
 import { getWeekSchedule } from "@/lib/admin/schedule";
 import { getScheduleTemplate } from "@/lib/admin/schedule-template";
+import { studioDayFromYmd } from "@/lib/time";
 import { requireOwner } from "@/lib/auth/admin";
 import { ScheduleView } from "@/components/admin/schedule-view";
 import { AdminForbidden } from "@/components/admin/admin-forbidden";
@@ -20,9 +21,12 @@ export default async function AdminSchedulePage({
     return <AdminForbidden />;
   }
   const { week } = await searchParams;
-  const anchor = week ? new Date(`${week}T00:00:00`) : new Date();
+  // Anchor to the Bangkok day of `?week=YYYY-MM-DD` (or today), so the week range
+  // is Bangkok-aligned regardless of the runtime timezone. studioDayFromYmd fails
+  // closed to the current Bangkok day for an absent/malformed param.
+  const anchor = studioDayFromYmd(week);
   const [schedule, template] = await Promise.all([
-    getWeekSchedule(Number.isNaN(anchor.getTime()) ? new Date() : anchor),
+    getWeekSchedule(anchor),
     getScheduleTemplate(),
   ]);
   return <ScheduleView schedule={schedule} template={template} />;

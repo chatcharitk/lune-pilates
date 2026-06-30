@@ -15,6 +15,7 @@ import type { CatalogCategory } from "@/lib/catalog/packages";
 import { useCustomerLang } from "./customer-context";
 import { ChevronLeft } from "./icons";
 import { CheckoutPanel } from "./checkout-panel";
+import { formatStudioDate } from "@/lib/time";
 
 export interface BuyViewProps {
   catalog: CatalogCategory[];
@@ -32,7 +33,7 @@ export function BuyView({ catalog, hours, nearestExpiryIso, isMember, house }: B
   const { t, lang } = useCustomerLang();
   const hoursLabel = hours === 1 ? t("hour") : t("hours");
   const expiryLabel = nearestExpiryIso
-    ? new Date(nearestExpiryIso).toLocaleDateString(lang === "th" ? "th-TH" : "en-US", {
+    ? formatStudioDate(new Date(nearestExpiryIso), lang, {
         day: "numeric",
         month: "short",
         year: "numeric",

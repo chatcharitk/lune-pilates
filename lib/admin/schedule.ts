@@ -28,6 +28,7 @@ import {
   startOfWeekMonday,
   startsAtFor,
 } from "@/lib/schedule/baseline";
+import { addDays, formatStudioTime, studioStartOfDay } from "@/lib/time";
 import {
   getTemplateSlotsByDow,
   type TemplateBaselineSlot,
@@ -80,7 +81,7 @@ export interface AdminWeekSchedule {
 // ───────────────────────── helpers ─────────────────────────
 
 function hhmm(d: Date): string {
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return formatStudioTime(d);
 }
 
 const slotKey = (dayOfWeek: number, time: string, type: ClassType) =>
@@ -124,11 +125,10 @@ function computeDiff(
   return { added, removed, changed };
 }
 
-/** Build the 7 empty day buckets (Mon..Sun) for `weekStart`. */
+/** Build the 7 empty day buckets (Mon..Sun) for `weekStart` (Bangkok days). */
 function emptyWeek(weekStart: Date): AdminScheduleDay[] {
   return Array.from({ length: 7 }, (_, i) => {
-    const date = new Date(weekStart);
-    date.setDate(date.getDate() + i);
+    const date = addDays(weekStart, i);
     return { date: date.toISOString(), dayOfWeek: isoDayOfWeek(date), classes: [] };
   });
 }
@@ -172,9 +172,11 @@ function assemble(
   templateByDow: Map<number, TemplateBaselineSlot[]>,
 ): AdminWeekSchedule {
   const days = emptyWeek(weekStart);
-  const byDate = new Map(days.map((d) => [new Date(d.date).toDateString(), d]));
+  // Bucket by the Bangkok day-start instant so a class lands on its STUDIO day,
+  // not the runtime-TZ day (toDateString would shift on a UTC host).
+  const byDate = new Map(days.map((d) => [studioStartOfDay(new Date(d.date)).getTime(), d]));
   for (const c of classes) {
-    const day = byDate.get(new Date(c.startsAt).toDateString());
+    const day = byDate.get(studioStartOfDay(new Date(c.startsAt)).getTime());
     if (day) day.classes.push(c);
   }
   for (const d of days) d.classes.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
@@ -275,8 +277,7 @@ function mockWeekSchedule(weekStart: Date): AdminWeekSchedule {
   // Baseline group slots → published drafts for the week (most days), with the
   // first day's classes left as draft to exercise the publish bar.
   for (let i = 0; i < 7; i++) {
-    const date = new Date(weekStart);
-    date.setDate(date.getDate() + i);
+    const date = addDays(weekStart, i);
     for (const slot of baselineSlotsForDate(date)) {
       const startsAt = startsAtFor(date, slot.time);
       classes.push({
@@ -296,8 +297,7 @@ function mockWeekSchedule(weekStart: Date): AdminWeekSchedule {
   }
 
   for (const a of MOCK_APPOINTMENTS) {
-    const date = new Date(weekStart);
-    date.setDate(date.getDate() + a.dayIndex);
+    const date = addDays(weekStart, a.dayIndex);
     const startsAt = startsAtFor(date, a.time);
     classes.push({
       id: mockUuid(n++),

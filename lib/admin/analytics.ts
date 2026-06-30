@@ -49,6 +49,7 @@ import {
   priorDayBounds,
   priorPeriodBounds,
 } from "@/lib/admin/period";
+import { formatStudioDate, studioParts } from "@/lib/time";
 
 // ═════════════════════════ fixed-window constants ═════════════════════════
 // Every window other than the [Month to date | Today] toggle is a FIXED constant
@@ -194,10 +195,12 @@ const TH_MONTHS = [
   "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค.",
 ] as const;
 
-/** Bilingual "Month Year" label (e.g. { en: "June 2026", th: "มิ.ย. 2569" }). */
+/** Bilingual "Month Year" label (e.g. { en: "June 2026", th: "มิ.ย. 2569" }), in
+ * Bangkok time so it never shifts a month across the UTC/ICT boundary. */
 export function monthLabelFor(now: Date): Bilingual {
-  const en = `${now.toLocaleString("en-US", { month: "long" })} ${now.getFullYear()}`;
-  const th = `${TH_MONTHS[now.getMonth()]} ${now.getFullYear() + 543}`;
+  const { month0, year } = studioParts(now);
+  const en = `${formatStudioDate(now, "en", { month: "long" })} ${year}`;
+  const th = `${TH_MONTHS[month0]} ${year + 543}`;
   return { en, th };
 }
 
@@ -213,20 +216,25 @@ function initialsFor(name: Bilingual): string {
   return (last.charAt(0) || "?").toUpperCase();
 }
 
-/** Short "D MMM" display of an instant (e.g. "8 Jun"); year added if not current. */
+/** Short "D MMM" display of an instant (e.g. "8 Jun") in Bangkok time; year added
+ * if not the current Bangkok year. */
 function expiresDisplay(when: Date, now: Date): string {
-  const month = when.toLocaleString("en-US", { month: "short" });
-  return when.getFullYear() === now.getFullYear()
-    ? `${when.getDate()} ${month}`
-    : `${when.getDate()} ${month} ${when.getFullYear()}`;
+  const w = studioParts(when);
+  const month = formatStudioDate(when, "en", { month: "short" });
+  return w.year === studioParts(now).year
+    ? `${w.day} ${month}`
+    : `${w.day} ${month} ${w.year}`;
 }
 
-/** Bilingual relative weekday + time label for an alert class (e.g. "Wed 17:00"). */
+/** Bilingual relative weekday + time label for an alert class (e.g. "Wed 17:00"),
+ * in Bangkok (studio) time. */
 function whenLabelFor(startsAt: Date): Bilingual {
-  const dayEn = startsAt.toLocaleString("en-US", { weekday: "short" });
-  const DAY_TH = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."] as const;
-  const dayTh = DAY_TH[startsAt.getDay()]!;
-  const hhmm = `${String(startsAt.getHours()).padStart(2, "0")}:${String(startsAt.getMinutes()).padStart(2, "0")}`;
+  const parts = studioParts(startsAt);
+  const dayEn = formatStudioDate(startsAt, "en", { weekday: "short" });
+  // ISO Mon=1 … Sun=7 → Thai short labels indexed Mon..Sun.
+  const DAY_TH = ["จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส.", "อา."] as const;
+  const dayTh = DAY_TH[parts.isoDow - 1]!;
+  const hhmm = `${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`;
   return { en: `${dayEn} ${hhmm}`, th: `${dayTh} ${hhmm}` };
 }
 

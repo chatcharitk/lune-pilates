@@ -18,6 +18,7 @@ import { Avatar, Badge, type BadgeTone } from "./ui";
 import type { SalesRow, PaymentMethod, PaymentStatus } from "@/lib/admin/sales";
 import { presetRange, type SalesRangePreset } from "@/lib/admin/period";
 import { thb, type StrKey } from "@/lib/i18n";
+import { formatStudioDate, formatStudioTime } from "@/lib/time";
 
 // ───────────────────────── shared conventions (mirror payments-view.tsx) ─────────────────────────
 
@@ -287,15 +288,8 @@ export function SalesView({
 /** Localised day + time for the sales Date column (e.g. "12 Jun, 09:12"). */
 function fmtWhen(iso: string, lang: "en" | "th"): string {
   const d = new Date(iso);
-  const date = new Intl.DateTimeFormat(lang === "th" ? "th-TH" : "en-GB", {
-    day: "numeric",
-    month: "short",
-  }).format(d);
-  const time = new Intl.DateTimeFormat(lang === "th" ? "th-TH" : "en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(d);
+  const date = formatStudioDate(d, lang, { day: "numeric", month: "short" });
+  const time = formatStudioTime(d);
   return `${date}, ${time}`;
 }
 

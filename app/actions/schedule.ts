@@ -23,6 +23,7 @@ import type { ClassType } from "@/lib/domain/types";
 import { CAPACITY, effectiveCapacity } from "@/lib/domain/types";
 import { computePublicVisibleAt } from "@/lib/schedule/visibility";
 import { startOfWeekMonday, startsAtFor } from "@/lib/schedule/baseline";
+import { addDays, studioDayFromYmd, studioIsoDow } from "@/lib/time";
 import { getTemplateSlotsByDow } from "@/lib/admin/schedule-template";
 import { emit } from "@/lib/events/bus";
 import { registerNotificationHandlers } from "@/lib/events/notifications";
@@ -32,15 +33,14 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const CLASS_TYPE = z.enum(["group", "private", "duo", "trio", "rental"]);
 
-/** ISO day of week (1=Mon … 7=Sun) for a Date (JS getDay is 0=Sun). */
+/** ISO day of week (1=Mon … 7=Sun) of an instant, in Bangkok (studio) time. */
 function isoDow(date: Date): number {
-  const d = date.getDay();
-  return d === 0 ? 7 : d;
+  return studioIsoDow(date);
 }
 
-/** Local midnight Date for a "YYYY-MM-DD" string. */
+/** The instant of Bangkok 00:00 for a "YYYY-MM-DD" calendar day. */
 function localDay(date: string): Date {
-  return new Date(`${date}T00:00:00`);
+  return studioDayFromYmd(date);
 }
 
 // ───────────────────────── create ─────────────────────────
@@ -234,7 +234,7 @@ export async function generateWeekFromBaseline(raw: WeekInput): Promise<Generate
 
   const parsed = weekInput.safeParse(raw);
   if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
-  const weekStart = startOfWeekMonday(new Date(parsed.data.weekStart));
+  const weekStart = startOfWeekMonday(studioDayFromYmd(parsed.data.weekStart));
 
   if (!process.env.DATABASE_URL) return { ok: true, created: 0 };
 
@@ -259,8 +259,7 @@ export async function generateWeekFromBaseline(raw: WeekInput): Promise<Generate
 
   const toInsert: (typeof classInstances.$inferInsert)[] = [];
   for (let i = 0; i < 7; i++) {
-    const date = new Date(weekStart);
-    date.setDate(date.getDate() + i);
+    const date = addDays(weekStart, i);
     for (const slot of slotsByDow.get(isoDow(date)) ?? []) {
       const startsAt = startsAtFor(date, slot.time);
       if (present.has(`${startsAt.getTime()}|${slot.type}`)) continue;
@@ -300,7 +299,7 @@ export async function publishWeek(raw: WeekInput): Promise<PublishResult> {
 
   const parsed = weekInput.safeParse(raw);
   if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
-  const weekStart = startOfWeekMonday(new Date(parsed.data.weekStart));
+  const weekStart = startOfWeekMonday(studioDayFromYmd(parsed.data.weekStart));
   const now = new Date();
 
   if (!process.env.DATABASE_URL) return { ok: true, published: 0 };

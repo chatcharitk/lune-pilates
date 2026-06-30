@@ -8,12 +8,19 @@
 import type { ClassType } from "@/lib/domain/types";
 import type { Bilingual } from "@/lib/i18n";
 import type { StrKey } from "@/lib/i18n/strings";
+import {
+  addDays,
+  formatStudioDate,
+  formatStudioTime,
+  studioParts,
+  studioStartOfDay,
+} from "@/lib/time";
 
 export type PartOfDay = "morning" | "afternoon" | "evening";
 
-/** Bucket an ISO start time into morning/afternoon/evening (mirrors partOfDay). */
+/** Bucket an ISO start time into morning/afternoon/evening (Bangkok wall-clock). */
 export function partOfDay(startsAtIso: string): PartOfDay {
-  const h = new Date(startsAtIso).getHours();
+  const h = studioParts(new Date(startsAtIso)).hour;
   return h < 12 ? "morning" : h < 17 ? "afternoon" : "evening";
 }
 
@@ -21,11 +28,12 @@ export function partOfDay(startsAtIso: string): PartOfDay {
  * The keyed time-of-day greeting for the current hour (mirrors lune-home.jsx's
  * greeting block): before noon → morning, before 17:00 → afternoon, else
  * evening. Returns the i18n key so the copy stays keyed/bilingual (the catalog
- * supplies greet_morning/greet_afternoon/greet_evening). Computed on the client
- * from the viewer's local clock — display-only, no business logic.
+ * supplies greet_morning/greet_afternoon/greet_evening). Anchored to the studio's
+ * Bangkok clock (the studio is in Bangkok), so it is stable regardless of the
+ * runtime/host timezone — display-only, no business logic.
  */
 export function greetingKey(now: Date = new Date()): StrKey {
-  const h = now.getHours();
+  const h = studioParts(now).hour;
   if (h < 12) return "greet_morning";
   if (h < 17) return "greet_afternoon";
   return "greet_evening";
@@ -35,7 +43,7 @@ export function greetingKey(now: Date = new Date()): StrKey {
  * Bilingual long date line for the Home greeting (mirrors lune-home.jsx
  * `dateLong`): EN uses the `en-US` weekday + day + month + year; TH uses the
  * `th-TH` Buddhist-era locale, which yields e.g. "วันจันทร์ที่ 1 มิถุนายน 2569".
- * Pure display derivation from the local clock.
+ * Pure display derivation, pinned to the studio's Bangkok day (host-TZ-independent).
  */
 export function longDateLabel(now: Date = new Date()): Bilingual {
   const opts: Intl.DateTimeFormatOptions = {
@@ -45,25 +53,22 @@ export function longDateLabel(now: Date = new Date()): Bilingual {
     year: "numeric",
   };
   return {
-    en: now.toLocaleDateString("en-US", opts),
-    th: now.toLocaleDateString("th-TH", opts),
+    // en uses the studio's en-GB grouping via formatStudioDate; en-US weekday/month
+    // names are identical, so the day order differs only cosmetically and stays
+    // Bangkok-correct.
+    en: formatStudioDate(now, "en", opts),
+    th: formatStudioDate(now, "th", opts),
   };
 }
 
-/** "HH:MM" local time from an ISO start string. */
+/** "HH:MM" Bangkok wall-clock time from an ISO start string. */
 export function hhmm(iso: string): string {
-  const d = new Date(iso);
-  const h = String(d.getHours()).padStart(2, "0");
-  const m = String(d.getMinutes()).padStart(2, "0");
-  return `${h}:${m}`;
+  return formatStudioTime(new Date(iso));
 }
 
-/** End "HH:MM" given a start ISO and duration in minutes (mirrors endTime). */
+/** End "HH:MM" given a start ISO and duration in minutes (Bangkok wall-clock). */
 export function endTime(startIso: string, durationMin: number): string {
-  const end = new Date(new Date(startIso).getTime() + durationMin * 60_000);
-  const h = String(end.getHours()).padStart(2, "0");
-  const m = String(end.getMinutes()).padStart(2, "0");
-  return `${h}:${m}`;
+  return formatStudioTime(new Date(new Date(startIso).getTime() + durationMin * 60_000));
 }
 
 /** The accent dot colour per class type (mirrors lune-data.jsx TYPES[*].dot). */
@@ -143,45 +148,49 @@ const TH_MONTHS_SHORT = [
   "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค.",
 ];
 
-/** Day-of-week index 1..7 (Mon=1) for an ISO date. */
+/** Day-of-week index 1..7 (Mon=1) for an ISO date, in Bangkok (studio) time. */
 export function weekdayOf(iso: string): number {
-  const day = new Date(iso).getDay(); // 0=Sun … 6=Sat
-  return ((day + 6) % 7) + 1; // Mon=1 … Sun=7
+  return studioParts(new Date(iso)).isoDow; // Mon=1 … Sun=7
 }
 
-/** Local midnight of today — the anchor for the bookable 7-day strip. */
+/** Bangkok 00:00 of today — the anchor for the bookable 7-day strip. */
 export function currentWeekStart(now: Date = new Date()): Date {
-  const d = new Date(now);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  return studioStartOfDay(now);
 }
 
 /** 7 consecutive days from `start`, with real weekday labels, dates and today flag. */
 export function buildWeek(start: Date, now: Date = new Date()): WeekDay[] {
   const today = currentWeekStart(now).getTime();
   return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(start);
-    d.setDate(d.getDate() + i);
-    const dow = ((d.getDay() + 6) % 7) + 1; // Mon=1 … Sun=7
-    return { d: dow, dow: DOW_LABELS[dow - 1]!, date: d.getDate(), today: d.getTime() === today };
+    const d = addDays(studioStartOfDay(start), i);
+    const parts = studioParts(d);
+    const dow = parts.isoDow; // Mon=1 … Sun=7
+    return {
+      d: dow,
+      dow: DOW_LABELS[dow - 1]!,
+      date: parts.day,
+      today: studioStartOfDay(d).getTime() === today,
+    };
   });
 }
 
-/** Bilingual "Month YYYY" (TH uses the Buddhist year). */
+/** Bilingual "Month YYYY" (TH uses the Buddhist year), in Bangkok time. */
 export function monthLabel(start: Date): Bilingual {
+  const { month0, year } = studioParts(start);
   return {
-    en: start.toLocaleString("en-US", { month: "long", year: "numeric" }),
-    th: `${TH_MONTHS[start.getMonth()]} ${start.getFullYear() + 543}`,
+    en: formatStudioDate(start, "en", { month: "long", year: "numeric" }),
+    th: `${TH_MONTHS[month0]} ${year + 543}`,
   };
 }
 
 /** Bilingual "Dow D Mon" label for a class start (e.g. Thu 19 Jun / พฤ. 19 มิ.ย.). */
 export function classDateLabel(iso: string): Bilingual {
   const d = new Date(iso);
-  const dow = DOW_LABELS[(d.getDay() + 6) % 7]!;
+  const parts = studioParts(d);
+  const dow = DOW_LABELS[parts.isoDow - 1]!;
   return {
-    en: `${dow.en} ${d.getDate()} ${d.toLocaleString("en-US", { month: "short" })}`,
-    th: `${dow.th} ${d.getDate()} ${TH_MONTHS_SHORT[d.getMonth()]}`,
+    en: `${dow.en} ${parts.day} ${formatStudioDate(d, "en", { month: "short" })}`,
+    th: `${dow.th} ${parts.day} ${TH_MONTHS_SHORT[parts.month0]}`,
   };
 }
 
@@ -197,9 +206,7 @@ export function relativeDateLabel(
   tomorrowLabel: Bilingual,
   now: Date = new Date(),
 ): Bilingual {
-  const start = new Date(iso);
-  const startMidnight = new Date(start);
-  startMidnight.setHours(0, 0, 0, 0);
+  const startMidnight = studioStartOfDay(new Date(iso));
   const todayMidnight = currentWeekStart(now);
   const diffDays = Math.round(
     (startMidnight.getTime() - todayMidnight.getTime()) / 86_400_000,

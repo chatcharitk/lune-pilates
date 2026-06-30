@@ -4,6 +4,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getTodayOverview } from "@/lib/admin/today";
+import { studioParts } from "@/lib/time";
 
 const ORIGINAL_DB_URL = process.env.DATABASE_URL;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -24,10 +25,10 @@ describe("getTodayOverview (no-DB mock)", () => {
   it("anchors every class to the requested day", async () => {
     const { date, classes } = await getTodayOverview(now);
     expect(classes.length).toBe(5);
-    // header date is midnight of `now`'s day
-    expect(new Date(date).getDate()).toBe(20);
+    // header date is Bangkok midnight of `now`'s Bangkok day (TZ-independent)
+    expect(studioParts(new Date(date)).day).toBe(20);
     for (const c of classes) {
-      expect(new Date(c.startsAt).getDate()).toBe(20);
+      expect(studioParts(new Date(c.startsAt)).day).toBe(20);
       // endsAt = startsAt + durationMin
       expect(new Date(c.endsAt).getTime() - new Date(c.startsAt).getTime()).toBe(
         c.durationMin * 60_000,

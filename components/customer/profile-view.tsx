@@ -16,6 +16,7 @@ import type { ProfileOverview } from "@/lib/customer/profile";
 import { thb } from "@/lib/i18n";
 import { useCustomerLang } from "./customer-context";
 import { ArrowRight, Sparkle } from "./icons";
+import { formatStudioDate } from "@/lib/time";
 
 export function ProfileView({ overview }: { overview: ProfileOverview }) {
   const { t, tt, lang } = useCustomerLang();
@@ -24,7 +25,7 @@ export function ProfileView({ overview }: { overview: ProfileOverview }) {
   const isMember = identity.tier === "member";
   const hoursLabel = balance.hours === 1 ? t("hour") : t("hours");
   const expiryLabel = balance.nearestExpiry
-    ? balance.nearestExpiry.toLocaleDateString(lang === "th" ? "th-TH" : "en-US", {
+    ? formatStudioDate(balance.nearestExpiry, lang, {
         day: "numeric",
         month: "short",
         year: "numeric",
@@ -168,7 +169,7 @@ export function ProfileView({ overview }: { overview: ProfileOverview }) {
                       {tt(p.label)}
                     </div>
                     <div className="mt-0.5 font-body text-xs text-muted">
-                      {p.purchasedAt.toLocaleDateString(lang === "th" ? "th-TH" : "en-US", {
+                      {formatStudioDate(p.purchasedAt, lang, {
                         day: "numeric",
                         month: "short",
                         year: "numeric",

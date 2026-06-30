@@ -22,6 +22,7 @@ import type { AdminScheduleClass, AdminWeekSchedule } from "@/lib/admin/schedule
 import type { TemplateSlot } from "@/lib/admin/schedule-template";
 import { CAPACITY, type ClassType } from "@/lib/domain/types";
 import type { Bilingual, StrKey } from "@/lib/i18n";
+import { addDays, formatStudioDate, studioParts, studioStartOfDay } from "@/lib/time";
 
 const TYPES: ClassType[] = ["group", "private", "duo", "trio", "rental"];
 const TIME_OPTIONS = [
@@ -42,9 +43,10 @@ const DOW_KEYS: StrKey[] = [
   "dow_mon", "dow_tue", "dow_wed", "dow_thu", "dow_fri", "dow_sat", "dow_sun",
 ];
 
-/** Local YYYY-MM-DD for a Date (for the week query param + createClass). */
+/** Bangkok YYYY-MM-DD for an instant (for the week query param + createClass). */
 function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const { year, month0, day } = studioParts(d);
+  return `${year}-${String(month0 + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
 interface EditorState {
@@ -69,9 +71,10 @@ export function ScheduleView({
 
   // Default the selected day to "today" if it's in this week, else Monday.
   const [selectedDay, setSelectedDay] = useState<number>(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const idx = schedule.days.findIndex((d) => new Date(d.date).toDateString() === today.toDateString());
+    const today = studioStartOfDay(new Date()).getTime();
+    const idx = schedule.days.findIndex(
+      (d) => studioStartOfDay(new Date(d.date)).getTime() === today,
+    );
     return idx >= 0 ? idx : 0;
   });
   const [editor, setEditor] = useState<EditorState | null>(null);
@@ -80,9 +83,7 @@ export function ScheduleView({
   const day = schedule.days[selectedDay] ?? schedule.days[0]!;
 
   function gotoWeek(deltaDays: number) {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() + deltaDays);
-    router.push(`/admin/schedule?week=${ymd(d)}`);
+    router.push(`/admin/schedule?week=${ymd(addDays(weekStart, deltaDays))}`);
   }
 
   function run(fn: () => Promise<{ ok: boolean }>, onOk?: () => void) {
@@ -105,13 +106,13 @@ export function ScheduleView({
     run(() => generateWeekFromBaseline({ weekStart: schedule.weekStart }));
   }
 
-  const monthLabel = new Intl.DateTimeFormat(lang === "th" ? "th-TH" : "en-GB", {
-    day: "numeric",
-    month: "short",
-  });
-  const weekEnd = new Date(weekStart.getTime() + 6 * 24 * 3_600_000);
-  const yearFmt = new Intl.DateTimeFormat(lang === "th" ? "th-TH" : "en-GB", { year: "numeric" });
-  const rangeLabel = `${monthLabel.format(weekStart)} – ${monthLabel.format(weekEnd)} ${yearFmt.format(weekEnd)}`;
+  const dayMonthOpts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short" };
+  const weekEnd = addDays(weekStart, 6);
+  const rangeLabel = `${formatStudioDate(weekStart, lang, dayMonthOpts)} – ${formatStudioDate(
+    weekEnd,
+    lang,
+    dayMonthOpts,
+  )} ${formatStudioDate(weekEnd, lang, { year: "numeric" })}`;
 
   const { added, removed, changed } = schedule.diff;
   const hasDiff = added + removed + changed > 0;
@@ -170,7 +171,7 @@ export function ScheduleView({
             <NavBtn dir="prev" label={t("prev_week")} onClick={() => gotoWeek(-7)} />
             <ul className="flex flex-1 gap-2 overflow-x-auto pb-1">
               {schedule.days.map((d, i) => {
-                const date = new Date(d.date);
+                const dayOfMonth = studioParts(new Date(d.date)).day;
                 const on = i === selectedDay;
                 return (
                   <li key={d.date}>
@@ -188,7 +189,7 @@ export function ScheduleView({
                         {t(DOW_KEYS[i]!)}
                       </span>
                       <span className="mt-0.5 flex items-baseline gap-1.5">
-                        <span className="font-head text-xl font-bold leading-none">{date.getDate()}</span>
+                        <span className="font-head text-xl font-bold leading-none">{dayOfMonth}</span>
                         <span className="font-body text-[10.5px] opacity-70">
                           {d.classes.length} {t("cls_short")}
                         </span>

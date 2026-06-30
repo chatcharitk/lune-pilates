@@ -22,6 +22,7 @@ import { Avatar } from "./ui";
 import { Donut, Gauge, ProgressTrack, Sparkline, thbCompact } from "./charts";
 import { thb, type Bilingual, type StrKey } from "@/lib/i18n";
 import type { DashboardOverview, CapacitySection, RetentionSection } from "@/lib/admin/analytics";
+import { formatStudioDate } from "@/lib/time";
 
 // Per-instructor / per-house track colours: deterministic from a stable id so the
 // avatar tint and its progress track always match (mirrors the prototype's fixed
@@ -58,8 +59,7 @@ export function DashboardView({ overview }: { overview: DashboardOverview }) {
   const { sales, capacity, retention, period: meta } = overview;
 
   // "As of" date in the active language (full weekday + date).
-  const asOfDate = new Date(meta.asOf);
-  const asOfLabel = asOfDate.toLocaleDateString(lang === "th" ? "th-TH" : "en-GB", {
+  const asOfLabel = formatStudioDate(new Date(meta.asOf), lang, {
     weekday: "long",
     day: "numeric",
     month: "long",

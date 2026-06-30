@@ -13,6 +13,7 @@ import {
   type AdminBookingRow,
   type AdminWaitlistRow,
 } from "@/lib/admin/bookings";
+import { studioParts } from "@/lib/time";
 
 const ORIGINAL_DB_URL = process.env.DATABASE_URL;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -200,13 +201,14 @@ describe("getAdminBookingsOverview (no-DB mock)", () => {
   });
 
   it("filters by a single day", async () => {
-    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
-      now.getDate(),
-    ).padStart(2, "0")}`;
+    // The mock bookings are anchored to `now`'s BANGKOK day, so derive the filter
+    // day from Bangkok parts (TZ-independent — must hold under default + TZ=UTC).
+    const np = studioParts(now);
+    const today = `${np.year}-${String(np.month0 + 1).padStart(2, "0")}-${String(np.day).padStart(2, "0")}`;
     const list = await getAdminBookings({ day: today }, now);
     expect(list.length).toBeGreaterThan(0);
     for (const b of list) {
-      expect(new Date(b.class.startsAt).getDate()).toBe(now.getDate());
+      expect(studioParts(new Date(b.class.startsAt)).day).toBe(np.day);
     }
     // A day with no mock classes yields an empty list (not an error).
     expect(await getAdminBookings({ day: "2020-01-01" }, now)).toEqual([]);

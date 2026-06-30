@@ -19,6 +19,7 @@ import { CAPACITY, effectiveCapacity } from "@/lib/domain/types";
 import type { SessionUser } from "@/lib/auth/session";
 import { selectUsablePackageRow } from "@/lib/credits/selectPackage";
 import { getMockSession } from "@/lib/mock/session";
+import { addDays, studioInstant, studioParts, studioStartOfWeekMonday } from "@/lib/time";
 import { isBookableForViewer } from "./visibility";
 
 // ───────────────────────── shared shapes ─────────────────────────
@@ -428,13 +429,13 @@ const MOCK_SESSIONS: MockSessionSeed[] = [
   { id: "s36", day: 7, time: "17:00", dur: 60, type: "group", instr: null, booked: 3 },
 ];
 
-/** Build the concrete start Date for a mock session anchored to weekStart. */
+/** Build the concrete start instant for a mock session, anchored to weekStart in
+ * Bangkok time (so it is correct under any runtime timezone). */
 function mockStartsAt(weekStart: Date, seed: MockSessionSeed): Date {
   const [h, m] = seed.time.split(":").map((n) => Number.parseInt(n, 10));
-  const d = new Date(weekStart);
-  d.setDate(d.getDate() + (seed.day - 1));
-  d.setHours(h ?? 0, m ?? 0, 0, 0);
-  return d;
+  const dayStart = addDays(weekStart, seed.day - 1);
+  const { year, month0, day } = studioParts(dayStart);
+  return studioInstant(year, month0, day, h ?? 0, m ?? 0);
 }
 
 function mockToBookable(weekStart: Date, seed: MockSessionSeed): BookableClass {
@@ -485,12 +486,7 @@ function mockGetClassDetail(
   return { ...base, positions };
 }
 
-/** Monday 00:00 of the current week, used to anchor mock detail dates. */
+/** Bangkok Monday 00:00 of the current week, used to anchor mock detail dates. */
 function startOfMockWeek(now: Date = new Date()): Date {
-  const d = new Date(now);
-  const day = d.getDay(); // 0=Sun … 6=Sat
-  const diffToMon = (day + 6) % 7; // days since Monday
-  d.setDate(d.getDate() - diffToMon);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  return studioStartOfWeekMonday(now);
 }

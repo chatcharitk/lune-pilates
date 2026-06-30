@@ -14,6 +14,7 @@
 
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
+import { studioInstant, studioParts, studioStartOfDay } from "@/lib/time";
 import { bookings, classInstances, households, instructors, users, waitlist } from "@/lib/db/schema";
 import type { ClassType, ReformerPosition } from "@/lib/domain/types";
 import { effectiveCapacity } from "@/lib/domain/types";
@@ -90,11 +91,9 @@ export interface AdminTodayOverview {
 
 // ───────────────────────── pure helpers ─────────────────────────
 
-/** Midnight (local) of `d`. */
+/** The instant of Bangkok 00:00 (studio "today") of the day containing `d`. */
 function startOfDay(d: Date): Date {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
+  return studioStartOfDay(d);
 }
 
 /** Roll up the stat tiles from the assembled class list. */
@@ -333,10 +332,10 @@ function mockTodayOverview(dayStart: Date, scopeInstructorId?: string): AdminTod
   const seeds = scopeInstructorId
     ? MOCK_TODAY.filter((s) => s.instr === scopeInstructorId)
     : MOCK_TODAY;
+  const { year, month0, day } = studioParts(dayStart);
   const classes: AdminTodayClass[] = seeds.map((seed, ci) => {
     const [h, m] = seed.time.split(":").map((n) => Number.parseInt(n, 10));
-    const startsAt = new Date(dayStart);
-    startsAt.setHours(h ?? 0, m ?? 0, 0, 0);
+    const startsAt = studioInstant(year, month0, day, h ?? 0, m ?? 0);
     const capacity = effectiveCapacity(99, seed.type);
     const roster: AdminAttendee[] = seed.roster.map(([memId, checkedIn], i) => {
       const mem = MOCK_MEMBERS[memId]!;

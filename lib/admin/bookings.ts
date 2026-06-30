@@ -36,6 +36,14 @@ import {
   type ClassTypeMeta,
   type InstructorMeta,
 } from "@/lib/schedule/queries";
+import {
+  addDays,
+  formatStudioTime,
+  studioDayFromYmd,
+  studioInstant,
+  studioParts,
+  studioStartOfDay,
+} from "@/lib/time";
 
 // ───────────────────────── contract (frontend imports these) ─────────────────────────
 
@@ -149,22 +157,20 @@ export interface AdminBookingsFilter {
 
 // ───────────────────────── pure helpers ─────────────────────────
 
-/** Local "HH:MM" of `d`. */
+/** Bangkok (studio) "HH:MM" of an instant. */
 function hhmm(d: Date): string {
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return formatStudioTime(d);
 }
 
-/** Midnight (local) of `d`. */
+/** Bangkok 00:00 (studio day-start) of the day containing `d`. */
 function startOfDay(d: Date): Date {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
+  return studioStartOfDay(d);
 }
 
-/** Local midnight Date for a "YYYY-MM-DD" string, or null when unparseable. */
+/** The instant of Bangkok 00:00 for a "YYYY-MM-DD" string, or null when malformed. */
 function localDay(date: string): Date | null {
-  const d = new Date(`${date}T00:00:00`);
-  return Number.isNaN(d.getTime()) ? null : d;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date.trim())) return null;
+  return studioDayFromYmd(date);
 }
 
 /** Whole minutes (ceil) from `now` to `holdExpiresAt`, never below 0. */
@@ -557,13 +563,13 @@ const MOCK_WAITLIST: MockWaitClassSeed[] = [
   },
 ];
 
-/** Build a concrete start Date for a mock entry, anchored to `now`'s day. */
+/** Build a concrete start instant for a mock entry, anchored to `now`'s Bangkok
+ * day (so the displayed Bangkok HH:MM is correct under any runtime TZ). */
 function mockStartsAt(now: Date, dayOffset: number, time: string): Date {
   const [h, m] = time.split(":").map((n) => Number.parseInt(n, 10));
-  const d = startOfDay(now);
-  d.setDate(d.getDate() + dayOffset);
-  d.setHours(h ?? 0, m ?? 0, 0, 0);
-  return d;
+  const dayStart = addDays(startOfDay(now), dayOffset);
+  const { year, month0, day } = studioParts(dayStart);
+  return studioInstant(year, month0, day, h ?? 0, m ?? 0);
 }
 
 function mockAdminBookingsOverview(

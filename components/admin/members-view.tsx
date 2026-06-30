@@ -24,14 +24,12 @@ import {
 } from "@/app/actions/admin-credits";
 import type { AdminCustomer, CustomerLedgerEntry, LedgerReason } from "@/lib/admin/members";
 import type { StrKey } from "@/lib/i18n";
+import { formatStudioDate } from "@/lib/time";
 
 
-/** Short localised date for an expiry ("24 Jun" / Thai). */
+/** Short localised date for an expiry ("24 Jun" / Thai), in Bangkok time. */
 function fmtDate(iso: string, lang: "en" | "th"): string {
-  return new Intl.DateTimeFormat(lang === "th" ? "th-TH" : "en-GB", {
-    day: "numeric",
-    month: "short",
-  }).format(new Date(iso));
+  return formatStudioDate(new Date(iso), lang, { day: "numeric", month: "short" });
 }
 
 // ───────────────────────── component ─────────────────────────
@@ -641,14 +639,14 @@ const LEDGER_REASON_KEY: Record<LedgerReason, StrKey> = {
 /** Localised date + time for a ledger row (th-TH → Buddhist era, like the other
  *  admin date displays). */
 function fmtLedgerDate(iso: string, lang: "en" | "th"): string {
-  return new Intl.DateTimeFormat(lang === "th" ? "th-TH" : "en-GB", {
+  return formatStudioDate(new Date(iso), lang, {
     day: "numeric",
     month: "short",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-  }).format(new Date(iso));
+  });
 }
 
 /**
