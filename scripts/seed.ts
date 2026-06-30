@@ -12,6 +12,7 @@ import { eq, gt } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import {
   classInstances,
+  classTemplates,
   households,
   instructorAvailability,
   instructors,
@@ -19,6 +20,7 @@ import {
   users,
 } from "@/lib/db/schema";
 import { computePublicVisibleAt } from "@/lib/schedule/visibility";
+import { BASELINE_SLOTS } from "@/lib/schedule/baseline";
 // The recurring weekly baseline is the single source of truth (lib/schedule/baseline.ts);
 // the seed generates its published week from it so the seed and the admin
 // "generate from baseline" action can never diverge. baselineSlotsForDate uses
@@ -73,6 +75,30 @@ async function main() {
       expiresAt: expires,
       ownerHouseholdId: house!.id,
     });
+  }
+
+  // Populate the EDITABLE recurring schedule template from BASELINE_SLOTS, so the
+  // admin "Schedule template" editor starts with the current (group-only) baseline.
+  // Idempotent: only seeded when the table is empty (a reset truncates it; this
+  // re-fills it). Once seeded, getTemplateSlotsByDow reads these rows instead of the
+  // hardcoded fallback.
+  const existingTemplates = await db
+    .select({ id: classTemplates.id })
+    .from(classTemplates)
+    .limit(1);
+  let templateRows = 0;
+  if (existingTemplates.length === 0) {
+    await db.insert(classTemplates).values(
+      BASELINE_SLOTS.map((s) => ({
+        dayOfWeek: s.dayOfWeek,
+        time: s.time,
+        type: s.type,
+        durationMin: s.durationMin,
+        capacity: s.capacity,
+        active: true,
+      })),
+    );
+    templateRows = BASELINE_SLOTS.length;
   }
 
   // Publish a bookable week of group classes (next 7 days) — only if none exist yet.
@@ -140,7 +166,7 @@ async function main() {
   }
 
   console.info(
-    `Seed complete: 3 instructors, household A-114, member Pim, group pool 8h, ${created} published group classes, ${availRows} availability rows${future.length ? " (week already existed — skipped)" : ""}.`,
+    `Seed complete: 3 instructors, household A-114, member Pim, group pool 8h, ${created} published group classes, ${templateRows} template slots, ${availRows} availability rows${future.length ? " (week already existed — skipped)" : ""}.`,
   );
 }
 

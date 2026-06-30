@@ -583,6 +583,57 @@ export const STR = {
     th: "กรุณาเลือกผู้สอนที่ถูกต้อง",
   },
 
+  // ───────────────────────── admin Schedule template editor (recurring weekly template) ─────────────────────────
+  // The "Manage template" control sits next to "Load from baseline" on the Schedule
+  // screen and opens a Mon→Sun editor of the recurring template slots.
+  manage_template: { en: "Manage template", th: "จัดการเทมเพลต" },
+  manage_template_title: { en: "Weekly template", th: "เทมเพลตประจำสัปดาห์" },
+  manage_template_sub: {
+    en: "The recurring weekly classes that “Load from baseline” generates.",
+    th: "คลาสประจำสัปดาห์ที่ “โหลดจากเทมเพลต” จะสร้างให้",
+  },
+  template_slot: { en: "Template slot", th: "ช่วงคลาสในเทมเพลต" },
+  add_slot: { en: "Add slot", th: "เพิ่มช่วงคลาส" },
+  add_slot_title: { en: "Add template slot", th: "เพิ่มช่วงคลาสในเทมเพลต" },
+  edit_slot: { en: "Edit slot", th: "แก้ไขช่วงคลาส" },
+  edit_slot_title: { en: "Edit template slot", th: "แก้ไขช่วงคลาสในเทมเพลต" },
+  remove_slot: { en: "Remove slot", th: "ลบช่วงคลาส" },
+  remove_slot_confirm: {
+    en: "Remove this {time} {type} slot from the weekly template?",
+    th: "ลบช่วงคลาส {type} เวลา {time} ออกจากเทมเพลตประจำสัปดาห์หรือไม่?",
+  },
+  slot_day: { en: "Day", th: "วัน" },
+  slot_time: { en: "Time", th: "เวลา" },
+  slot_type: { en: "Type", th: "ประเภท" },
+  slot_duration: { en: "Duration", th: "ระยะเวลา" },
+  slot_capacity: { en: "Capacity", th: "จำนวนที่รับ" },
+  slot_instructor: { en: "Instructor", th: "ผู้สอน" },
+  instructor_any: { en: "Any instructor", th: "ผู้สอนคนใดก็ได้" },
+  template_empty_day: { en: "No slots this day", th: "ไม่มีช่วงคลาสในวันนี้" },
+  template_empty: {
+    en: "No template slots yet — add one to build the recurring week.",
+    th: "ยังไม่มีช่วงคลาสในเทมเพลต — เพิ่มเพื่อสร้างสัปดาห์ประจำ",
+  },
+  toast_template_added: { en: "Template slot added", th: "เพิ่มช่วงคลาสแล้ว" },
+  toast_template_updated: { en: "Template slot updated", th: "แก้ไขช่วงคลาสแล้ว" },
+  toast_template_removed: { en: "Template slot removed", th: "ลบช่วงคลาสแล้ว" },
+  err_template_invalid: {
+    en: "Please check the slot details and try again.",
+    th: "กรุณาตรวจสอบรายละเอียดช่วงคลาสแล้วลองใหม่",
+  },
+  err_template_unknown: {
+    en: "This template slot no longer exists.",
+    th: "ไม่พบช่วงคลาสนี้ในเทมเพลตแล้ว",
+  },
+  err_template_unknown_instructor: {
+    en: "Please choose a valid instructor.",
+    th: "กรุณาเลือกผู้สอนที่ถูกต้อง",
+  },
+  err_template_save: {
+    en: "Couldn’t save this slot. Please try again.",
+    th: "บันทึกช่วงคลาสไม่สำเร็จ กรุณาลองใหม่",
+  },
+
   // ───────────────────────── admin Bookings & waitlist control (admin-more.jsx) ─────────────────────────
   // tabs + table headers
   all_bookings: { en: "All bookings", th: "การจองทั้งหมด" },

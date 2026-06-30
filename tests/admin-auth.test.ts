@@ -8,10 +8,13 @@ import { requireAdmin, requireOwner } from "@/lib/auth/admin";
 import { setCheckIn } from "@/app/actions/admin";
 import {
   createClass,
+  createTemplateSlot,
   deleteClass,
+  deleteTemplateSlot,
   generateWeekFromBaseline,
   publishWeek,
   updateClass,
+  updateTemplateSlot,
 } from "@/app/actions/schedule";
 import {
   adminBookForCustomer,
@@ -64,6 +67,19 @@ const GATED_ACTIONS: { name: string; call: () => Promise<{ ok: boolean; code?: s
       updateClass({ id: "bad", time: "bad", type: "group", durationMin: 60, capacity: 3, instructorId: null }),
   },
   { name: "deleteClass", call: () => deleteClass({ id: "not-a-uuid" }) },
+  // Template CRUD (Owner-only): malformed input (bad dayOfWeek/time/uuid) —
+  // UNAUTHORIZED can only come from the requireOwner gate running first.
+  {
+    name: "createTemplateSlot",
+    call: () =>
+      createTemplateSlot({ dayOfWeek: 0, time: "bad", type: "group", durationMin: 60, capacity: 3 }),
+  },
+  {
+    name: "updateTemplateSlot",
+    call: () =>
+      updateTemplateSlot({ id: "bad", time: "bad", type: "group", durationMin: 60, capacity: 3 }),
+  },
+  { name: "deleteTemplateSlot", call: () => deleteTemplateSlot({ id: "not-a-uuid" }) },
   { name: "generateWeekFromBaseline", call: () => generateWeekFromBaseline({ weekStart: "2026-06-15" }) },
   { name: "publishWeek", call: () => publishWeek({ weekStart: "2026-06-15" }) },
   { name: "adminCancelBooking", call: () => adminCancelBooking({ bookingId: "not-a-uuid" }) },

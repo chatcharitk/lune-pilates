@@ -1,4 +1,5 @@
 import { getWeekSchedule } from "@/lib/admin/schedule";
+import { getScheduleTemplate } from "@/lib/admin/schedule-template";
 import { requireOwner } from "@/lib/auth/admin";
 import { ScheduleView } from "@/components/admin/schedule-view";
 import { AdminForbidden } from "@/components/admin/admin-forbidden";
@@ -20,6 +21,9 @@ export default async function AdminSchedulePage({
   }
   const { week } = await searchParams;
   const anchor = week ? new Date(`${week}T00:00:00`) : new Date();
-  const schedule = await getWeekSchedule(Number.isNaN(anchor.getTime()) ? new Date() : anchor);
-  return <ScheduleView schedule={schedule} />;
+  const [schedule, template] = await Promise.all([
+    getWeekSchedule(Number.isNaN(anchor.getTime()) ? new Date() : anchor),
+    getScheduleTemplate(),
+  ]);
+  return <ScheduleView schedule={schedule} template={template} />;
 }

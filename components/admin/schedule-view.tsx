@@ -10,6 +10,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminLang } from "./admin-context";
 import { Badge, Dot, Drawer } from "./ui";
+import { TemplateEditor } from "./template-editor";
 import {
   createClass,
   deleteClass,
@@ -18,6 +19,7 @@ import {
   updateClass,
 } from "@/app/actions/schedule";
 import type { AdminScheduleClass, AdminWeekSchedule } from "@/lib/admin/schedule";
+import type { TemplateSlot } from "@/lib/admin/schedule-template";
 import { CAPACITY, type ClassType } from "@/lib/domain/types";
 import type { Bilingual, StrKey } from "@/lib/i18n";
 
@@ -50,10 +52,17 @@ interface EditorState {
   cls?: AdminScheduleClass;
 }
 
-export function ScheduleView({ schedule }: { schedule: AdminWeekSchedule }) {
+export function ScheduleView({
+  schedule,
+  template,
+}: {
+  schedule: AdminWeekSchedule;
+  template: TemplateSlot[];
+}) {
   const { t, tt, lang } = useAdminLang();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [templateOpen, setTemplateOpen] = useState(false);
 
   const weekStart = useMemo(() => new Date(schedule.weekStart), [schedule.weekStart]);
   const totalClasses = schedule.days.reduce((a, d) => a + d.classes.length, 0);
@@ -117,7 +126,15 @@ export function ScheduleView({ schedule }: { schedule: AdminWeekSchedule }) {
           </h1>
           <p className="mt-1 font-body text-[13.5px] text-muted">{rangeLabel}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setTemplateOpen(true)}
+            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-[13.5px] font-semibold text-ink"
+          >
+            <SlidersIcon />
+            {t("manage_template")}
+          </button>
           <button
             type="button"
             onClick={onGenerate}
@@ -275,6 +292,12 @@ export function ScheduleView({ schedule }: { schedule: AdminWeekSchedule }) {
           }}
         />
       )}
+
+      <TemplateEditor
+        open={templateOpen}
+        template={template}
+        onClose={() => setTemplateOpen(false)}
+      />
     </div>
   );
 }
@@ -561,6 +584,14 @@ function Plus() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
       <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+function SlidersIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" />
     </svg>
   );
 }

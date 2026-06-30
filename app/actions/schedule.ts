@@ -18,15 +18,12 @@ import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getDb } from "@/lib/db/client";
-import { bookings, classInstances, instructors } from "@/lib/db/schema";
+import { bookings, classInstances, classTemplates, instructors } from "@/lib/db/schema";
 import type { ClassType } from "@/lib/domain/types";
-import { effectiveCapacity } from "@/lib/domain/types";
+import { CAPACITY, effectiveCapacity } from "@/lib/domain/types";
 import { computePublicVisibleAt } from "@/lib/schedule/visibility";
-import {
-  baselineSlotsForDate,
-  startOfWeekMonday,
-  startsAtFor,
-} from "@/lib/schedule/baseline";
+import { startOfWeekMonday, startsAtFor } from "@/lib/schedule/baseline";
+import { getTemplateSlotsByDow } from "@/lib/admin/schedule-template";
 import { emit } from "@/lib/events/bus";
 import { registerNotificationHandlers } from "@/lib/events/notifications";
 import { requireOwner } from "@/lib/auth/admin";
@@ -34,6 +31,12 @@ import { requireOwner } from "@/lib/auth/admin";
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const CLASS_TYPE = z.enum(["group", "private", "duo", "trio", "rental"]);
+
+/** ISO day of week (1=Mon … 7=Sun) for a Date (JS getDay is 0=Sun). */
+function isoDow(date: Date): number {
+  const d = date.getDay();
+  return d === 0 ? 7 : d;
+}
 
 /** Local midnight Date for a "YYYY-MM-DD" string. */
 function localDay(date: string): Date {
@@ -215,9 +218,16 @@ export type GenerateResult =
   | { ok: false; code: "UNAUTHORIZED" | "INVALID_INPUT" };
 
 /**
- * Materialise the recurring baseline into a week as DRAFT instances. Idempotent:
- * only baseline group slots with no existing instance at that exact start are
- * created, so re-running never duplicates. The baseline itself is never mutated.
+ * Materialise the EDITABLE recurring template into a week as DRAFT instances.
+ * Slots are sourced from the active `class_templates` rows (grouped by ISO weekday
+ * via getTemplateSlotsByDow), so editing the template changes what gets generated.
+ * The fallback to BASELINE_SLOTS (when the table is empty) lives in that read model,
+ * so a fresh/unseeded DB still generates the original group baseline.
+ *
+ * Idempotent: only template slots with no existing instance at that exact start+type
+ * are created, so re-running never duplicates. Each generated instance carries the
+ * source template's id in `template_id` (FK) where one exists. The template itself is
+ * never mutated (invariant 5 — edits to a week never touch the recurring template).
  */
 export async function generateWeekFromBaseline(raw: WeekInput): Promise<GenerateResult> {
   if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
@@ -231,7 +241,11 @@ export async function generateWeekFromBaseline(raw: WeekInput): Promise<Generate
   const db = getDb();
   const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 3_600_000);
 
-  // Existing starts in the week, to skip already-present baseline slots.
+  // The active editable template, grouped by ISO weekday (falls back to
+  // BASELINE_SLOTS when the table is empty — see getTemplateSlotsByDow).
+  const slotsByDow = await getTemplateSlotsByDow();
+
+  // Existing starts in the week, to skip already-present template slots.
   const existing = await db
     .select({ startsAt: classInstances.startsAt, type: classInstances.type })
     .from(classInstances)
@@ -247,14 +261,16 @@ export async function generateWeekFromBaseline(raw: WeekInput): Promise<Generate
   for (let i = 0; i < 7; i++) {
     const date = new Date(weekStart);
     date.setDate(date.getDate() + i);
-    for (const slot of baselineSlotsForDate(date)) {
+    for (const slot of slotsByDow.get(isoDow(date)) ?? []) {
       const startsAt = startsAtFor(date, slot.time);
       if (present.has(`${startsAt.getTime()}|${slot.type}`)) continue;
       toInsert.push({
+        templateId: slot.templateId ?? null,
         startsAt,
         durationMin: slot.durationMin,
         type: slot.type,
         capacity: slot.capacity,
+        instructorId: slot.instructorId ?? null,
         status: "draft",
       });
     }
@@ -334,6 +350,179 @@ export async function publishWeek(raw: WeekInput): Promise<PublishResult> {
 
   revalidatePath("/admin/schedule");
   return { ok: true, published };
+}
+
+// ───────────────────────── template CRUD (Owner-only) ─────────────────────────
+// Create / edit / soft-remove rows of the EDITABLE recurring weekly schedule
+// template (`class_templates`). Each is OWNER-ONLY (requireOwner first, BEFORE input
+// parsing and the no-DB branch — same ordering as every other admin action, see
+// tests/admin-auth.test.ts), zod-validated server-side (CLAUDE.md §8), and returns a
+// typed result union (never throws on an expected conflict).
+//
+// The template is the recurring baseline; editing it changes what
+// generateWeekFromBaseline materialises and what the changes-vs-template diff
+// compares against. Edits here NEVER touch concrete class_instances (invariant 5 is
+// the inverse: per-week edits never touch the template; template edits never
+// retroactively mutate already-generated weeks).
+//
+// Capacity is validated against the type's HARD cap (CAPACITY[type]) so a Duo slot
+// can never be saved with capacity 3, etc. Delete is a SOFT delete (active=false) to
+// preserve the class_instances.template_id FK on any instances generated from a slot.
+
+export type TemplateCrudFailureCode =
+  | "UNAUTHORIZED"
+  | "INVALID_INPUT"
+  | "UNKNOWN_TEMPLATE"
+  | "UNKNOWN_INSTRUCTOR";
+
+// dayOfWeek 1..7, "HH:MM" 24h, duration > 0, capacity ≥ 1 (the per-type hard-cap
+// check is applied after parse since it depends on `type`).
+const createTemplateInput = z.object({
+  dayOfWeek: z.number().int().min(1).max(7),
+  time: z.string().regex(TIME_RE),
+  type: CLASS_TYPE,
+  durationMin: z.number().int().positive().max(180),
+  capacity: z.number().int().min(1),
+  instructorId: z.string().min(1).nullable().optional(),
+});
+export type CreateTemplateSlotInput = z.infer<typeof createTemplateInput>;
+
+export type CreateTemplateSlotResult =
+  | { ok: true; id: string }
+  | { ok: false; code: TemplateCrudFailureCode };
+
+/**
+ * Add one ACTIVE recurring template slot. Validates the time format, dayOfWeek 1..7,
+ * a positive duration, and capacity within the type's hard cap (CAPACITY[type]); a
+ * provided instructorId must exist. Inserted active.
+ */
+export async function createTemplateSlot(
+  raw: CreateTemplateSlotInput,
+): Promise<CreateTemplateSlotResult> {
+  if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
+
+  const parsed = createTemplateInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
+  const input = parsed.data;
+
+  // Capacity may not exceed the type's hard reformer cap.
+  if (input.capacity > CAPACITY[input.type]) return { ok: false, code: "INVALID_INPUT" };
+
+  if (!process.env.DATABASE_URL) {
+    return { ok: true, id: "00000000-0000-4000-a000-0000000000c1" };
+  }
+
+  const db = getDb();
+  const instructorId = await resolveInstructor(input.type, input.instructorId ?? null);
+  if (instructorId === INVALID) return { ok: false, code: "UNKNOWN_INSTRUCTOR" };
+
+  const [row] = await db
+    .insert(classTemplates)
+    .values({
+      dayOfWeek: input.dayOfWeek,
+      time: input.time,
+      type: input.type,
+      durationMin: input.durationMin,
+      capacity: effectiveCapacity(input.capacity, input.type),
+      instructorId,
+      active: true,
+    })
+    .returning({ id: classTemplates.id });
+
+  revalidatePath("/admin/schedule");
+  return { ok: true, id: row!.id };
+}
+
+const updateTemplateInput = z.object({
+  id: z.string().uuid(),
+  time: z.string().regex(TIME_RE),
+  type: CLASS_TYPE,
+  durationMin: z.number().int().positive().max(180),
+  capacity: z.number().int().min(1),
+  instructorId: z.string().min(1).nullable().optional(),
+});
+export type UpdateTemplateSlotInput = z.infer<typeof updateTemplateInput>;
+
+export type UpdateTemplateSlotResult =
+  | { ok: true }
+  | { ok: false; code: TemplateCrudFailureCode };
+
+/**
+ * Edit a template slot's time / type / duration / capacity / instructor. The id and
+ * the active flag are never changed here (active is toggled via deleteTemplateSlot).
+ * Same validation as create. A missing (or already soft-deleted) slot →
+ * UNKNOWN_TEMPLATE.
+ */
+export async function updateTemplateSlot(
+  raw: UpdateTemplateSlotInput,
+): Promise<UpdateTemplateSlotResult> {
+  if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
+
+  const parsed = updateTemplateInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
+  const input = parsed.data;
+
+  if (input.capacity > CAPACITY[input.type]) return { ok: false, code: "INVALID_INPUT" };
+
+  if (!process.env.DATABASE_URL) return { ok: true };
+
+  const db = getDb();
+  const instructorId = await resolveInstructor(input.type, input.instructorId ?? null);
+  if (instructorId === INVALID) return { ok: false, code: "UNKNOWN_INSTRUCTOR" };
+
+  const updated = await db
+    .update(classTemplates)
+    .set({
+      time: input.time,
+      type: input.type,
+      durationMin: input.durationMin,
+      capacity: effectiveCapacity(input.capacity, input.type),
+      instructorId,
+    })
+    .where(and(eq(classTemplates.id, input.id), eq(classTemplates.active, true)))
+    .returning({ id: classTemplates.id });
+
+  if (updated.length === 0) return { ok: false, code: "UNKNOWN_TEMPLATE" };
+
+  revalidatePath("/admin/schedule");
+  return { ok: true };
+}
+
+const deleteTemplateInput = z.object({ id: z.string().uuid() });
+export type DeleteTemplateSlotInput = z.infer<typeof deleteTemplateInput>;
+
+export type DeleteTemplateSlotResult =
+  | { ok: true }
+  | { ok: false; code: TemplateCrudFailureCode };
+
+/**
+ * SOFT-remove a template slot (active=false) so it drops out of the editor and out
+ * of generation/diff, while PRESERVING the row and the class_instances.template_id FK
+ * on any instances already generated from it. A missing (or already removed) slot →
+ * UNKNOWN_TEMPLATE.
+ */
+export async function deleteTemplateSlot(
+  raw: DeleteTemplateSlotInput,
+): Promise<DeleteTemplateSlotResult> {
+  if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
+
+  const parsed = deleteTemplateInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
+  const { id } = parsed.data;
+
+  if (!process.env.DATABASE_URL) return { ok: true };
+
+  const db = getDb();
+  const updated = await db
+    .update(classTemplates)
+    .set({ active: false })
+    .where(and(eq(classTemplates.id, id), eq(classTemplates.active, true)))
+    .returning({ id: classTemplates.id });
+
+  if (updated.length === 0) return { ok: false, code: "UNKNOWN_TEMPLATE" };
+
+  revalidatePath("/admin/schedule");
+  return { ok: true };
 }
 
 // ───────────────────────── instructor resolution ─────────────────────────

@@ -22,11 +22,16 @@ import {
   type InstructorMeta,
 } from "@/lib/schedule/queries";
 import {
+  BASELINE_SLOTS,
   baselineSlotsForDate,
   isoDayOfWeek,
   startOfWeekMonday,
   startsAtFor,
 } from "@/lib/schedule/baseline";
+import {
+  getTemplateSlotsByDow,
+  type TemplateBaselineSlot,
+} from "@/lib/admin/schedule-template";
 
 // ───────────────────────── contract ─────────────────────────
 
@@ -53,13 +58,13 @@ export interface AdminScheduleDay {
   classes: AdminScheduleClass[];
 }
 
-/** Changes of this week's instances vs the recurring baseline (group slots). */
+/** Changes of this week's instances vs the editable recurring template. */
 export interface BaselineDiff {
-  /** Instances with no matching baseline slot (incl. all appointment classes). */
+  /** Instances with no matching template slot (incl. all appointment classes). */
   added: number;
-  /** Baseline group slots with no instance this week (cancelled vs baseline). */
+  /** Template slots with no instance this week (cancelled vs the template). */
   removed: number;
-  /** Matched baseline group slots whose capacity differs from the baseline. */
+  /** Matched template slots whose capacity differs from the template. */
   changed: number;
 }
 
@@ -78,34 +83,44 @@ function hhmm(d: Date): string {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
-const slotKey = (dayOfWeek: number, time: string) => `${dayOfWeek}|${time}`;
+const slotKey = (dayOfWeek: number, time: string, type: ClassType) =>
+  `${dayOfWeek}|${time}|${type}`;
 
-/** Compute the changes-vs-baseline diff for a week's assembled days. */
-function computeDiff(days: AdminScheduleDay[]): BaselineDiff {
-  // Baseline group slots keyed by (dow|time) with their baseline capacity.
-  const baseline = new Map<string, number>();
+/**
+ * Compute the changes-vs-template diff for a week's assembled days against the
+ * EDITABLE template slots grouped by ISO weekday (`templateByDow`). A class matches a
+ * template slot on (dayOfWeek, time, type); a matched slot whose capacity differs is
+ * `changed`; a class with no matching slot is `added`; a template slot with no
+ * instance this week is `removed`.
+ */
+function computeDiff(
+  days: AdminScheduleDay[],
+  templateByDow: Map<number, TemplateBaselineSlot[]>,
+): BaselineDiff {
+  // Template slots keyed by (dow|time|type) with their template capacity.
+  const template = new Map<string, number>();
   for (const day of days) {
-    for (const slot of baselineSlotsForDate(new Date(day.date))) {
-      baseline.set(slotKey(slot.dayOfWeek, slot.time), slot.capacity);
+    for (const slot of templateByDow.get(day.dayOfWeek) ?? []) {
+      template.set(slotKey(slot.dayOfWeek, slot.time, slot.type), slot.capacity);
     }
   }
 
-  const seenBaseline = new Set<string>();
+  const seenTemplate = new Set<string>();
   let added = 0;
   let changed = 0;
   for (const day of days) {
     for (const c of day.classes) {
-      const key = slotKey(day.dayOfWeek, c.time);
-      const baseCap = c.type === "group" ? baseline.get(key) : undefined;
+      const key = slotKey(day.dayOfWeek, c.time, c.type);
+      const baseCap = template.get(key);
       if (baseCap === undefined) {
-        added++; // no baseline slot (appointment class, or a group at a new time)
+        added++; // no template slot (appointment class, or a slot at a new time/type)
       } else {
-        seenBaseline.add(key);
+        seenTemplate.add(key);
         if (c.capacity !== baseCap) changed++;
       }
     }
   }
-  const removed = [...baseline.keys()].filter((k) => !seenBaseline.has(k)).length;
+  const removed = [...template.keys()].filter((k) => !seenTemplate.has(k)).length;
   return { added, removed, changed };
 }
 
@@ -151,7 +166,11 @@ function shape(row: {
   };
 }
 
-function assemble(weekStart: Date, classes: AdminScheduleClass[]): AdminWeekSchedule {
+function assemble(
+  weekStart: Date,
+  classes: AdminScheduleClass[],
+  templateByDow: Map<number, TemplateBaselineSlot[]>,
+): AdminWeekSchedule {
   const days = emptyWeek(weekStart);
   const byDate = new Map(days.map((d) => [new Date(d.date).toDateString(), d]));
   for (const c of classes) {
@@ -165,7 +184,7 @@ function assemble(weekStart: Date, classes: AdminScheduleClass[]): AdminWeekSche
     days,
     draftCount: classes.filter((c) => c.status === "draft").length,
     publishedCount: classes.filter((c) => c.status === "published").length,
-    diff: computeDiff(days),
+    diff: computeDiff(days, templateByDow),
   };
 }
 
@@ -185,6 +204,11 @@ export async function getWeekSchedule(anyDate: Date = new Date()): Promise<Admin
 
   const db = getDb();
   const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 3_600_000);
+
+  // The editable template (active class_templates rows, grouped by ISO weekday;
+  // falls back to BASELINE_SLOTS when the table is empty) — the diff compares this
+  // week's instances against it.
+  const templateByDow = await getTemplateSlotsByDow();
 
   const bookedCount = sql<number>`(
     select count(*)::int from ${bookings}
@@ -219,6 +243,7 @@ export async function getWeekSchedule(anyDate: Date = new Date()): Promise<Admin
   return assemble(
     weekStart,
     rows.map((r) => shape({ ...r, booked: r.booked ?? 0 })),
+    templateByDow,
   );
 }
 
@@ -289,5 +314,15 @@ function mockWeekSchedule(weekStart: Date): AdminWeekSchedule {
     });
   }
 
-  return assemble(weekStart, classes);
+  // No-DB diff source = the BASELINE_SLOTS fallback grouped by weekday (identical to
+  // getTemplateSlotsByDow's no-DB return), so the mock screen's diff is unchanged.
+  const templateByDow = new Map<number, TemplateBaselineSlot[]>();
+  for (const s of BASELINE_SLOTS) {
+    const slot: TemplateBaselineSlot = { ...s, templateId: null, instructorId: null };
+    const list = templateByDow.get(s.dayOfWeek) ?? [];
+    list.push(slot);
+    templateByDow.set(s.dayOfWeek, list);
+  }
+
+  return assemble(weekStart, classes, templateByDow);
 }
