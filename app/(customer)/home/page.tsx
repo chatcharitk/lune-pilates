@@ -24,25 +24,31 @@ const THIS_WEEK_LIMIT = 6;
 export default async function HomePage() {
   const now = new Date();
   const viewer = await getCurrentUser();
-  const overview = await getCreditOverview(viewer);
-  // The viewer's real soonest upcoming booking (or null → hide the card). Shaped
-  // from the same read model as the My Bookings list, so the two never disagree.
-  const next = await getNextBooking(viewer, now);
-  // Does the viewer hold a LIVE waitlist offer right now? listMyWaitlist lazily
-  // downgrades stale offers to `expired` server-side, so an `offered` entry here
-  // is genuinely confirmable — surface a banner nudging them to /bookings.
-  const hasOffer = (await listMyWaitlist(viewer)).some((w) => w.status === "offered");
-  // Real bookable classes this week — same query/visibility the Schedule screen
-  // uses (DB path filtered server-side; mock path gated behind DATABASE_URL).
-  // Keep only still-upcoming, not-full slots and cap the preview, mirroring the
-  // prototype's "upcoming this-week" subset.
-  const week = (
-    await listBookableClasses({
+  // The four reads below depend only on `viewer`, so they run in ONE parallel
+  // round (four sequential DB round trips → one) — the Home screen's whole fetch:
+  // - overview: the real summed household pool (invariant 2);
+  // - next: the soonest upcoming booking (or null → hide the card), shaped from
+  //   the same read model as the My Bookings list, so the two never disagree;
+  // - myWaitlist: listMyWaitlist lazily downgrades stale offers to `expired`
+  //   server-side, so an `offered` entry here is genuinely confirmable —
+  //   surface a banner nudging them to /bookings;
+  // - weekAll: real bookable classes this week — same query/visibility the
+  //   Schedule screen uses (DB path filtered server-side; mock path gated
+  //   behind DATABASE_URL).
+  const [overview, next, myWaitlist, weekAll] = await Promise.all([
+    getCreditOverview(viewer),
+    getNextBooking(viewer, now),
+    listMyWaitlist(viewer),
+    listBookableClasses({
       viewer: { tier: viewer.tier },
       weekStart: currentWeekStart(now),
       now,
-    })
-  )
+    }),
+  ]);
+  const hasOffer = myWaitlist.some((w) => w.status === "offered");
+  // Keep only still-upcoming, not-full slots and cap the preview, mirroring the
+  // prototype's "upcoming this-week" subset.
+  const week = weekAll
     .filter((c) => new Date(c.startsAt).getTime() > now.getTime() && !c.full)
     .slice(0, THIS_WEEK_LIMIT);
 

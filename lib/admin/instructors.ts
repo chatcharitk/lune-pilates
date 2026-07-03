@@ -170,41 +170,43 @@ export async function getAdminInstructors(now: Date = new Date()): Promise<Admin
 
   const instrIds = instrRows.map((i) => i.id);
 
-  // 2) Today's classes for those instructors, with a live booked count.
+  // 2) Today's classes for those instructors (with a live booked count) and
+  // 3) all availability rows (whole week → editor + today) — both depend only on
+  // `instrIds`, so they run in ONE parallel round trip.
   const bookedCount = sql<number>`(
     select count(*)::int from ${bookings}
     where ${bookings.classInstanceId} = ${classInstances.id}
       and ${bookings.status} = 'booked'
   )`;
-  const classRows = await db
-    .select({
-      id: classInstances.id,
-      startsAt: classInstances.startsAt,
-      type: classInstances.type,
-      capacity: classInstances.capacity,
-      instructorId: classInstances.instructorId,
-      booked: bookedCount,
-    })
-    .from(classInstances)
-    .where(
-      and(
-        inArray(classInstances.instructorId, instrIds),
-        sql`${classInstances.startsAt} >= ${dayStart}`,
-        sql`${classInstances.startsAt} < ${dayEnd}`,
-      ),
-    )
-    .orderBy(asc(classInstances.startsAt));
-
-  // 3) All availability rows for those instructors (whole week → editor + today).
-  const availRows = await db
-    .select({
-      instructorId: instructorAvailability.instructorId,
-      dayOfWeek: instructorAvailability.dayOfWeek,
-      startTime: instructorAvailability.startTime,
-      endTime: instructorAvailability.endTime,
-    })
-    .from(instructorAvailability)
-    .where(inArray(instructorAvailability.instructorId, instrIds));
+  const [classRows, availRows] = await Promise.all([
+    db
+      .select({
+        id: classInstances.id,
+        startsAt: classInstances.startsAt,
+        type: classInstances.type,
+        capacity: classInstances.capacity,
+        instructorId: classInstances.instructorId,
+        booked: bookedCount,
+      })
+      .from(classInstances)
+      .where(
+        and(
+          inArray(classInstances.instructorId, instrIds),
+          sql`${classInstances.startsAt} >= ${dayStart}`,
+          sql`${classInstances.startsAt} < ${dayEnd}`,
+        ),
+      )
+      .orderBy(asc(classInstances.startsAt)),
+    db
+      .select({
+        instructorId: instructorAvailability.instructorId,
+        dayOfWeek: instructorAvailability.dayOfWeek,
+        startTime: instructorAvailability.startTime,
+        endTime: instructorAvailability.endTime,
+      })
+      .from(instructorAvailability)
+      .where(inArray(instructorAvailability.instructorId, instrIds)),
+  ]);
 
   // Group classes by instructor.
   const classesByInstr = new Map<string, AdminInstructorClass[]>();

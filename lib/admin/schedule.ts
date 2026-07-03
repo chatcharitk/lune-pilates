@@ -207,18 +207,19 @@ export async function getWeekSchedule(anyDate: Date = new Date()): Promise<Admin
   const db = getDb();
   const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 3_600_000);
 
-  // The editable template (active class_templates rows, grouped by ISO weekday;
-  // falls back to BASELINE_SLOTS when the table is empty) — the diff compares this
-  // week's instances against it.
-  const templateByDow = await getTemplateSlotsByDow();
-
   const bookedCount = sql<number>`(
     select count(*)::int from ${bookings}
     where ${bookings.classInstanceId} = ${classInstances.id}
       and ${bookings.status} = 'booked'
   )`;
 
-  const rows = await db
+  // The editable template (active class_templates rows, grouped by ISO weekday;
+  // falls back to BASELINE_SLOTS when the table is empty) — the diff compares this
+  // week's instances against it. Independent of the instances query, so both run
+  // in ONE parallel round trip.
+  const [templateByDow, rows] = await Promise.all([
+    getTemplateSlotsByDow(),
+    db
     .select({
       id: classInstances.id,
       startsAt: classInstances.startsAt,
@@ -240,7 +241,8 @@ export async function getWeekSchedule(anyDate: Date = new Date()): Promise<Admin
         sql`${classInstances.startsAt} < ${weekEnd}`,
       ),
     )
-    .orderBy(asc(classInstances.startsAt));
+    .orderBy(asc(classInstances.startsAt)),
+  ]);
 
   return assemble(
     weekStart,

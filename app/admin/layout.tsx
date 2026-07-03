@@ -1,5 +1,17 @@
+import type { Metadata } from "next";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { requireAdmin } from "@/lib/auth/admin";
+
+// Admin surface installs as its own standalone app: a separate manifest scoped
+// to /admin (start_url /admin/today) replaces the customer app/manifest.ts link,
+// so "Add to Home Screen" from any /admin page yields the admin app. Metadata
+// merges with the root layout; appleWebApp is replaced wholesale, so restate
+// capable/statusBarStyle alongside the admin title.
+export const metadata: Metadata = {
+  title: "LUNE Admin",
+  manifest: "/admin.webmanifest",
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "LUNE Admin" },
+};
 
 // Admin app shell (responsive: dark sidebar on tablet/desktop, bottom nav on
 // phones). Lives under the literal `/admin` path so its routes never collide with

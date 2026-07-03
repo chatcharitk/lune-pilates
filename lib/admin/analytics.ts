@@ -490,43 +490,45 @@ async function buildCapacitySection(now: Date): Promise<CapacitySection> {
     where waitlist.class_instance_id = ${classInstances.id} and waitlist.status in ('waiting','offered')
   )`;
 
-  // Fill rate: published classes that have already started in the window.
-  const fillRows = await db
-    .select({
-      type: classInstances.type,
-      capacity: classInstances.capacity,
-      booked: bookedCount,
-    })
-    .from(classInstances)
-    .where(
-      and(
-        eq(classInstances.status, "published"),
-        gte(classInstances.startsAt, fillStart),
-        lt(classInstances.startsAt, now),
+  // Fill rate (published classes already started in the window) and alerts
+  // (published, upcoming within the horizon) — independent queries, ONE parallel
+  // round trip.
+  const [fillRows, alertRows] = await Promise.all([
+    db
+      .select({
+        type: classInstances.type,
+        capacity: classInstances.capacity,
+        booked: bookedCount,
+      })
+      .from(classInstances)
+      .where(
+        and(
+          eq(classInstances.status, "published"),
+          gte(classInstances.startsAt, fillStart),
+          lt(classInstances.startsAt, now),
+        ),
       ),
-    );
+    db
+      .select({
+        id: classInstances.id,
+        startsAt: classInstances.startsAt,
+        type: classInstances.type,
+        capacity: classInstances.capacity,
+        booked: bookedCount,
+        waitlistCount,
+      })
+      .from(classInstances)
+      .where(
+        and(
+          eq(classInstances.status, "published"),
+          gte(classInstances.startsAt, now),
+          lt(classInstances.startsAt, alertsEnd),
+        ),
+      )
+      .orderBy(classInstances.startsAt),
+  ]);
 
   const { overall, byType } = computeFillRates(fillRows);
-
-  // Alerts: published, upcoming within the horizon, that need a decision.
-  const alertRows = await db
-    .select({
-      id: classInstances.id,
-      startsAt: classInstances.startsAt,
-      type: classInstances.type,
-      capacity: classInstances.capacity,
-      booked: bookedCount,
-      waitlistCount,
-    })
-    .from(classInstances)
-    .where(
-      and(
-        eq(classInstances.status, "published"),
-        gte(classInstances.startsAt, now),
-        lt(classInstances.startsAt, alertsEnd),
-      ),
-    )
-    .orderBy(classInstances.startsAt);
 
   const alerts = alertRows
     .map((r) => buildAlert(r.id, r.startsAt, r.type, r.booked ?? 0, r.capacity, r.waitlistCount ?? 0))
@@ -601,24 +603,46 @@ async function buildRetentionSection(now: Date): Promise<RetentionSection> {
   const db = getDb();
   const horizon = new Date(now.getTime() + EXPIRING_SOON_DAYS * 24 * 3_600_000);
 
-  // Expiring soon: any package (member or guest) expiring within the horizon.
-  const expRows = await db
-    .select({
-      packageId: packages.id,
-      hoursLeft: packages.hoursLeft,
-      expiresAt: packages.expiresAt,
-      ownerHouseholdId: packages.ownerHouseholdId,
-      ownerUserId: packages.ownerUserId,
-      houseNumber: households.houseNumber,
-      userName: users.name,
-      userId: users.id,
-      tier: users.tier,
-    })
-    .from(packages)
-    .leftJoin(households, eq(packages.ownerHouseholdId, households.id))
-    .leftJoin(users, eq(packages.ownerUserId, users.id))
-    .where(and(gte(packages.expiresAt, now), lt(packages.expiresAt, horizon), sql`${packages.hoursLeft} > 0`))
-    .orderBy(packages.expiresAt);
+  // Three independent reads — expiring-soon packages, per-house usage rollup, and
+  // members per household — in ONE parallel round trip.
+  const [expRows, houseRows, memberRows] = await Promise.all([
+    // Expiring soon: any package (member or guest) expiring within the horizon.
+    db
+      .select({
+        packageId: packages.id,
+        hoursLeft: packages.hoursLeft,
+        expiresAt: packages.expiresAt,
+        ownerHouseholdId: packages.ownerHouseholdId,
+        ownerUserId: packages.ownerUserId,
+        houseNumber: households.houseNumber,
+        userName: users.name,
+        userId: users.id,
+        tier: users.tier,
+      })
+      .from(packages)
+      .leftJoin(households, eq(packages.ownerHouseholdId, households.id))
+      .leftJoin(users, eq(packages.ownerUserId, users.id))
+      .where(and(gte(packages.expiresAt, now), lt(packages.expiresAt, horizon), sql`${packages.hoursLeft} > 0`))
+      .orderBy(packages.expiresAt),
+    // House usage: HOUSEHOLD-owned packages only (guest/ownerUserId packages
+    // excluded — §5 inv 2/3). Used hours derived from totals vs left.
+    db
+      .select({
+        householdId: households.id,
+        houseNumber: households.houseNumber,
+        totalHours: sql<number>`coalesce(sum(${packages.hoursTotal}), 0)::float8`,
+        leftHours: sql<number>`coalesce(sum(${packages.hoursLeft}), 0)::float8`,
+      })
+      .from(households)
+      .innerJoin(packages, eq(packages.ownerHouseholdId, households.id))
+      .where(gte(packages.expiresAt, now))
+      .groupBy(households.id, households.houseNumber),
+    // Members per household (for avatars / count).
+    db
+      .select({ householdId: users.householdId, userId: users.id })
+      .from(users)
+      .where(sql`${users.householdId} is not null`),
+  ]);
 
   const expiringSoon = expRows.map((r) => {
     const isGuest = r.ownerUserId !== null;
@@ -637,26 +661,6 @@ async function buildRetentionSection(now: Date): Promise<RetentionSection> {
     };
   });
 
-  // House usage: HOUSEHOLD-owned packages only (guest/ownerUserId packages
-  // excluded — §5 inv 2/3). Used hours derived from the ledger (the truth):
-  // used = Σ(−delta) for booking-type debits, reconciled against (total − left).
-  const houseRows = await db
-    .select({
-      householdId: households.id,
-      houseNumber: households.houseNumber,
-      totalHours: sql<number>`coalesce(sum(${packages.hoursTotal}), 0)::float8`,
-      leftHours: sql<number>`coalesce(sum(${packages.hoursLeft}), 0)::float8`,
-    })
-    .from(households)
-    .innerJoin(packages, eq(packages.ownerHouseholdId, households.id))
-    .where(gte(packages.expiresAt, now))
-    .groupBy(households.id, households.houseNumber);
-
-  // Members per household (for avatars / count).
-  const memberRows = await db
-    .select({ householdId: users.householdId, userId: users.id })
-    .from(users)
-    .where(sql`${users.householdId} is not null`);
   const membersByHouse = new Map<string, string[]>();
   for (const m of memberRows) {
     if (!m.householdId) continue;

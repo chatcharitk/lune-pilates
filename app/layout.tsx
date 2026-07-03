@@ -4,6 +4,15 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "LUNE Pilates",
   description: "Boutique reformer Pilates — book, share household credits, and flow.",
+  // iOS "Add to Home Screen": run standalone (no Safari chrome). The admin
+  // layout overrides the title (and manifest) for its own install identity.
+  // The customer manifest is a route handler (see app/manifest.webmanifest/)
+  // linked here via metadata so the admin override actually takes effect.
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "LUNE" },
+  // Next emits the modern `mobile-web-app-capable` for appleWebApp.capable;
+  // add the legacy Apple-prefixed tag for older iOS Safari.
+  other: { "apple-mobile-web-app-capable": "yes" },
 };
 
 export const viewport: Viewport = {

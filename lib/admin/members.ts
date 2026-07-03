@@ -223,30 +223,32 @@ export async function listCustomers(filter: ListCustomersFilter = {}, now: Date 
 
   const db = getDb();
 
-  // 1) Every customer + their household number (left join: guests have none).
-  const userRows = await db
-    .select({
-      id: users.id,
-      name: users.name,
-      phone: users.phone,
-      tier: users.tier,
-      householdId: users.householdId,
-      house: households.houseNumber,
-    })
-    .from(users)
-    .leftJoin(households, eq(users.householdId, households.id));
-
-  // 2) Every usable package (hours_left > 0, not expired) with its owner key, in
-  //    ONE pass — so we never fan out a per-customer balance query.
-  const pkgRows = await db
-    .select({
-      ownerHouseholdId: packages.ownerHouseholdId,
-      ownerUserId: packages.ownerUserId,
-      hoursLeft: packages.hoursLeft,
-      expiresAt: packages.expiresAt,
-    })
-    .from(packages)
-    .where(and(gt(packages.hoursLeft, 0), gt(packages.expiresAt, now)));
+  // 1) Every customer + their household number (left join: guests have none), and
+  // 2) every usable package (hours_left > 0, not expired) with its owner key, in
+  //    ONE pass — so we never fan out a per-customer balance query. The two are
+  //    independent, so they run in ONE parallel round trip.
+  const [userRows, pkgRows] = await Promise.all([
+    db
+      .select({
+        id: users.id,
+        name: users.name,
+        phone: users.phone,
+        tier: users.tier,
+        householdId: users.householdId,
+        house: households.houseNumber,
+      })
+      .from(users)
+      .leftJoin(households, eq(users.householdId, households.id)),
+    db
+      .select({
+        ownerHouseholdId: packages.ownerHouseholdId,
+        ownerUserId: packages.ownerUserId,
+        hoursLeft: packages.hoursLeft,
+        expiresAt: packages.expiresAt,
+      })
+      .from(packages)
+      .where(and(gt(packages.hoursLeft, 0), gt(packages.expiresAt, now))),
+  ]);
 
   // Bucket usable packages by their pool key (household:<id> | user:<id>).
   const byHousehold = new Map<string, UsablePackageSummary[]>();
@@ -318,31 +320,36 @@ export async function getCustomerDetail(
 
   if (!u) return null;
 
-  // Usable packages for THIS customer's pool — recomputed server-side, never
-  // trusting any client value (CLAUDE.md §8). poolOwnerWhere encodes invariants 2/3.
-  const pkgs = await db
-    .select({ hoursLeft: packages.hoursLeft, expiresAt: packages.expiresAt })
-    .from(packages)
-    .where(
-      and(
-        poolOwnerWhere({ id: u.id, tier: u.tier, householdId: u.householdId }),
-        gt(packages.hoursLeft, 0),
-        gt(packages.expiresAt, now),
+  // Usable packages for THIS customer's pool (recomputed server-side, never
+  // trusting any client value — CLAUDE.md §8; poolOwnerWhere encodes invariants
+  // 2/3) and the housemates in the same house number (members + guests, self
+  // included; a guest / member without a household has no sharing group). Both
+  // depend only on `u`, so they run in ONE parallel round trip.
+  const [pkgs, housemateRows] = await Promise.all([
+    db
+      .select({ hoursLeft: packages.hoursLeft, expiresAt: packages.expiresAt })
+      .from(packages)
+      .where(
+        and(
+          poolOwnerWhere({ id: u.id, tier: u.tier, householdId: u.householdId }),
+          gt(packages.hoursLeft, 0),
+          gt(packages.expiresAt, now),
+        ),
       ),
-    );
+    u.householdId
+      ? db
+          .select({ id: users.id, name: users.name, tier: users.tier })
+          .from(users)
+          .where(eq(users.householdId, u.householdId))
+          .orderBy(asc(users.name), asc(users.id))
+      : Promise.resolve([]),
+  ]);
   const credit = summariseCredits(pkgs, now);
-
-  // Housemates: everyone in the same house number (members + guests), self
-  // included. A guest / member without a household has no sharing group.
-  let housemates: Housemate[] = [];
-  if (u.householdId) {
-    const rows = await db
-      .select({ id: users.id, name: users.name, tier: users.tier })
-      .from(users)
-      .where(eq(users.householdId, u.householdId))
-      .orderBy(asc(users.name), asc(users.id));
-    housemates = rows.map((r) => ({ id: r.id, name: r.name, tier: r.tier }));
-  }
+  const housemates: Housemate[] = housemateRows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    tier: r.tier,
+  }));
 
   const base = shapeCustomer(
     { id: u.id, name: u.name, phone: u.phone, tier: u.tier, house: u.house ?? null },

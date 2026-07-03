@@ -166,12 +166,11 @@ export async function getProfileOverview(now: Date = new Date()): Promise<Profil
   }
 
   const viewer = await getCurrentUser();
-  const db = getDb();
 
-  // Balance — single-sourced from the shared credit-overview logic (invariant 2).
-  const credit = await getCreditOverview(viewer, now);
-
-  const [housemates, purchaseHistory] = await Promise.all([
+  // Balance (single-sourced from the shared credit-overview logic, invariant 2),
+  // housemates and purchase history all depend only on `viewer` — ONE parallel round.
+  const [credit, housemates, purchaseHistory] = await Promise.all([
+    getCreditOverview(viewer, now),
     loadHousemates(viewer),
     loadPurchaseHistory(viewer),
   ]);

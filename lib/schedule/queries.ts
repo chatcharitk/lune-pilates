@@ -314,24 +314,33 @@ export async function getClassDetail(
   }
 
   const db = getDb();
-  const [cls] = await db
-    .select({
-      id: classInstances.id,
-      startsAt: classInstances.startsAt,
-      durationMin: classInstances.durationMin,
-      type: classInstances.type,
-      capacity: classInstances.capacity,
-      status: classInstances.status,
-      publicVisibleAt: classInstances.publicVisibleAt,
-      instructorId: classInstances.instructorId,
-      instructorName: instructors.name,
-      instructorNameTh: instructors.nameTh,
-      instructorTag: instructors.tag,
-    })
-    .from(classInstances)
-    .leftJoin(instructors, eq(classInstances.instructorId, instructors.id))
-    .where(eq(classInstances.id, classInstanceId))
-    .limit(1);
+  // The class row and its live bookings both key off `classInstanceId` alone, so
+  // they run in ONE parallel round trip (the bookings read is wasted only in the
+  // rare not-found / not-visible case — a fine trade for the saved round trip).
+  const [[cls], liveBookings] = await Promise.all([
+    db
+      .select({
+        id: classInstances.id,
+        startsAt: classInstances.startsAt,
+        durationMin: classInstances.durationMin,
+        type: classInstances.type,
+        capacity: classInstances.capacity,
+        status: classInstances.status,
+        publicVisibleAt: classInstances.publicVisibleAt,
+        instructorId: classInstances.instructorId,
+        instructorName: instructors.name,
+        instructorNameTh: instructors.nameTh,
+        instructorTag: instructors.tag,
+      })
+      .from(classInstances)
+      .leftJoin(instructors, eq(classInstances.instructorId, instructors.id))
+      .where(eq(classInstances.id, classInstanceId))
+      .limit(1),
+    db
+      .select({ position: bookings.position })
+      .from(bookings)
+      .where(and(eq(bookings.classInstanceId, classInstanceId), eq(bookings.status, "booked"))),
+  ]);
 
   if (!cls) return null;
   if (
@@ -343,11 +352,6 @@ export async function getClassDetail(
   ) {
     return null;
   }
-
-  const liveBookings = await db
-    .select({ position: bookings.position })
-    .from(bookings)
-    .where(and(eq(bookings.classInstanceId, cls.id), eq(bookings.status, "booked")));
 
   const booked = liveBookings.length;
   const takenPositions = liveBookings

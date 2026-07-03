@@ -261,22 +261,30 @@ export async function getPaymentsStats(now: Date = new Date()): Promise<Payments
 
   const db = getDb();
 
-  // Charges opened in the period, shaped to rows so the SAME summariser runs.
-  const chargeRows = await db
-    .select({
-      chargeId: charges.chargeId,
-      packageId: charges.packageId,
-      userId: charges.userId,
-      amount: charges.amount,
-      method: charges.method,
-      status: charges.status,
-      createdAt: charges.createdAt,
-      reviewedAt: charges.reviewedAt,
-      name: users.name,
-    })
-    .from(charges)
-    .innerJoin(users, eq(charges.userId, users.id))
-    .where(and(gte(charges.createdAt, start), lt(charges.createdAt, end)));
+  // Charges opened in the period (shaped to rows so the SAME summariser runs) and
+  // the new-member count — independent queries, ONE parallel round trip.
+  const [chargeRows, memberRows] = await Promise.all([
+    db
+      .select({
+        chargeId: charges.chargeId,
+        packageId: charges.packageId,
+        userId: charges.userId,
+        amount: charges.amount,
+        method: charges.method,
+        status: charges.status,
+        createdAt: charges.createdAt,
+        reviewedAt: charges.reviewedAt,
+        name: users.name,
+      })
+      .from(charges)
+      .innerJoin(users, eq(charges.userId, users.id))
+      .where(and(gte(charges.createdAt, start), lt(charges.createdAt, end))),
+    // New members: users created in the period.
+    db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(gte(users.createdAt, start), lt(users.createdAt, end))),
+  ]);
 
   const rows: PaymentRow[] = chargeRows.map((r) => ({
     id: r.chargeId,
@@ -292,12 +300,6 @@ export async function getPaymentsStats(now: Date = new Date()): Promise<Payments
     hasSlip: false,
     reviewedAt: r.reviewedAt ? r.reviewedAt.toISOString() : null,
   }));
-
-  // New members: users created in the period.
-  const memberRows = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(and(gte(users.createdAt, start), lt(users.createdAt, end)));
 
   return summarisePayments(rows, memberRows.length);
 }

@@ -174,44 +174,46 @@ export async function getTodayOverview(
 
   const classIds = classRows.map((c) => c.id);
 
-  // 2) All booked attendees on those classes + member/household context.
-  const bookingRows = await db
-    .select({
-      bookingId: bookings.id,
-      classInstanceId: bookings.classInstanceId,
-      userId: bookings.userId,
-      position: bookings.position,
-      checkedInAt: bookings.checkedInAt,
-      name: users.name,
-      phone: users.phone,
-      tier: users.tier,
-      house: households.houseNumber,
-    })
-    .from(bookings)
-    .innerJoin(users, eq(bookings.userId, users.id))
-    .leftJoin(households, eq(users.householdId, households.id))
-    .where(and(inArray(bookings.classInstanceId, classIds), eq(bookings.status, "booked")));
-
-  // 3) Live waitlist (waiting + offered) on those classes, FIFO by position.
-  const waitRows = await db
-    .select({
-      waitlistId: waitlist.id,
-      classInstanceId: waitlist.classInstanceId,
-      userId: waitlist.userId,
-      position: waitlist.position,
-      status: waitlist.status,
-      name: users.name,
-      phone: users.phone,
-    })
-    .from(waitlist)
-    .innerJoin(users, eq(waitlist.userId, users.id))
-    .where(
-      and(
-        inArray(waitlist.classInstanceId, classIds),
-        inArray(waitlist.status, ["waiting", "offered"]),
-      ),
-    )
-    .orderBy(asc(waitlist.position));
+  // 2) All booked attendees on those classes + member/household context, and
+  // 3) the live waitlist (waiting + offered), FIFO by position — both depend only
+  // on `classIds`, so they run in ONE parallel round trip.
+  const [bookingRows, waitRows] = await Promise.all([
+    db
+      .select({
+        bookingId: bookings.id,
+        classInstanceId: bookings.classInstanceId,
+        userId: bookings.userId,
+        position: bookings.position,
+        checkedInAt: bookings.checkedInAt,
+        name: users.name,
+        phone: users.phone,
+        tier: users.tier,
+        house: households.houseNumber,
+      })
+      .from(bookings)
+      .innerJoin(users, eq(bookings.userId, users.id))
+      .leftJoin(households, eq(users.householdId, households.id))
+      .where(and(inArray(bookings.classInstanceId, classIds), eq(bookings.status, "booked"))),
+    db
+      .select({
+        waitlistId: waitlist.id,
+        classInstanceId: waitlist.classInstanceId,
+        userId: waitlist.userId,
+        position: waitlist.position,
+        status: waitlist.status,
+        name: users.name,
+        phone: users.phone,
+      })
+      .from(waitlist)
+      .innerJoin(users, eq(waitlist.userId, users.id))
+      .where(
+        and(
+          inArray(waitlist.classInstanceId, classIds),
+          inArray(waitlist.status, ["waiting", "offered"]),
+        ),
+      )
+      .orderBy(asc(waitlist.position)),
+  ]);
 
   // Group bookings + waitlist by class id.
   const rosterByClass = new Map<string, AdminAttendee[]>();

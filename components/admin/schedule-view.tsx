@@ -241,38 +241,46 @@ export function ScheduleView({
               {t("no_classes_day")}
             </p>
           ) : (
-            <ul className="flex flex-col gap-2.5">
+            <ul className="flex flex-col gap-1.5">
               {day.classes.map((c) => (
                 <li key={c.id}>
-                  <div className="flex items-center gap-4 rounded-2xl border border-line bg-surface-2 px-4 py-3.5 shadow-soft">
-                    <div className="w-12 shrink-0">
-                      <p className="font-head text-[17px] font-bold leading-none text-ink tabular-nums">{c.time}</p>
-                      <p className="mt-1 font-body text-[11px] text-muted">{c.durationMin}′</p>
+                  <div className="flex min-h-[56px] items-center gap-2.5 rounded-2xl border border-line bg-surface-2 py-1.5 pl-3 pr-1.5 shadow-soft md:gap-3 md:pl-4 md:pr-2">
+                    <div className="w-11 shrink-0 md:w-12">
+                      <p className="font-head text-[14px] font-semibold leading-none text-ink tabular-nums">{c.time}</p>
+                      <p className="mt-0.5 font-body text-[10.5px] leading-none text-muted">{c.durationMin}′</p>
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="mb-1 flex flex-wrap items-center gap-2">
-                        <Dot type={c.type} />
-                        <span className="font-head text-[15px] font-semibold text-ink">{tt(c.typeMeta.label)}</span>
-                        <Badge tone={c.status === "published" ? "green" : "neutral"}>
-                          {c.status === "published" ? t("status_published") : t("status_draft")}
-                        </Badge>
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <Dot type={c.type} size={7} />
+                        <span className="truncate font-head text-[13.5px] font-semibold leading-tight text-ink">
+                          {tt(c.typeMeta.label)}
+                        </span>
                       </div>
-                      <p className="flex items-center gap-2 font-body text-[12.5px] text-ink-soft">
-                        <span className={c.instructor ? "" : "text-muted"}>
+                      <div className="mt-0.5 flex min-w-0 items-center gap-1.5 font-body text-[11.5px] text-ink-soft">
+                        <span
+                          className={`shrink-0 whitespace-nowrap rounded-full px-1.5 py-px font-body text-[10px] font-semibold ${
+                            c.status === "published" ? "bg-sage/15 text-sage-deep" : "bg-cream-2 text-ink-soft"
+                          }`}
+                        >
+                          {c.status === "published" ? t("status_published") : t("status_draft")}
+                        </span>
+                        <span className={`min-w-0 truncate ${c.instructor ? "" : "text-muted"}`}>
                           {c.instructor ? tt(c.instructor.name) : t("no_instructor")}
                         </span>
-                        <span className="text-line-strong">·</span>
-                        <span className="tabular-nums">
-                          {c.booked}/{c.capacity} {t("booked_label")}
+                        <span className="shrink-0 text-line-strong">·</span>
+                        <span className="shrink-0 whitespace-nowrap tabular-nums">
+                          {c.booked}/{c.capacity}
                         </span>
-                      </p>
+                      </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => setEditor({ mode: "edit", cls: c })}
-                      className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-line-strong bg-surface px-3.5 font-body text-[13px] font-semibold text-ink"
+                      aria-label={t("edit")}
+                      title={t("edit")}
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-ink-soft transition-colors hover:bg-surface"
                     >
-                      {t("edit")}
+                      <PencilIcon />
                     </button>
                   </div>
                 </li>
@@ -593,6 +601,14 @@ function SlidersIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" />
+    </svg>
+  );
+}
+
+function PencilIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
     </svg>
   );
 }
