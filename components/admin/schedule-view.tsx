@@ -109,90 +109,91 @@ export function ScheduleView({
 
   return (
     <div>
-      {/* header: title + one compact wrapping control row */}
-      <div className="mb-3">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-          <h1 className="font-head text-2xl font-semibold tracking-tight text-ink">
-            {t("admin_schedule")}
-          </h1>
-          <p className="font-body text-[13px] text-muted">{rangeLabel}</p>
-        </div>
-        <div className="mt-2.5 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setTemplateOpen(true)}
-            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-line-strong bg-surface-2 px-3 font-body text-[13px] font-semibold text-ink"
-          >
-            <SlidersIcon />
-            {t("manage_template")}
-          </button>
-          <button
-            type="button"
-            onClick={onGenerate}
-            disabled={pending}
-            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-line-strong bg-surface-2 px-3 font-body text-[13px] font-semibold text-ink disabled:opacity-50"
-          >
-            {t("generate_from_baseline")}
-          </button>
-          <button
-            type="button"
-            onClick={() => setEditor({ mode: "new" })}
-            className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-ink px-3.5 font-body text-[13px] font-semibold text-cream"
-          >
-            <Plus />
-            {t("new_class")}
-          </button>
-        </div>
+      {/* header: title + primary action on one row */}
+      <div className="mb-2.5 flex items-center justify-between gap-2">
+        <h1 className="min-w-0 truncate font-head text-xl font-semibold tracking-tight text-ink">
+          {t("admin_schedule")}
+        </h1>
+        <button
+          type="button"
+          onClick={() => setEditor({ mode: "new" })}
+          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-ink px-3.5 font-body text-[13px] font-semibold text-cream"
+        >
+          <Plus />
+          {t("new_class")}
+        </button>
       </div>
 
-      {totalClasses === 0 ? (
-        <EmptyWeek onGenerate={onGenerate} pending={pending} />
-      ) : (
-        <>
-          {/* week navigation + strip */}
-          <div className="mb-4 flex items-center gap-2">
-            <NavBtn dir="prev" label={t("prev_week")} onClick={() => gotoWeek(-7)} />
-            <ul className="flex flex-1 gap-2 overflow-x-auto pb-1">
-              {schedule.days.map((d, i) => {
-                const dayOfMonth = studioParts(new Date(d.date)).day;
-                const on = i === selectedDay;
-                return (
-                  <li key={d.date}>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedDay(i)}
-                      aria-pressed={on}
-                      className={`min-w-[74px] shrink-0 rounded-2xl border px-3.5 py-2.5 text-left transition-colors ${
-                        on
-                          ? "border-transparent bg-ink text-cream"
-                          : "border-line bg-surface-2 text-ink"
-                      }`}
-                    >
-                      <span className="block font-body text-[11px] font-semibold uppercase tracking-wide opacity-70">
-                        {t(DOW_KEYS[i]!)}
-                      </span>
-                      <span className="mt-0.5 flex items-baseline gap-1.5">
-                        <span className="font-head text-xl font-bold leading-none">{dayOfMonth}</span>
-                        <span className="font-body text-[10.5px] opacity-70">
-                          {d.classes.length} {t("cls_short")}
-                        </span>
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-            <NavBtn dir="next" label={t("next_week")} onClick={() => gotoWeek(7)} />
-          </div>
+      {/* template controls */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setTemplateOpen(true)}
+          className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-line-strong bg-surface-2 px-3 font-body text-[13px] font-semibold text-ink"
+        >
+          <SlidersIcon />
+          {t("manage_template")}
+        </button>
+        <button
+          type="button"
+          onClick={onGenerate}
+          disabled={pending}
+          className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-line-strong bg-surface-2 px-3 font-body text-[13px] font-semibold text-ink disabled:opacity-50"
+        >
+          {t("generate_from_baseline")}
+        </button>
+      </div>
 
-          {/* day class list */}
-          {day.classes.length === 0 ? (
-            <p className="rounded-2xl border border-line bg-surface-2 p-8 text-center font-body text-sm text-muted">
-              {t("no_classes_day")}
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-1.5">
-              {day.classes.map((c) => (
+      {/* week navigation — always visible: prev · range · next */}
+      <div className="mb-2.5 flex items-center justify-between gap-2">
+        <NavBtn dir="prev" label={t("prev_week")} onClick={() => gotoWeek(-7)} />
+        <p className="min-w-0 truncate text-center font-body text-[13px] font-semibold text-ink">
+          {rangeLabel}
+        </p>
+        <NavBtn dir="next" label={t("next_week")} onClick={() => gotoWeek(7)} />
+      </div>
+
+      {/* 7-day strip — always visible, whole week fits (Mon..Sun) */}
+      <ul className="mb-4 grid grid-cols-7 gap-1">
+        {schedule.days.map((d, i) => {
+          const dayOfMonth = studioParts(new Date(d.date)).day;
+          const on = i === selectedDay;
+          const count = d.classes.length;
+          return (
+            <li key={d.date}>
+              <button
+                type="button"
+                onClick={() => setSelectedDay(i)}
+                aria-pressed={on}
+                className={`flex w-full flex-col items-center rounded-xl border py-1.5 transition-colors ${
+                  on ? "border-transparent bg-ink text-cream" : "border-line bg-surface-2 text-ink"
+                }`}
+              >
+                <span className="font-body text-[10px] font-semibold uppercase opacity-70">
+                  {t(DOW_KEYS[i]!)}
+                </span>
+                <span className="mt-0.5 font-head text-[15px] font-bold leading-none">{dayOfMonth}</span>
+                <span className="mt-1 font-body text-[10px] font-semibold leading-none opacity-70">
+                  {count > 0 ? count : "·"}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+
+      {/* content: selected day's classes, or empty states (strip stays above) */}
+      {day.classes.length === 0 ? (
+        totalClasses === 0 ? (
+          <EmptyWeek onGenerate={onGenerate} pending={pending} />
+        ) : (
+          <p className="rounded-2xl border border-line bg-surface-2 p-8 text-center font-body text-sm text-muted">
+            {t("no_classes_day")}
+          </p>
+        )
+      ) : (
+        <ul className="flex flex-col gap-1.5">
+          {day.classes.map((c) => (
                 <li key={c.id}>
                   <div className="flex min-h-[56px] items-center gap-2.5 rounded-2xl border border-line bg-surface-2 py-1.5 pl-3 pr-1.5 shadow-soft md:gap-3 md:pl-4 md:pr-2">
                     <div className="w-11 shrink-0 md:w-12">
@@ -237,8 +238,6 @@ export function ScheduleView({
               ))}
             </ul>
           )}
-        </>
-      )}
 
       {editor && (
         <ClassEditor
