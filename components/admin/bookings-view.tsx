@@ -28,8 +28,10 @@ import type {
   AdminWaitlistClass,
 } from "@/lib/admin/bookings";
 import type { BookableClass } from "@/lib/schedule/queries";
+import type { AdminCustomer } from "@/lib/admin/members";
 import type { StrKey } from "@/lib/i18n";
 import { formatStudioDate, formatStudioTime, studioStartOfDay } from "@/lib/time";
+import { AddBookingDrawer } from "./add-booking-drawer";
 
 type Tab = "bookings" | "waitlist";
 
@@ -65,15 +67,20 @@ function fmtCredits(n: number): string {
 export function BookingsView({
   overview,
   bookable,
+  customers,
 }: {
   overview: AdminBookingsOverview;
-  /** This week's published classes — the candidate pool for the admin reschedule
-   *  picker. The action re-validates server-side; this only populates the list. */
+  /** Upcoming published classes — the candidate pool for the reschedule picker AND
+   *  the "book for a customer" flow. The action re-validates server-side; this only
+   *  populates the list. */
   bookable: BookableClass[];
+  /** All customers — the searchable picker for "book for a customer". */
+  customers: AdminCustomer[];
 }) {
   const { t } = useAdminLang();
   const [tab, setTab] = useState<Tab>("bookings");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
   const [toast, setToast] = useState<{ key: StrKey; cost?: string } | null>(null);
 
   const open = useMemo(
@@ -93,10 +100,20 @@ export function BookingsView({
 
   return (
     <div>
-      <header className="mb-5">
+      <header className="mb-5 flex items-center justify-between gap-2">
         <h1 className="font-head text-2xl font-semibold tracking-tight text-ink">
           {t("admin_bookings")}
         </h1>
+        <button
+          type="button"
+          onClick={() => setAddOpen(true)}
+          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-ink px-3.5 font-body text-[13px] font-semibold text-cream"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          {t("book_for_customer")}
+        </button>
       </header>
 
       <Segmented value={tab} onChange={setTab} options={tabs} ariaLabel={t("admin_bookings")} />
@@ -135,6 +152,18 @@ export function BookingsView({
         onResult={(key, cost) => {
           setOpenId(null);
           flash(key, cost);
+        }}
+      />
+
+      {/* book-for-a-customer drawer */}
+      <AddBookingDrawer
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        customers={customers}
+        bookable={bookable}
+        onBooked={() => {
+          setAddOpen(false);
+          flash("booked_for_customer");
         }}
       />
     </div>
