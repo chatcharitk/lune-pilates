@@ -1,8 +1,9 @@
 {
+  "id": "lune-admin",
   "name": "LUNE Admin",
   "short_name": "LUNE Admin",
   "start_url": "/admin/today",
-  "scope": "/admin",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#F1E9E0",
   "theme_color": "#F1E9E0",

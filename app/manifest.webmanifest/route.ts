@@ -9,6 +9,7 @@ import type { MetadataRoute } from "next";
 // the root layout, the admin layout's metadata cleanly overrides the link, so
 // installing from an /admin page yields the admin app.
 const manifest: MetadataRoute.Manifest = {
+  id: "lune-customer",
   name: "LUNE Pilates",
   short_name: "LUNE",
   start_url: "/home",
