@@ -238,6 +238,19 @@ export async function deleteClass(raw: DeleteClassInput): Promise<DeleteClassRes
 const weekInput = z.object({ weekStart: z.string() });
 export type WeekInput = z.infer<typeof weekInput>;
 
+/**
+ * Parse a week-start that may be a full ISO instant (what `getWeekSchedule` ships
+ * as `weekStart`) OR a bare YYYY-MM-DD (the `?week=` param), then snap to the
+ * Bangkok Monday. `new Date` handles both forms; an unparseable value falls back
+ * to the current week. (Using studioDayFromYmd here silently dropped full-ISO
+ * inputs to "today", so generate/publish always hit the current week — the bug
+ * this replaces.)
+ */
+function weekStartOf(raw: string): Date {
+  const d = new Date(raw);
+  return startOfWeekMonday(Number.isNaN(d.getTime()) ? new Date() : d);
+}
+
 export type GenerateResult =
   | { ok: true; created: number }
   | { ok: false; code: "UNAUTHORIZED" | "INVALID_INPUT" };
@@ -264,7 +277,7 @@ export async function generateWeekFromBaseline(raw: WeekInput): Promise<Generate
 
   const parsed = weekInput.safeParse(raw);
   if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
-  const weekStart = startOfWeekMonday(studioDayFromYmd(parsed.data.weekStart));
+  const weekStart = weekStartOf(parsed.data.weekStart);
 
   if (!process.env.DATABASE_URL) return { ok: true, created: 0 };
 
@@ -345,7 +358,7 @@ export async function publishWeek(raw: WeekInput): Promise<PublishResult> {
 
   const parsed = weekInput.safeParse(raw);
   if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
-  const weekStart = startOfWeekMonday(studioDayFromYmd(parsed.data.weekStart));
+  const weekStart = weekStartOf(parsed.data.weekStart);
   const now = new Date();
 
   if (!process.env.DATABASE_URL) return { ok: true, published: 0 };

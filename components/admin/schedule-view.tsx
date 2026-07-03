@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { useAdminLang } from "./admin-context";
 import { Dot, Drawer } from "./ui";
 import { TemplateEditor } from "./template-editor";
+import { ClassRosterDrawer } from "./class-roster-drawer";
 import {
   createClass,
   deleteClass,
@@ -65,6 +66,7 @@ export function ScheduleView({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [templateOpen, setTemplateOpen] = useState(false);
+  const [rosterId, setRosterId] = useState<string | null>(null);
 
   const weekStart = useMemo(() => new Date(schedule.weekStart), [schedule.weekStart]);
   const totalClasses = schedule.days.reduce((a, d) => a + d.classes.length, 0);
@@ -193,35 +195,35 @@ export function ScheduleView({
         <ul className="flex flex-col gap-1.5">
           {day.classes.map((c) => (
                 <li key={c.id}>
-                  <div className="flex min-h-[56px] items-center gap-2.5 rounded-2xl border border-line bg-surface-2 py-1.5 pl-3 pr-1.5 shadow-soft md:gap-3 md:pl-4 md:pr-2">
-                    <div className="w-11 shrink-0 md:w-12">
-                      <p className="font-head text-[14px] font-semibold leading-none text-ink tabular-nums">{c.time}</p>
-                      <p className="mt-0.5 font-body text-[10.5px] leading-none text-muted">{c.durationMin}′</p>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex min-w-0 items-center gap-1.5">
-                        <Dot type={c.type} size={7} />
-                        <span className="truncate font-head text-[13.5px] font-semibold leading-tight text-ink">
-                          {tt(c.typeMeta.label)}
-                        </span>
+                  <div className="flex min-h-[56px] items-center gap-1 rounded-2xl border border-line bg-surface-2 py-1.5 pl-1 pr-1.5 shadow-soft md:pr-2">
+                    <button
+                      type="button"
+                      onClick={() => setRosterId(c.id)}
+                      aria-label={`${tt(c.typeMeta.label)} ${c.time} · ${t("roster")}`}
+                      className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl px-2 py-1 text-left transition-colors hover:bg-surface md:gap-3 md:px-3"
+                    >
+                      <div className="w-11 shrink-0 md:w-12">
+                        <p className="font-head text-[14px] font-semibold leading-none text-ink tabular-nums">{c.time}</p>
+                        <p className="mt-0.5 font-body text-[10.5px] leading-none text-muted">{c.durationMin}′</p>
                       </div>
-                      <div className="mt-0.5 flex min-w-0 items-center gap-1.5 font-body text-[11.5px] text-ink-soft">
-                        <span
-                          className={`shrink-0 whitespace-nowrap rounded-full px-1.5 py-px font-body text-[10px] font-semibold ${
-                            c.status === "published" ? "bg-sage/15 text-sage-deep" : "bg-cream-2 text-ink-soft"
-                          }`}
-                        >
-                          {c.status === "published" ? t("status_published") : t("status_draft")}
-                        </span>
-                        <span className={`min-w-0 truncate ${c.instructor ? "" : "text-muted"}`}>
-                          {c.instructor ? tt(c.instructor.name) : t("no_instructor")}
-                        </span>
-                        <span className="shrink-0 text-line-strong">·</span>
-                        <span className="shrink-0 whitespace-nowrap tabular-nums">
-                          {c.booked}/{c.capacity}
-                        </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <Dot type={c.type} size={7} />
+                          <span className="truncate font-head text-[13.5px] font-semibold leading-tight text-ink">
+                            {tt(c.typeMeta.label)}
+                          </span>
+                        </div>
+                        <div className="mt-0.5 flex min-w-0 items-center gap-1.5 font-body text-[11.5px] text-ink-soft">
+                          <span className={`min-w-0 truncate ${c.instructor ? "" : "text-muted"}`}>
+                            {c.instructor ? tt(c.instructor.name) : t("no_instructor")}
+                          </span>
+                          <span className="shrink-0 text-line-strong">·</span>
+                          <span className="shrink-0 whitespace-nowrap tabular-nums">
+                            {c.booked}/{c.capacity}
+                          </span>
+                        </div>
                       </div>
-                    </div>
+                    </button>
                     <button
                       type="button"
                       onClick={() => setEditor({ mode: "edit", cls: c })}
@@ -254,6 +256,8 @@ export function ScheduleView({
         template={template}
         onClose={() => setTemplateOpen(false)}
       />
+
+      <ClassRosterDrawer classId={rosterId} onClose={() => setRosterId(null)} />
     </div>
   );
 }

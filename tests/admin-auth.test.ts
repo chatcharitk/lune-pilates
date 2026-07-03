@@ -21,6 +21,7 @@ import {
   adminCancelBooking,
   adminOfferWaitlistSeat,
   adminReschedule,
+  adminSetBookingPosition,
 } from "@/app/actions/admin-bookings";
 import { createCustomer } from "@/app/actions/admin-members";
 import { posConfirmPayment, posSellPackage } from "@/app/actions/admin-pos";
@@ -119,6 +120,11 @@ const GATED_ACTIONS: { name: string; call: () => Promise<{ ok: boolean; code?: s
   {
     name: "adminReschedule",
     call: () => adminReschedule({ bookingId: "not-a-uuid", newClassInstanceId: "not-a-uuid" }),
+  },
+  // Reformer position change (Owner-only): malformed uuid — UNAUTHORIZED beats it.
+  {
+    name: "adminSetBookingPosition",
+    call: () => adminSetBookingPosition({ bookingId: "not-a-uuid", position: "left" }),
   },
   // Manual credit adjustment (#8, Owner-only): malformed input — UNAUTHORIZED beats it.
   {

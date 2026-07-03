@@ -520,6 +520,12 @@ export const STR = {
   notify: { en: "Notify", th: "แจ้งเตือน" },
   notified: { en: "Notified", th: "แจ้งแล้ว" },
   guest: { en: "Guest", th: "ทั่วไป" },
+  loading: { en: "Loading…", th: "กำลังโหลด…" },
+  no_attendees: { en: "No one booked yet", th: "ยังไม่มีผู้จอง" },
+  keep: { en: "Keep", th: "เก็บไว้" },
+  err_position_taken: { en: "That position is taken.", th: "ตำแหน่งนี้ถูกจองแล้ว" },
+  booking_cancelled_refunded: { en: "Cancelled · credit refunded", th: "ยกเลิกแล้ว · คืนเครดิต" },
+  booking_cancelled_kept: { en: "Cancelled · no refund", th: "ยกเลิกแล้ว · ไม่คืนเครดิต" },
 
   // admin Schedule management
   edit: { en: "Edit", th: "แก้ไข" },

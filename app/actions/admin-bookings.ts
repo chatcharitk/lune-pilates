@@ -20,7 +20,7 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/client";
 import { bookings, classInstances } from "@/lib/db/schema";
-import { CAPACITY, type ClassType } from "@/lib/domain/types";
+import { CAPACITY, type ClassType, type ReformerPosition } from "@/lib/domain/types";
 import {
   bookClassWithDebit,
   cancelBooking,
@@ -597,4 +597,72 @@ async function loadBookingForAdminCancel(bookingId: string): Promise<BookingForA
     .where(eq(bookings.id, bookingId))
     .limit(1);
   return row ?? null;
+}
+
+// ───────────────────────── admin set reformer position ─────────────────────────
+
+const adminSetPositionInput = z.object({
+  bookingId: z.string().uuid(),
+  position: z.enum(["left", "middle", "right"]).nullable(),
+});
+export type AdminSetPositionInput = z.infer<typeof adminSetPositionInput>;
+
+export type AdminSetPositionFailureCode =
+  | "UNAUTHORIZED"
+  | "INVALID_INPUT"
+  | "NOT_FOUND"
+  | "NOT_LIVE"
+  | "POSITION_TAKEN";
+
+export type AdminSetPositionResult =
+  | { ok: true; position: ReformerPosition | null }
+  | { ok: false; code: AdminSetPositionFailureCode };
+
+const PG_UNIQUE_VIOLATION = "23505";
+/** True when `err` is a Postgres unique-violation (the one-live-booking-per-position index). */
+function isUniquePositionViolation(err: unknown): boolean {
+  if (typeof err !== "object" || err === null) return false;
+  const e = err as { code?: unknown; cause?: { code?: unknown } };
+  return e.code === PG_UNIQUE_VIOLATION || e.cause?.code === PG_UNIQUE_VIOLATION;
+}
+
+/**
+ * Reassign (or clear) a live booking's reformer position from the front desk
+ * (Owner-only). The DB's partial unique index `bookings_one_live_per_position`
+ * guarantees at most one live booking per (class, position); a collision surfaces
+ * as POSITION_TAKEN rather than a 500. Clearing to null is always allowed. No
+ * credit movement — this is a seat swap, not a booking change.
+ *
+ * No-DB dev path: echoes the requested position so the drawer's picker works.
+ */
+export async function adminSetBookingPosition(
+  raw: AdminSetPositionInput,
+): Promise<AdminSetPositionResult> {
+  if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
+
+  const parsed = adminSetPositionInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
+  const { bookingId, position } = parsed.data;
+
+  if (!process.env.DATABASE_URL) return { ok: true, position };
+
+  const db = getDb();
+  const [row] = await db
+    .select({ status: bookings.status })
+    .from(bookings)
+    .where(eq(bookings.id, bookingId))
+    .limit(1);
+  if (!row) return { ok: false, code: "NOT_FOUND" };
+  if (row.status !== "booked") return { ok: false, code: "NOT_LIVE" };
+
+  try {
+    await db.update(bookings).set({ position }).where(eq(bookings.id, bookingId));
+  } catch (err) {
+    if (isUniquePositionViolation(err)) return { ok: false, code: "POSITION_TAKEN" };
+    throw err;
+  }
+
+  revalidatePath("/admin/schedule");
+  revalidatePath("/admin/today");
+  return { ok: true, position };
 }
