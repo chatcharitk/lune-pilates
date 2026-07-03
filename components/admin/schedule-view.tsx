@@ -109,27 +109,17 @@ export function ScheduleView({
 
   return (
     <div>
-      {/* header: title + primary action on one row */}
-      <div className="mb-2.5 flex items-center justify-between gap-2">
-        <h1 className="min-w-0 truncate font-head text-xl font-semibold tracking-tight text-ink">
-          {t("admin_schedule")}
-        </h1>
-        <button
-          type="button"
-          onClick={() => setEditor({ mode: "new" })}
-          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-ink px-3.5 font-body text-[13px] font-semibold text-cream"
-        >
-          <Plus />
-          {t("new_class")}
-        </button>
-      </div>
+      {/* header: title */}
+      <h1 className="mb-2.5 font-head text-xl font-semibold tracking-tight text-ink">
+        {t("admin_schedule")}
+      </h1>
 
-      {/* template controls */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      {/* actions — all three on one line */}
+      <div className="mb-3 flex items-center gap-1.5">
         <button
           type="button"
           onClick={() => setTemplateOpen(true)}
-          className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-line-strong bg-surface-2 px-3 font-body text-[13px] font-semibold text-ink"
+          className="inline-flex h-9 shrink-0 items-center gap-1 rounded-xl border border-line-strong bg-surface-2 px-2.5 font-body text-[12.5px] font-semibold text-ink"
         >
           <SlidersIcon />
           {t("manage_template")}
@@ -138,9 +128,17 @@ export function ScheduleView({
           type="button"
           onClick={onGenerate}
           disabled={pending}
-          className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-line-strong bg-surface-2 px-3 font-body text-[13px] font-semibold text-ink disabled:opacity-50"
+          className="inline-flex h-9 shrink-0 items-center gap-1 rounded-xl border border-line-strong bg-surface-2 px-2.5 font-body text-[12.5px] font-semibold text-ink disabled:opacity-50"
         >
           {t("generate_from_baseline")}
+        </button>
+        <button
+          type="button"
+          onClick={() => setEditor({ mode: "new" })}
+          className="inline-flex h-9 shrink-0 items-center gap-1 rounded-xl bg-ink px-2.5 font-body text-[12.5px] font-semibold text-cream"
+        >
+          <Plus />
+          {t("new_class")}
         </button>
       </div>
 
