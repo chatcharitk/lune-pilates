@@ -1,21 +1,21 @@
 "use client";
 
-// Admin Schedule management (admin-schedule.jsx + spec §4 baseline→publish).
-// Week strip → a day's classes → class editor drawer (create/edit/delete), plus
-// the publish bar with the changes-vs-baseline diff. All edits go through server
-// actions (per-week instances only — the baseline is never mutated). After each
-// action the server data is re-fetched via router.refresh().
+// Admin Schedule management (admin-schedule.jsx + spec §4).
+// Week strip → a day's classes → class editor drawer (create/edit/delete).
+// Classes are born published (createClass/generateWeekFromBaseline publish
+// immediately), so there is no publish bar. All edits go through server
+// actions (per-week instances only — the baseline is never mutated). After
+// each action the server data is re-fetched via router.refresh().
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminLang } from "./admin-context";
-import { Badge, Dot, Drawer } from "./ui";
+import { Dot, Drawer } from "./ui";
 import { TemplateEditor } from "./template-editor";
 import {
   createClass,
   deleteClass,
   generateWeekFromBaseline,
-  publishWeek,
   updateClass,
 } from "@/app/actions/schedule";
 import type { AdminScheduleClass, AdminWeekSchedule } from "@/lib/admin/schedule";
@@ -78,7 +78,6 @@ export function ScheduleView({
     return idx >= 0 ? idx : 0;
   });
   const [editor, setEditor] = useState<EditorState | null>(null);
-  const [banner, setBanner] = useState<{ key: StrKey } | null>(null);
 
   const day = schedule.days[selectedDay] ?? schedule.days[0]!;
 
@@ -96,12 +95,6 @@ export function ScheduleView({
     });
   }
 
-  function onPublish() {
-    run(() => publishWeek({ weekStart: schedule.weekStart }), () => {
-      setBanner({ key: "published_toast" });
-    });
-  }
-
   function onGenerate() {
     run(() => generateWeekFromBaseline({ weekStart: schedule.weekStart }));
   }
@@ -114,24 +107,21 @@ export function ScheduleView({
     dayMonthOpts,
   )} ${formatStudioDate(weekEnd, lang, { year: "numeric" })}`;
 
-  const { added, removed, changed } = schedule.diff;
-  const hasDiff = added + removed + changed > 0;
-
   return (
     <div>
-      {/* header */}
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-        <div>
+      {/* header: title + one compact wrapping control row */}
+      <div className="mb-3">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
           <h1 className="font-head text-2xl font-semibold tracking-tight text-ink">
             {t("admin_schedule")}
           </h1>
-          <p className="mt-1 font-body text-[13.5px] text-muted">{rangeLabel}</p>
+          <p className="font-body text-[13px] text-muted">{rangeLabel}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="mt-2.5 flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => setTemplateOpen(true)}
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-[13.5px] font-semibold text-ink"
+            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-line-strong bg-surface-2 px-3 font-body text-[13px] font-semibold text-ink"
           >
             <SlidersIcon />
             {t("manage_template")}
@@ -140,27 +130,20 @@ export function ScheduleView({
             type="button"
             onClick={onGenerate}
             disabled={pending}
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-[13.5px] font-semibold text-ink disabled:opacity-50"
+            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-line-strong bg-surface-2 px-3 font-body text-[13px] font-semibold text-ink disabled:opacity-50"
           >
             {t("generate_from_baseline")}
           </button>
           <button
             type="button"
             onClick={() => setEditor({ mode: "new" })}
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-ink px-4 font-body text-[13.5px] font-semibold text-cream"
+            className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-ink px-3.5 font-body text-[13px] font-semibold text-cream"
           >
             <Plus />
             {t("new_class")}
           </button>
         </div>
       </div>
-
-      {/* transient publish banner */}
-      {banner && (
-        <div className="mb-4 rounded-xl bg-sage/15 px-4 py-2.5 font-body text-[13px] font-semibold text-sage-deep">
-          {t(banner.key)}
-        </div>
-      )}
 
       {totalClasses === 0 ? (
         <EmptyWeek onGenerate={onGenerate} pending={pending} />
@@ -200,39 +183,6 @@ export function ScheduleView({
               })}
             </ul>
             <NavBtn dir="next" label={t("next_week")} onClick={() => gotoWeek(7)} />
-          </div>
-
-          {/* publish bar */}
-          <div className="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-surface-2 px-4 py-3 shadow-soft">
-            <div className="flex flex-1 flex-wrap items-center gap-x-3 gap-y-1.5">
-              <span className="font-body text-[13px] font-semibold text-ink">
-                {schedule.draftCount > 0
-                  ? t("n_unpublished").replace("{n}", String(schedule.draftCount))
-                  : t("all_published")}
-              </span>
-              <span className="text-line-strong">·</span>
-              {hasDiff ? (
-                <span className="flex flex-wrap items-center gap-1.5">
-                  <span className="font-body text-[11.5px] font-medium uppercase tracking-wide text-muted">
-                    {t("changes_vs_baseline")}
-                  </span>
-                  {added > 0 && <Badge tone="green">{t("diff_added").replace("{n}", String(added))}</Badge>}
-                  {removed > 0 && <Badge tone="rose">{t("diff_removed").replace("{n}", String(removed))}</Badge>}
-                  {changed > 0 && <Badge tone="amber">{t("diff_changed").replace("{n}", String(changed))}</Badge>}
-                </span>
-              ) : (
-                <span className="font-body text-[12.5px] text-muted">{t("matches_baseline")}</span>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={onPublish}
-              disabled={pending || schedule.draftCount === 0}
-              className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-sage-deep px-4 font-body text-[13.5px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <Check />
-              {t("publish_week")}
-            </button>
           </div>
 
           {/* day class list */}

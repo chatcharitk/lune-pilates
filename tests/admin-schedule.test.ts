@@ -75,12 +75,15 @@ describe("getWeekSchedule (no-DB mock)", () => {
     }
   });
 
-  it("materialises 28 baseline slots + 2 appointments and partitions draft/published", async () => {
+  it("materialises 28 baseline slots + 2 appointments, all born published (no drafts)", async () => {
     const wk = await getWeekSchedule(anchor);
     const total = wk.days.reduce((a, d) => a + d.classes.length, 0);
     expect(total).toBe(30); // 28 group baseline + 2 appointment classes
     expect(wk.draftCount + wk.publishedCount).toBe(total);
-    expect(wk.draftCount).toBeGreaterThan(0); // Monday + appointments are draft
+    // The draft→publish ceremony was removed — everything is live immediately.
+    expect(wk.draftCount).toBe(0);
+    expect(wk.publishedCount).toBe(total);
+    for (const d of wk.days) for (const c of d.classes) expect(c.status).toBe("published");
   });
 
   it("diffs the two appointment classes as additions vs the baseline", async () => {

@@ -1,14 +1,15 @@
-// Read model for the admin Schedule management screen (spec §4 "Schedule mgmt —
-// baseline + publish", admin-schedule.jsx). Returns one week of class instances
-// grouped by day (draft + published), each with its live booked count, plus a
-// changes-vs-baseline diff so the admin can review what changed before publishing.
+// Read model for the admin Schedule management screen (spec §4, admin-schedule.jsx).
+// Returns one week of class instances grouped by day, each with its live booked
+// count, plus a changes-vs-baseline diff. Instances are born `published` (the
+// draft→publish ceremony was removed); draft/published counts remain in the
+// contract for any pre-existing draft rows.
 //
 // This is the studio's own schedule, so — like the Today read model — it does NOT
 // apply tiered visibility. Booked counts come live from the bookings table.
 //
 // No-DB dev fallback: when DATABASE_URL is unset it returns the baseline
-// materialised as drafts for the week (plus a couple of appointment classes), so
-// the screen renders without a database. The DB path is the real one.
+// materialised as published instances for the week (plus a couple of appointment
+// classes), so the screen renders without a database. The DB path is the real one.
 
 import { and, asc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
@@ -252,8 +253,10 @@ export async function getWeekSchedule(anyDate: Date = new Date()): Promise<Admin
 }
 
 // ───────────────────────── no-DB mock fallback ─────────────────────────
-// The baseline materialised as drafts for the week, plus a couple of appointment
-// classes, so the screen (and the diff) render without a database.
+// The baseline materialised for the week, plus a couple of appointment classes,
+// so the screen (and the diff) render without a database. Everything is
+// `published` — instances are born live (the draft→publish ceremony was removed;
+// draftCount stays in the contract only for pre-existing draft rows in the DB path).
 
 function mockUuid(n: number): string {
   return `00000000-0000-4000-9000-${n.toString(16).padStart(12, "0")}`;
@@ -276,8 +279,7 @@ function mockWeekSchedule(weekStart: Date): AdminWeekSchedule {
   const classes: AdminScheduleClass[] = [];
   let n = 1;
 
-  // Baseline group slots → published drafts for the week (most days), with the
-  // first day's classes left as draft to exercise the publish bar.
+  // Baseline group slots → live (published) instances for the whole week.
   for (let i = 0; i < 7; i++) {
     const date = addDays(weekStart, i);
     for (const slot of baselineSlotsForDate(date)) {
@@ -293,7 +295,7 @@ function mockWeekSchedule(weekStart: Date): AdminWeekSchedule {
         instructor: null,
         capacity: slot.capacity,
         booked: (i + slot.time.length) % 4, // some believable spread
-        status: i === 0 ? "draft" : "published",
+        status: "published",
       });
     }
   }
@@ -312,7 +314,7 @@ function mockWeekSchedule(weekStart: Date): AdminWeekSchedule {
       instructor: instructorMetaFor(a.instr),
       capacity: effectiveCapacity(99, a.type),
       booked: a.booked,
-      status: "draft",
+      status: "published",
     });
   }
 

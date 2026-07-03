@@ -14,8 +14,14 @@
 //      id and active are untouched.
 //   3. SOFT DELETE: deleteTemplateSlot → drops out of the ACTIVE list, but the
 //      class_templates row SURVIVES (active=false) so the instances.template_id FK holds.
-//   4. GENERATE: a created slot shows up as a generated DRAFT class_instance for a week
+//   4. GENERATE: a created slot shows up as a generated class_instance for a week
 //      (materialised straight from the DB template), carrying templateId = the slot id.
+//      Instances are born PUBLISHED (the draft→publish ceremony was removed): stamped
+//      published_at = members_visible_at = now, public_visible_at =
+//      computePublicVisibleAt(starts_at, type), with ONE schedule.published event per
+//      generate call that created ≥ 1 instance.
+//   5. CREATE CLASS: createClass inserts a born-published instance with the same
+//      three stamps and emits ONE schedule.published event.
 //
 // requireAdmin()/requireOwner() use the mock provider (allow) with ADMIN_AUTH unset,
 // like the other admin integration tests; the deny/owner-gate path is covered in
@@ -37,13 +43,17 @@ vi.mock("next/cache", () => ({
 import { getDb, closeDb } from "@/lib/db/client";
 import { classInstances, classTemplates } from "@/lib/db/schema";
 import {
+  createClass,
   createTemplateSlot,
   deleteTemplateSlot,
   generateWeekFromBaseline,
   updateTemplateSlot,
 } from "@/app/actions/schedule";
 import { getScheduleTemplate, getTemplateSlotsByDow } from "@/lib/admin/schedule-template";
+import { on } from "@/lib/events/bus";
+import { computePublicVisibleAt } from "@/lib/schedule/visibility";
 import { startOfWeekMonday, startsAtFor } from "@/lib/schedule/baseline";
+import { studioParts } from "@/lib/time";
 
 const HAS_DB = !!process.env.DATABASE_URL;
 
@@ -195,7 +205,7 @@ describe.skipIf(!HAS_DB)("schedule template (integration · requires DATABASE_UR
     });
   });
 
-  it("GENERATE: a created slot materialises as a DRAFT instance carrying its templateId", async () => {
+  it("GENERATE: a created slot materialises as a born-PUBLISHED instance (all three stamps) carrying its templateId, with ONE schedule.published event", async () => {
     // Create a Wednesday slot at the test time.
     const created = await createTemplateSlot({
       dayOfWeek: 3, // Wednesday
@@ -213,12 +223,33 @@ describe.skipIf(!HAS_DB)("schedule template (integration · requires DATABASE_UR
     const wed = map.get(3) ?? [];
     expect(wed.some((s) => s.time === TEST_TIME_A && s.templateId === created.id)).toBe(true);
 
-    // Generate the far-future week from the DB template.
-    const gen = await generateWeekFromBaseline({ weekStart: weekStart.toISOString() });
-    expect(gen.ok).toBe(true);
+    // Generate the far-future week from the DB template — count the broadcast events.
+    const events: { weekStart: string }[] = [];
+    const off = on("schedule.published", async (e) => {
+      events.push(e);
+    });
+    try {
+      const gen = await generateWeekFromBaseline({ weekStart: weekStart.toISOString() });
+      expect(gen.ok).toBe(true);
+      if (!gen.ok) throw new Error("generate failed");
+      expect(gen.created).toBeGreaterThan(0);
 
-    // The Wednesday of that week at the test time exists as a DRAFT instance whose
-    // template_id points at our slot.
+      // Exactly ONE schedule.published for the whole generated batch.
+      expect(events.length).toBe(1);
+      expect(events[0]!.weekStart).toBe(weekStart.toISOString());
+
+      // Re-running is idempotent (0 created) → NO further event.
+      const again = await generateWeekFromBaseline({ weekStart: weekStart.toISOString() });
+      expect(again).toEqual({ ok: true, created: 0 });
+      expect(events.length).toBe(1);
+    } finally {
+      off();
+    }
+
+    // The Wednesday of that week at the test time exists as a born-PUBLISHED
+    // instance whose template_id points at our slot, stamped per invariant 4:
+    // members_visible_at = published_at (= generation time) and
+    // public_visible_at = computePublicVisibleAt(starts_at, type).
     const wednesday = new Date(weekStart);
     wednesday.setDate(wednesday.getDate() + 2); // Mon=+0 … Wed=+2
     const startsAt = startsAtFor(wednesday, TEST_TIME_A);
@@ -230,13 +261,79 @@ describe.skipIf(!HAS_DB)("schedule template (integration · requires DATABASE_UR
         status: classInstances.status,
         templateId: classInstances.templateId,
         type: classInstances.type,
+        publishedAt: classInstances.publishedAt,
+        membersVisibleAt: classInstances.membersVisibleAt,
+        publicVisibleAt: classInstances.publicVisibleAt,
       })
       .from(classInstances)
       .where(eq(classInstances.startsAt, startsAt))
       .limit(1);
     expect(inst).toBeTruthy();
-    expect(inst!.status).toBe("draft");
+    expect(inst!.status).toBe("published");
     expect(inst!.type).toBe("group");
     expect(inst!.templateId).toBe(created.id);
+    expect(inst!.publishedAt).not.toBeNull();
+    expect(inst!.membersVisibleAt).not.toBeNull();
+    expect(inst!.publicVisibleAt).not.toBeNull();
+    expect(inst!.membersVisibleAt!.getTime()).toBe(inst!.publishedAt!.getTime());
+    expect(inst!.publicVisibleAt!.getTime()).toBe(
+      computePublicVisibleAt(startsAt, "group").getTime(),
+    );
+  });
+
+  it("CREATE CLASS: createClass inserts a born-PUBLISHED instance (all three stamps) and emits ONE schedule.published event", async () => {
+    // Thursday of the far-future test week (inside the afterAll cleanup window),
+    // at an off-baseline time so it collides with nothing. The Y-M-D is the
+    // BANGKOK calendar day (weekStart is Bangkok midnight = 17:00Z the day
+    // before, so toISOString().slice would be off by one).
+    const thursday = new Date(weekStart);
+    thursday.setDate(thursday.getDate() + 3); // Mon=+0 … Thu=+3
+    const p = studioParts(thursday);
+    const ymd = `${p.year}-${String(p.month0 + 1).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
+    const TEST_TIME_C = "13:11";
+
+    const events: { weekStart: string }[] = [];
+    const off = on("schedule.published", async (e) => {
+      events.push(e);
+    });
+    let res: Awaited<ReturnType<typeof createClass>>;
+    try {
+      res = await createClass({
+        date: ymd,
+        time: TEST_TIME_C,
+        type: "group",
+        durationMin: 60,
+        capacity: 3,
+        instructorId: null,
+      });
+      expect(res.ok).toBe(true);
+      // Exactly ONE broadcast event, same payload shape as publishWeek's.
+      expect(events.length).toBe(1);
+    } finally {
+      off();
+    }
+    if (!res.ok) throw new Error("createClass failed");
+
+    const db = getDb();
+    const [inst] = await db
+      .select({
+        status: classInstances.status,
+        startsAt: classInstances.startsAt,
+        publishedAt: classInstances.publishedAt,
+        membersVisibleAt: classInstances.membersVisibleAt,
+        publicVisibleAt: classInstances.publicVisibleAt,
+      })
+      .from(classInstances)
+      .where(eq(classInstances.id, res.id))
+      .limit(1);
+    expect(inst).toBeTruthy();
+    expect(inst!.status).toBe("published");
+    expect(inst!.publishedAt).not.toBeNull();
+    expect(inst!.membersVisibleAt).not.toBeNull();
+    expect(inst!.publicVisibleAt).not.toBeNull();
+    expect(inst!.membersVisibleAt!.getTime()).toBe(inst!.publishedAt!.getTime());
+    expect(inst!.publicVisibleAt!.getTime()).toBe(
+      computePublicVisibleAt(inst!.startsAt, "group").getTime(),
+    );
   });
 });

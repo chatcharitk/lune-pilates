@@ -4,10 +4,16 @@
 //
 // INVARIANT 5 — per-week, never the baseline: every edit here writes ONLY to
 // `class_instances` (a concrete week), never to the recurring baseline (which v1
-// keeps in code, lib/schedule/baseline.ts). "Generate from baseline" materialises
-// missing baseline slots as DRAFT instances for one week; publishing flips that
-// week's drafts to `published`, computes the tiered-visibility windows, and emits
-// exactly ONE `schedule.published` broadcast event.
+// keeps in code, lib/schedule/baseline.ts).
+//
+// NO draft→publish ceremony (owner request 2026-07-04, "remove เผยแพร่สัปดาห์"):
+// classes go LIVE the moment they are created. createClass and
+// generateWeekFromBaseline insert instances born `published`, stamped
+// published_at = members_visible_at = now and public_visible_at =
+// computePublicVisibleAt(starts_at, type) (invariant 4 holds on this auto-publish
+// path), and each emits exactly ONE `schedule.published` broadcast event per call
+// that created ≥ 1 instance. publishWeek remains only as the cleanup path for any
+// pre-existing drafts — the UI no longer calls it.
 //
 // Every action is OWNER-ONLY: gated by `requireOwner()` (lib/auth/admin.ts — v1
 // mock provider, real one swaps in later). An instructor is rejected like unauth
@@ -60,7 +66,12 @@ export type CreateClassResult =
   | { ok: true; id: string }
   | { ok: false; code: CreateClassFailureCode };
 
-/** Add a single DRAFT class instance to a week. Never touches the baseline. */
+/**
+ * Add a single class instance to a week — born PUBLISHED (live immediately, no
+ * draft→publish ceremony). Stamps published_at = members_visible_at = now and
+ * public_visible_at = computePublicVisibleAt(starts_at, type) (invariant 4), then
+ * emits ONE `schedule.published` event after the insert. Never touches the baseline.
+ */
 export async function createClass(raw: CreateClassInput): Promise<CreateClassResult> {
   if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
 
@@ -68,7 +79,13 @@ export async function createClass(raw: CreateClassInput): Promise<CreateClassRes
   if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
   const input = parsed.data;
 
+  const weekStart = startOfWeekMonday(localDay(input.date));
+
   if (!process.env.DATABASE_URL) {
+    // Mock path mirrors the DB path's contract: the class is live immediately,
+    // so the one broadcast event fires here too.
+    registerNotificationHandlers();
+    await emit({ type: "schedule.published", weekStart: weekStart.toISOString() });
     return { ok: true, id: "00000000-0000-4000-8000-00000000c1a5" };
   }
 
@@ -77,6 +94,7 @@ export async function createClass(raw: CreateClassInput): Promise<CreateClassRes
   if (instructorId === INVALID) return { ok: false, code: "INVALID_INSTRUCTOR" };
 
   const startsAt = startsAtFor(localDay(input.date), input.time);
+  const now = new Date();
   const [row] = await db
     .insert(classInstances)
     .values({
@@ -85,9 +103,16 @@ export async function createClass(raw: CreateClassInput): Promise<CreateClassRes
       type: input.type,
       capacity: effectiveCapacity(input.capacity, input.type),
       instructorId,
-      status: "draft",
+      status: "published",
+      publishedAt: now,
+      membersVisibleAt: now,
+      publicVisibleAt: computePublicVisibleAt(startsAt, input.type),
     })
     .returning({ id: classInstances.id });
+
+  // ONE broadcast event after the insert — same payload shape as publishWeek.
+  registerNotificationHandlers();
+  await emit({ type: "schedule.published", weekStart: weekStart.toISOString() });
 
   revalidatePath("/admin/schedule");
   return { ok: true, id: row!.id };
@@ -218,11 +243,16 @@ export type GenerateResult =
   | { ok: false; code: "UNAUTHORIZED" | "INVALID_INPUT" };
 
 /**
- * Materialise the EDITABLE recurring template into a week as DRAFT instances.
- * Slots are sourced from the active `class_templates` rows (grouped by ISO weekday
- * via getTemplateSlotsByDow), so editing the template changes what gets generated.
- * The fallback to BASELINE_SLOTS (when the table is empty) lives in that read model,
- * so a fresh/unseeded DB still generates the original group baseline.
+ * Materialise the EDITABLE recurring template into a week as PUBLISHED instances —
+ * live immediately, no draft→publish ceremony. Each created instance is stamped
+ * published_at = members_visible_at = now and public_visible_at =
+ * computePublicVisibleAt(starts_at, type) (invariant 4); exactly ONE
+ * `schedule.published` event is emitted after the insert when ≥ 1 instance was
+ * created (0 created → no event). Slots are sourced from the active
+ * `class_templates` rows (grouped by ISO weekday via getTemplateSlotsByDow), so
+ * editing the template changes what gets generated. The fallback to BASELINE_SLOTS
+ * (when the table is empty) lives in that read model, so a fresh/unseeded DB still
+ * generates the original group baseline.
  *
  * Idempotent: only template slots with no existing instance at that exact start+type
  * are created, so re-running never duplicates. Each generated instance carries the
@@ -257,6 +287,7 @@ export async function generateWeekFromBaseline(raw: WeekInput): Promise<Generate
     );
   const present = new Set(existing.map((e) => `${e.startsAt.getTime()}|${e.type}`));
 
+  const now = new Date();
   const toInsert: (typeof classInstances.$inferInsert)[] = [];
   for (let i = 0; i < 7; i++) {
     const date = addDays(weekStart, i);
@@ -270,12 +301,21 @@ export async function generateWeekFromBaseline(raw: WeekInput): Promise<Generate
         type: slot.type,
         capacity: slot.capacity,
         instructorId: slot.instructorId ?? null,
-        status: "draft",
+        // Born published (live immediately) — invariant 4 stamps per instance.
+        status: "published",
+        publishedAt: now,
+        membersVisibleAt: now,
+        publicVisibleAt: computePublicVisibleAt(startsAt, slot.type),
       });
     }
   }
 
-  if (toInsert.length > 0) await db.insert(classInstances).values(toInsert);
+  if (toInsert.length > 0) {
+    await db.insert(classInstances).values(toInsert);
+    // ONE broadcast event for the whole generated batch (0 created → no event).
+    registerNotificationHandlers();
+    await emit({ type: "schedule.published", weekStart: weekStart.toISOString() });
+  }
   revalidatePath("/admin/schedule");
   return { ok: true, created: toInsert.length };
 }
@@ -293,6 +333,12 @@ export type PublishResult =
  * flip runs in ONE transaction; exactly ONE `schedule.published` event is emitted
  * after it commits (the CRM is a thin listener — invariant 5 / spec §6).
  * Idempotent: already-published instances are untouched.
+ *
+ * NOTE (2026-07-04): the admin UI no longer calls this — the draft→publish
+ * ceremony was removed and new instances are born `published` (createClass /
+ * generateWeekFromBaseline stamp the same fields at insert). Kept exported and
+ * working as the cleanup path for any pre-existing draft rows; pinned by
+ * tests/admin-auth.test.ts.
  */
 export async function publishWeek(raw: WeekInput): Promise<PublishResult> {
   if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
