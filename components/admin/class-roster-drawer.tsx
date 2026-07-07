@@ -121,20 +121,15 @@ export function ClassRosterDrawer({
             </div>
           )}
 
-          {/* instructor + counts */}
-          <div className="mb-4 flex items-center justify-between rounded-2xl bg-cream-2 px-3.5 py-3">
-            <div>
-              <p className="font-body text-[13.5px] font-semibold text-ink">
-                {roster.instructor ? tt(roster.instructor.name) : t("no_instructor")}
-              </p>
-              <p className="font-body text-xs text-muted tabular-nums">
-                {formatStudioTime(new Date(roster.startsAt))}–{formatStudioTime(new Date(roster.endsAt))} ·{" "}
-                {roster.durationMin} {t("min")}
-              </p>
-            </div>
-            <span className="font-head text-base font-bold text-ink tabular-nums">
-              {roster.checkedIn}/{roster.booked}/{roster.capacity}
-            </span>
+          {/* instructor header */}
+          <div className="mb-4 rounded-2xl bg-cream-2 px-3.5 py-3">
+            <p className="font-body text-[13.5px] font-semibold text-ink">
+              {roster.instructor ? tt(roster.instructor.name) : t("no_instructor")}
+            </p>
+            <p className="font-body text-xs text-muted tabular-nums">
+              {formatStudioTime(new Date(roster.startsAt))}–{formatStudioTime(new Date(roster.endsAt))} ·{" "}
+              {roster.durationMin} {t("min")}
+            </p>
           </div>
 
           {/* roster */}
