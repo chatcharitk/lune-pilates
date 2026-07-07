@@ -628,13 +628,22 @@ function CoinIcon() {
 
 // ───────────────────────── credit-transaction history ─────────────────────────
 
-/** Reason → keyed label for a ledger row. */
-const LEDGER_REASON_KEY: Record<LedgerReason, StrKey> = {
+/** Reason → keyed label for a ledger row. Includes "promo" (free trial 1+1 grant),
+ *  which the backend may emit ahead of the LedgerReason union — lookups fall back
+ *  to the raw reason string when unmapped, so unknown reasons still render. */
+const LEDGER_REASON_KEY: Record<LedgerReason | "promo", StrKey> = {
   booking: "ledger_booking",
   cancel_refund: "ledger_cancel_refund",
   purchase: "ledger_purchase",
   adjustment: "ledger_adjustment",
+  promo: "ledger_promo",
 };
+
+/** Keyed label when mapped; the raw reason string otherwise (fallback-safe). */
+function ledgerReasonLabel(reason: string, t: (k: StrKey) => string): string {
+  const key = (LEDGER_REASON_KEY as Partial<Record<string, StrKey>>)[reason];
+  return key ? t(key) : reason;
+}
 
 /** Localised date + time for a ledger row (th-TH → Buddhist era, like the other
  *  admin date displays). */
@@ -698,7 +707,7 @@ function LedgerSection({ customerId }: { customerId: string }) {
               >
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-body text-[13.5px] font-semibold text-ink">
-                    {t(LEDGER_REASON_KEY[e.reason])}
+                    {ledgerReasonLabel(e.reason, t)}
                   </p>
                   <p className="font-body text-[11.5px] text-muted">
                     {fmtLedgerDate(e.createdAt, lang)}

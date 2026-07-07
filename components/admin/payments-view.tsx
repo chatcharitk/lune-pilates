@@ -24,7 +24,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminLang } from "./admin-context";
 import { Avatar, Badge, Drawer, Sparkle, Stat, type BadgeTone } from "./ui";
-import { PromptPayQr } from "@/components/customer/promptpay-qr";
+import { PromptPayQr, QrDownloadButton } from "@/components/customer/promptpay-qr";
 import {
   posSellPackage,
   posConfirmPayment,
@@ -943,6 +943,17 @@ function QrStep({
       <p className="mx-auto mt-3.5 max-w-[240px] font-body text-[13px] leading-relaxed text-muted">
         {t("scan_hint")}
       </p>
+
+      {/* save the QR image — send it to the customer via LINE, or save to gallery */}
+      <div className="mt-3.5 w-full">
+        <QrDownloadButton
+          payload={charge.qrPayload}
+          filename={`lune-promptpay-${charge.amount}.png`}
+          label={t("download_qr")}
+          ariaLabel={t("download_qr_aria")}
+          amountLabel={`PromptPay ${thb(charge.amount)}`}
+        />
+      </div>
 
       {/* receipt-ish: package + amount */}
       <div className="mt-4 w-full overflow-hidden rounded-2xl border border-line">

@@ -326,6 +326,11 @@ export const STR = {
     th: "QR พร้อมเพย์สำหรับ {amount} อ้างอิง {reference}",
   },
   amount: { en: "Amount", th: "จำนวนเงิน" },
+  download_qr: { en: "Save QR", th: "บันทึก QR" },
+  download_qr_aria: {
+    en: "Save the PromptPay QR code as an image",
+    th: "บันทึกรหัส QR พร้อมเพย์เป็นรูปภาพ",
+  },
   ive_paid: { en: "I’ve paid", th: "ชำระเงินแล้ว" },
   payment_done: { en: "Payment received", th: "รับชำระเงินแล้ว" },
   payment_sub: {
@@ -794,6 +799,7 @@ export const STR = {
   ledger_cancel_refund: { en: "Cancellation refund", th: "คืนเครดิตจากการยกเลิก" },
   ledger_purchase: { en: "Package purchase", th: "ซื้อแพ็กเกจ" },
   ledger_adjustment: { en: "Manual adjustment", th: "ปรับด้วยตนเอง" },
+  ledger_promo: { en: "Free trial class (1+1)", th: "คลาสทดลองฟรี (1+1)" },
   // running-balance caption + empty state + loading
   ledger_running_balance: { en: "Balance: {n}", th: "คงเหลือ: {n}" },
   ledger_empty: { en: "No transactions yet", th: "ยังไม่มีรายการ" },

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { isFull, packageDebitBlock, seatsLeft } from "@/lib/credits/guards";
 import { creditCostForClassType } from "@/lib/credits/cost";
 import { evaluateCancellation } from "@/lib/credits/policy";
+import { promoBonusHours } from "@/lib/credits/creditPackage";
 
 const NOW = new Date("2026-06-01T12:00:00Z");
 const future = (h: number) => new Date(NOW.getTime() + h * 3_600_000);
@@ -80,5 +81,22 @@ describe("evaluateCancellation (fixed 5h free window)", () => {
     const out = evaluateCancellation(future(1), NOW);
     expect(out.cancellable).toBe(false);
     expect(out.free).toBe(false);
+  });
+});
+
+describe("promoBonusHours (first-purchase 1+1 trial promo)", () => {
+  it("first-ever paid purchase of the group drop-in earns the +1 bonus", () => {
+    expect(promoBonusHours("drop", false)).toBe(1);
+  });
+
+  it("a repeat buyer of the drop-in earns nothing", () => {
+    expect(promoBonusHours("drop", true)).toBe(0);
+  });
+
+  it("no other catalog item earns the bonus, even on a first purchase", () => {
+    for (const id of ["p5", "p10", "p15", "pv-drop", "pv8", "duo-drop", "trio8", "r-solo"]) {
+      expect(promoBonusHours(id, false)).toBe(0);
+      expect(promoBonusHours(id, true)).toBe(0);
+    }
   });
 });

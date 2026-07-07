@@ -98,8 +98,9 @@ export interface AdminCustomerDetail extends AdminCustomer {
   sharingNote: "member" | "guest";
 }
 
-/** The reason a credit-ledger row was written (mirrors creditLedger.reason). */
-export type LedgerReason = "booking" | "cancel_refund" | "purchase" | "adjustment";
+/** The reason a credit-ledger row was written (mirrors creditLedger.reason).
+ *  "promo" = the free first-purchase 1+1 trial hour (lib/credits/creditPackage.ts). */
+export type LedgerReason = "booking" | "cancel_refund" | "purchase" | "promo" | "adjustment";
 
 /**
  * One row of a customer's credit-ledger history for the admin customer drawer. The

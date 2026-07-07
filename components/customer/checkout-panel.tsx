@@ -54,7 +54,7 @@ import {
   Upload,
   ImageIcon,
 } from "./icons";
-import { PromptPayQr } from "./promptpay-qr";
+import { PromptPayQr, QrDownloadButton } from "./promptpay-qr";
 
 // Client-side pre-validation mirrors the SERVER gate (lib/payments/slip.ts) so a
 // bad file is caught instantly — but the server is the real authority (CLAUDE.md §8).
@@ -786,6 +786,19 @@ function PromptPayStep({
       <p className="mx-auto mt-3.5 max-w-[260px] font-body text-[13px] leading-[1.5] text-muted">
         {t("scan_hint")}
       </p>
+
+      {/* save the QR to the gallery, then scan it from the bank app (same-phone flow) */}
+      {checkout && (
+        <div className="mt-3.5">
+          <QrDownloadButton
+            payload={checkout.qrPayload}
+            filename={`lune-promptpay-${checkout.amount}.png`}
+            label={t("download_qr")}
+            ariaLabel={t("download_qr_aria")}
+            amountLabel={`PromptPay ${thb(checkout.amount)}`}
+          />
+        </div>
+      )}
 
       {/* receipt: package line + amount */}
       {item && (

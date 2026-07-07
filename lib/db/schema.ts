@@ -173,7 +173,7 @@ export const creditLedger = pgTable(
       .notNull()
       .references(() => users.id),
     bookingId: uuid("booking_id"),
-    reason: text("reason").notNull(), // "booking" | "cancel_refund" | "purchase" | "adjustment"
+    reason: text("reason").notNull(), // "booking" | "cancel_refund" | "purchase" | "promo" | "adjustment"
     // Client-supplied retry token for manual owner adjustments (reason="adjustment")
     // so a dropped-response retry can't double-apply. Null for every other row; the
     // partial unique index dedupes only the non-null adjustment keys.
