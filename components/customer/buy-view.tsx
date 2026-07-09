@@ -15,6 +15,7 @@ import type { CatalogCategory } from "@/lib/catalog/packages";
 import { useCustomerLang } from "./customer-context";
 import { ChevronLeft } from "./icons";
 import { CheckoutPanel } from "./checkout-panel";
+import { LangToggle } from "./header";
 import { formatStudioDate } from "@/lib/time";
 
 export interface BuyViewProps {
@@ -51,9 +52,12 @@ export function BuyView({ catalog, hours, nearestExpiryIso, isMember, house }: B
         >
           <ChevronLeft size={20} />
         </Link>
-        <h1 className="m-0 font-head text-[24px] font-medium tracking-[0.01em] text-ink">
+        <h1 className="m-0 min-w-0 flex-1 truncate font-head text-[24px] font-medium tracking-[0.01em] text-ink">
           {t("packages")}
         </h1>
+        {/* Language switch — this screen has its own header chrome (global header
+            hidden), and a first-visit guest often lands straight here needing EN. */}
+        <LangToggle />
       </header>
 
       <div className="pt-2">

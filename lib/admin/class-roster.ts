@@ -7,7 +7,7 @@
 // Reuses the AdminAttendee / AdminWaitEntry shapes from ./today. No-DB dev path
 // returns a small synthesized roster so the drawer renders without a database.
 
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { requireAdmin } from "@/lib/auth/admin";
 import { bookings, classInstances, households, instructors, users, waitlist } from "@/lib/db/schema";
@@ -105,7 +105,14 @@ export async function getClassRoster(classInstanceId: string): Promise<AdminClas
       })
       .from(waitlist)
       .innerJoin(users, eq(waitlist.userId, users.id))
-      .where(and(eq(waitlist.classInstanceId, classInstanceId), eq(waitlist.status, "waiting")))
+      // waiting + offered, like the Today read model — an entry holding a live
+      // offer must still show (as "notified"), not vanish from the queue.
+      .where(
+        and(
+          eq(waitlist.classInstanceId, classInstanceId),
+          inArray(waitlist.status, ["waiting", "offered"]),
+        ),
+      )
       .orderBy(asc(waitlist.position)),
   ]);
 

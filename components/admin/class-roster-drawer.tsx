@@ -12,7 +12,11 @@ import { useAdminLang } from "./admin-context";
 import { Avatar, Badge, Drawer } from "./ui";
 import { loadClassRoster } from "@/app/actions/admin-roster";
 import { setCheckIn } from "@/app/actions/admin";
-import { adminCancelBooking, adminSetBookingPosition } from "@/app/actions/admin-bookings";
+import {
+  adminCancelBooking,
+  adminOfferWaitlistSeat,
+  adminSetBookingPosition,
+} from "@/app/actions/admin-bookings";
 import type { AdminClassRoster } from "@/lib/admin/class-roster";
 import type { AdminAttendee } from "@/lib/admin/today";
 import type { ReformerPosition } from "@/lib/domain/types";
@@ -73,8 +77,12 @@ export function ClassRosterDrawer({
   }
 
   function onCheck(a: AdminAttendee) {
+    setToast(null);
     withBusy(a.bookingId, async () => {
-      await setCheckIn({ bookingId: a.bookingId, checkedIn: !a.checkedIn });
+      const res = await setCheckIn({ bookingId: a.bookingId, checkedIn: !a.checkedIn });
+      // An instructor scoped out of this class gets the clear reason (the Today
+      // screen's old drawer did too); other failures surface generically.
+      if (!res.ok) setToast(t(res.code === "FORBIDDEN" ? "admin_checkin_forbidden" : "err_generic"));
     });
   }
 
@@ -96,6 +104,15 @@ export function ClassRosterDrawer({
       } else {
         setToast(t("err_generic"));
       }
+    });
+  }
+
+  function onNotify(waitlistId: string) {
+    if (!classId) return;
+    setToast(null);
+    withBusy(waitlistId, async () => {
+      const res = await adminOfferWaitlistSeat({ classInstanceId: classId });
+      if (!res.ok) setToast(t("err_generic"));
     });
   }
 
@@ -248,14 +265,14 @@ export function ClassRosterDrawer({
             </ul>
           )}
 
-          {/* waitlist (read-only here — notify lives on the Today screen) */}
+          {/* waitlist — the queue head can be offered the seat (30-min confirm window) */}
           {roster.waitlist.length > 0 && (
             <div className="mt-5">
               <p className="mb-2.5 font-body text-[11.5px] font-semibold uppercase tracking-[0.06em] text-[#9a7b45]">
                 {t("waitlist")} · {roster.waitlist.length}
               </p>
               <ul className="flex flex-col gap-2">
-                {roster.waitlist.map((w) => (
+                {roster.waitlist.map((w, i) => (
                   <li
                     key={w.waitlistId}
                     className="flex items-center gap-3 rounded-2xl border border-dashed border-line-strong px-3 py-2.5"
@@ -268,6 +285,24 @@ export function ClassRosterDrawer({
                       <p className="truncate font-body text-[13.5px] font-semibold text-ink">{w.name}</p>
                       <p className="font-body text-xs text-muted">{w.phone}</p>
                     </div>
+                    {w.offered ? (
+                      <span className="inline-flex h-9 shrink-0 items-center gap-1.5 px-2 font-body text-[13px] font-semibold text-sage-deep">
+                        <BellIcon />
+                        {t("notified")}
+                      </span>
+                    ) : (
+                      i === 0 && (
+                        <button
+                          type="button"
+                          disabled={busyId === w.waitlistId}
+                          onClick={() => onNotify(w.waitlistId)}
+                          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-line-strong px-3 font-body text-[13px] font-semibold text-ink disabled:opacity-50"
+                        >
+                          <BellIcon />
+                          {t("notify")}
+                        </button>
+                      )
+                    )}
                   </li>
                 ))}
               </ul>
@@ -291,6 +326,14 @@ function TrashIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+    </svg>
+  );
+}
+
+function BellIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" />
     </svg>
   );
 }

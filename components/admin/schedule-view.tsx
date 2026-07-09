@@ -58,9 +58,12 @@ interface EditorState {
 export function ScheduleView({
   schedule,
   template,
+  readOnly = false,
 }: {
   schedule: AdminWeekSchedule;
   template: TemplateSlot[];
+  /** Instructor mode: their scoped week, no owner controls (create/edit/template). */
+  readOnly?: boolean;
 }) {
   const { t, tt, lang } = useAdminLang();
   const router = useRouter();
@@ -116,7 +119,8 @@ export function ScheduleView({
         {t("admin_schedule")}
       </h1>
 
-      {/* actions — all three on one line */}
+      {/* actions — all three on one line (owner-only chrome) */}
+      {!readOnly && (
       <div className="mb-3 flex items-center gap-1.5">
         <button
           type="button"
@@ -143,6 +147,7 @@ export function ScheduleView({
           {t("new_class")}
         </button>
       </div>
+      )}
 
       {/* week navigation — always visible: prev · range · next */}
       <div className="mb-2.5 flex items-center justify-between gap-2">
@@ -184,7 +189,7 @@ export function ScheduleView({
 
       {/* content: selected day's classes, or empty states (strip stays above) */}
       {day.classes.length === 0 ? (
-        totalClasses === 0 ? (
+        totalClasses === 0 && !readOnly ? (
           <EmptyWeek onGenerate={onGenerate} pending={pending} />
         ) : (
           <p className="rounded-2xl border border-line bg-surface-2 p-8 text-center font-body text-sm text-muted">
@@ -224,15 +229,17 @@ export function ScheduleView({
                         </div>
                       </div>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditor({ mode: "edit", cls: c })}
-                      aria-label={t("edit")}
-                      title={t("edit")}
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-ink-soft transition-colors hover:bg-surface"
-                    >
-                      <PencilIcon />
-                    </button>
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        onClick={() => setEditor({ mode: "edit", cls: c })}
+                        aria-label={t("edit")}
+                        title={t("edit")}
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-ink-soft transition-colors hover:bg-surface"
+                      >
+                        <PencilIcon />
+                      </button>
+                    )}
                   </div>
                 </li>
               ))}
@@ -251,11 +258,13 @@ export function ScheduleView({
         />
       )}
 
-      <TemplateEditor
-        open={templateOpen}
-        template={template}
-        onClose={() => setTemplateOpen(false)}
-      />
+      {!readOnly && (
+        <TemplateEditor
+          open={templateOpen}
+          template={template}
+          onClose={() => setTemplateOpen(false)}
+        />
+      )}
 
       <ClassRosterDrawer classId={rosterId} onClose={() => setRosterId(null)} />
     </div>

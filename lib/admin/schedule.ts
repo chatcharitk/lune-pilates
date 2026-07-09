@@ -198,11 +198,24 @@ function assemble(
  * booked counts and the changes-vs-baseline diff. `anyDate` is snapped to the
  * Monday of its week.
  */
-export async function getWeekSchedule(anyDate: Date = new Date()): Promise<AdminWeekSchedule> {
+export async function getWeekSchedule(
+  anyDate: Date = new Date(),
+  opts?: { instructorId?: string },
+): Promise<AdminWeekSchedule> {
   const weekStart = startOfWeekMonday(anyDate);
+  const scopeInstructorId = opts?.instructorId;
 
   if (!process.env.DATABASE_URL) {
-    return mockWeekSchedule(weekStart);
+    const week = mockWeekSchedule(weekStart);
+    if (!scopeInstructorId) return week;
+    // Instructor scope on the mock: keep only their classes per day.
+    return {
+      ...week,
+      days: week.days.map((d) => ({
+        ...d,
+        classes: d.classes.filter((c) => c.instructorId === scopeInstructorId),
+      })),
+    };
   }
 
   const db = getDb();
@@ -240,6 +253,8 @@ export async function getWeekSchedule(anyDate: Date = new Date()): Promise<Admin
       and(
         sql`${classInstances.startsAt} >= ${weekStart}`,
         sql`${classInstances.startsAt} < ${weekEnd}`,
+        // Instructor sessions see only THEIR classes (role scoping, like Today).
+        ...(scopeInstructorId ? [eq(classInstances.instructorId, scopeInstructorId)] : []),
       ),
     )
     .orderBy(asc(classInstances.startsAt)),

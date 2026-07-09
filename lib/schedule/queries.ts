@@ -462,12 +462,18 @@ function mockToBookable(weekStart: Date, seed: MockSessionSeed): BookableClass {
 
 function mockListBookableClasses(
   _viewer: ClassViewer,
-  weekStart: Date,
+  _weekStart: Date,
   _now: Date,
 ): BookableClass[] {
   // The mock catalogue is treated as already-published & visible to all tiers so
   // the UI always has data; the real visibility filter lives on the DB path.
-  return MOCK_SESSIONS.map((s) => mockToBookable(weekStart, s)).sort((a, b) =>
+  //
+  // Anchor to the SAME canonical Bangkok Monday as mockGetClassDetail — NOT the
+  // caller's weekStart. Home passes a rolling "today" start; anchoring the list to
+  // it made a card's displayed date disagree with its /schedule/[id] detail (same
+  // mock id, two different dates). On the DB path ids are real rows, so the
+  // caller's weekStart only windows the query and this mismatch cannot happen.
+  return MOCK_SESSIONS.map((s) => mockToBookable(startOfMockWeek(), s)).sort((a, b) =>
     a.startsAt.localeCompare(b.startsAt),
   );
 }

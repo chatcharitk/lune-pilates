@@ -50,7 +50,9 @@ const NAV: NavItem[] = [
   {
     href: "/admin/schedule",
     key: "admin_schedule",
-    ownerOnly: true,
+    // Instructors get a read-only week scoped to their classes (the page itself
+    // strips the owner controls), so the tab shows for both roles.
+    ownerOnly: false,
     icon: (
       <>
         <rect x="3" y="4" width="18" height="17" rx="2" />

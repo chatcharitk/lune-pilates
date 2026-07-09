@@ -31,8 +31,10 @@ export function BrandLockup() {
   );
 }
 
-/** EN/TH segmented toggle. Order TH·EN matches the prototype LangToggle. */
-function LangToggle() {
+/** EN/TH segmented toggle. Order TH·EN matches the prototype LangToggle.
+ *  Exported for screens with their own header chrome (e.g. Buy), so the language
+ *  switch is reachable everywhere. */
+export function LangToggle() {
   const { t, lang, setLang } = useCustomerLang();
   return (
     <div

@@ -115,15 +115,19 @@ export async function createCheckout(raw: CreateCheckoutInput): Promise<CreateCh
   // the catalog + session. confirmPayment treats this row — not the client — as the
   // authoritative source of what the charge pays for (CLAUDE.md §8). Amount, hours,
   // owner and recipient are all server-derived; the client never gets to set them.
-  await getDb()
-    .insert(charges)
-    .values({
-      chargeId: charge.chargeId,
-      packageId: item.id,
-      userId: viewer.id,
-      amount: item.price,
-      reference: charge.reference,
-    });
+  // (No-DB dev path: skip persisting — the mock provider's QR still renders, so the
+  // whole checkout UI is exercisable without a database.)
+  if (process.env.DATABASE_URL) {
+    await getDb()
+      .insert(charges)
+      .values({
+        chargeId: charge.chargeId,
+        packageId: item.id,
+        userId: viewer.id,
+        amount: item.price,
+        reference: charge.reference,
+      });
+  }
 
   return {
     ok: true,
@@ -201,6 +205,10 @@ export async function uploadPaymentSlip(
   const { chargeId, slipDataUrl } = parsed.data;
 
   const viewer = await getCurrentUser();
+
+  // No-DB dev path: accept the slip so the upload → under-review UI is exercisable
+  // on mock data (nothing persists; production always has a database).
+  if (!process.env.DATABASE_URL) return { ok: true };
 
   // The charge intent persisted at checkout is authoritative. Look it up by the
   // provider's chargeId; if there is no binding, this charge was never opened here.
@@ -336,6 +344,12 @@ export async function confirmPayment(raw: ConfirmPaymentInput): Promise<ConfirmP
   const { chargeId } = parsed.data;
 
   const viewer = await getCurrentUser();
+
+  // No-DB dev path: report "paid" so the mock flow completes end-to-end (QR → slip
+  // → under-review poll → credited screen). No credit moves — mock only.
+  if (!process.env.DATABASE_URL) {
+    return { ok: true, status: "paid", rejectionReason: null };
+  }
 
   const db = getDb();
   const [intent] = await db

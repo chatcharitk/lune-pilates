@@ -1,16 +1,17 @@
 "use client";
 
-// Admin "Today at a glance" (admin-today.jsx): stat tiles, a class timeline with
-// capacity bars + attendee avatars, and a roster drawer with per-attendee
-// check-in and the class waitlist. All copy is keyed via the admin language
-// context; check-in persists through the setCheckIn server action with optimistic
-// UI (reverted on failure).
+// Admin "Today at a glance" (admin-today.jsx): stat tiles and a class timeline
+// with capacity bars + attendee avatars. Tapping a class opens the SHARED
+// ClassRosterDrawer (the same one the Schedule screen uses), so check-in,
+// reformer-position changes, cancellation and waitlist all behave identically
+// everywhere — one roster surface, no drift. The drawer refreshes server data
+// after each action, which keeps these cards' counts live too.
 
-import { useMemo, useState, useTransition } from "react";
+import { useState } from "react";
 import { useAdminLang } from "./admin-context";
-import { Avatar, Badge, CapBar, Dot, Drawer, Stat } from "./ui";
-import { setCheckIn } from "@/app/actions/admin";
-import type { AdminTodayClass, AdminTodayOverview } from "@/lib/admin/today";
+import { Avatar, Badge, CapBar, Dot, Stat } from "./ui";
+import { ClassRosterDrawer } from "./class-roster-drawer";
+import type { AdminTodayOverview } from "@/lib/admin/today";
 import { formatStudioDate, formatStudioTime } from "@/lib/time";
 
 // ───────────────────────── formatting helpers ─────────────────────────
@@ -34,62 +35,10 @@ function longDate(iso: string, lang: "en" | "th"): string {
 
 export function TodayView({ overview }: { overview: AdminTodayOverview }) {
   const { t, tt, lang } = useAdminLang();
-
-  // Optimistic check-in state, keyed by bookingId, seeded from the server roster.
-  const [checks, setChecks] = useState<Record<string, boolean>>(() => {
-    const init: Record<string, boolean> = {};
-    for (const c of overview.classes) {
-      for (const a of c.roster) init[a.bookingId] = a.checkedIn;
-    }
-    return init;
-  });
-  // Manual waitlist "Notify" nudge — local for now; an entry already `offered`
-  // counts as notified. Wiring the button to the LINE adapter / re-offer is a
-  // follow-up; the automated offer flow runs via the cron sweep.
-  const [notified, setNotified] = useState<Record<string, boolean>>({});
   const [openId, setOpenId] = useState<string | null>(null);
-  // Transient error toast — e.g. an instructor checking in a class that isn't theirs.
-  const [toast, setToast] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
-
-  const open = overview.classes.find((c) => c.id === openId) ?? null;
-
-  const totalChecked = useMemo(
-    () => Object.values(checks).filter(Boolean).length,
-    [checks],
-  );
-
-  function toggleCheck(bookingId: string) {
-    const next = !checks[bookingId];
-    setChecks((prev) => ({ ...prev, [bookingId]: next })); // optimistic
-    startTransition(async () => {
-      const res = await setCheckIn({ bookingId, checkedIn: next });
-      if (!res.ok) {
-        setChecks((prev) => ({ ...prev, [bookingId]: !next })); // revert
-        // An instructor scoped out of this class gets a clear reason; other
-        // failures just revert silently (the toggle snapping back is the signal).
-        if (res.code === "FORBIDDEN") {
-          setToast(t("admin_checkin_forbidden"));
-          setTimeout(() => setToast(null), 2600);
-        }
-      }
-    });
-  }
-
-  const checkedInClass = (c: AdminTodayClass) =>
-    c.roster.filter((a) => checks[a.bookingId]).length;
 
   return (
     <div>
-      {toast && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed inset-x-0 bottom-24 z-[70] mx-auto w-fit rounded-full bg-ink px-4 py-2 font-body text-[13px] font-medium text-cream shadow-lift md:bottom-8"
-        >
-          {toast}
-        </div>
-      )}
       <header className="mb-5">
         <h1 className="font-head text-2xl font-semibold tracking-tight text-ink">
           {t("admin_overview")}
@@ -107,7 +56,7 @@ export function TodayView({ overview }: { overview: AdminTodayOverview }) {
         />
         <Stat
           label={t("checked_in")}
-          value={totalChecked}
+          value={overview.stats.checkedIn}
           accent="var(--color-sage-deep)"
         />
         <Stat
@@ -126,8 +75,7 @@ export function TodayView({ overview }: { overview: AdminTodayOverview }) {
       ) : (
         <ul className="flex flex-col gap-3">
           {overview.classes.map((c) => {
-            const checked = checkedInClass(c);
-            const allChecked = c.booked > 0 && checked === c.booked;
+            const allChecked = c.booked > 0 && c.checkedIn === c.booked;
             return (
               <li key={c.id}>
                 <button
@@ -192,12 +140,12 @@ export function TodayView({ overview }: { overview: AdminTodayOverview }) {
                           className="rounded-full border-2 border-surface-2"
                           style={{ marginLeft: i ? -8 : 0 }}
                         >
-                          <Avatar name={a.name} seed={a.userId} size={30} checked={checks[a.bookingId]} />
+                          <Avatar name={a.name} seed={a.userId} size={30} checked={a.checkedIn} />
                         </span>
                       ))}
                     </div>
                     <Badge tone={allChecked ? "green" : "neutral"}>
-                      {checked}/{c.booked} {t("checked_in")}
+                      {c.checkedIn}/{c.booked} {t("checked_in")}
                     </Badge>
                   </div>
                   <svg className="shrink-0 text-muted" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -210,131 +158,8 @@ export function TodayView({ overview }: { overview: AdminTodayOverview }) {
         </ul>
       )}
 
-      {/* roster drawer */}
-      <Drawer
-        open={open !== null}
-        onClose={() => setOpenId(null)}
-        title={open ? `${tt(open.typeMeta.label)} · ${hhmm(open.startsAt)}` : ""}
-      >
-        {open && (
-          <div>
-            {/* instructor header */}
-            {open.instructor && (
-              <div className="mb-5 flex items-center gap-3 rounded-2xl bg-cream-2 px-3.5 py-3">
-                <Avatar
-                  name={tt(open.instructor.name)}
-                  seed={open.instructor.id}
-                  initials={open.instructor.id.charAt(0)}
-                  size={36}
-                />
-                <div>
-                  <p className="font-body text-[13.5px] font-semibold text-ink">
-                    {tt(open.instructor.name)}
-                  </p>
-                  <p className="font-body text-xs text-muted tabular-nums">
-                    {hhmm(open.startsAt)}–{hhmm(open.endsAt)} · {open.durationMin} {t("min")}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* roster */}
-            <p className="mb-2.5 font-body text-[11.5px] font-semibold uppercase tracking-[0.06em] text-muted">
-              {t("roster")} · {open.booked}/{open.capacity}
-            </p>
-            <ul className="flex flex-col gap-2">
-              {open.roster.map((a) => {
-                const isChecked = checks[a.bookingId];
-                return (
-                  <li
-                    key={a.bookingId}
-                    className={`flex items-center gap-3 rounded-2xl border px-3 py-2.5 ${
-                      isChecked ? "border-sage/30 bg-sage/8" : "border-line bg-surface-2"
-                    }`}
-                  >
-                    <Avatar name={a.name} seed={a.userId} size={38} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate font-body text-sm font-semibold text-ink">
-                          {a.name}
-                        </span>
-                        <Badge tone="neutral">{a.isMember ? t("member") : t("guest")}</Badge>
-                      </div>
-                      <p className="font-body text-xs text-muted">
-                        {a.phone}
-                        {a.house ? ` · ${t("house_label")} ${a.house}` : ""}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => toggleCheck(a.bookingId)}
-                      aria-pressed={isChecked}
-                      className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl px-3.5 font-body text-[13px] font-semibold transition-colors ${
-                        isChecked
-                          ? "bg-sage text-white"
-                          : "border border-line-strong text-ink"
-                      }`}
-                    >
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M20 6 9 17l-5-5" />
-                      </svg>
-                      {isChecked ? t("checked") : t("check_in")}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-
-            {/* waitlist */}
-            {open.waitlist.length > 0 && (
-              <div className="mt-5">
-                <p className="mb-2.5 font-body text-[11.5px] font-semibold uppercase tracking-[0.06em] text-[#9a7b45]">
-                  {t("waitlist")} · {open.waitlist.length}
-                </p>
-                <ul className="flex flex-col gap-2">
-                  {open.waitlist.map((w) => {
-                    const isNotified = w.offered || notified[w.waitlistId];
-                    return (
-                      <li
-                        key={w.waitlistId}
-                        className="flex items-center gap-3 rounded-2xl border border-dashed border-line-strong px-3 py-2.5"
-                      >
-                        <span className="w-4 shrink-0 text-center font-head text-sm font-bold text-muted tabular-nums">
-                          {w.position}
-                        </span>
-                        <Avatar name={w.name} seed={w.userId} size={34} />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-body text-[13.5px] font-semibold text-ink">
-                            {w.name}
-                          </p>
-                          <p className="font-body text-xs text-muted">{w.phone}</p>
-                        </div>
-                        <button
-                          type="button"
-                          disabled={isNotified}
-                          onClick={() =>
-                            setNotified((prev) => ({ ...prev, [w.waitlistId]: true }))
-                          }
-                          className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl px-3.5 font-body text-[13px] font-semibold ${
-                            isNotified
-                              ? "text-sage-deep"
-                              : "border border-line-strong text-ink"
-                          }`}
-                        >
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" />
-                          </svg>
-                          {isNotified ? t("notified") : t("notify")}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-      </Drawer>
+      {/* shared roster drawer (check-in / position / cancel / waitlist) */}
+      <ClassRosterDrawer classId={openId} onClose={() => setOpenId(null)} />
     </div>
   );
 }
