@@ -535,6 +535,13 @@ export const STR = {
   change: { en: "Change", th: "เปลี่ยน" },
   no_results: { en: "No results", th: "ไม่พบผลลัพธ์" },
   booked_for_customer: { en: "Booked for the customer", th: "จองให้ลูกค้าแล้ว" },
+  // sales-history detail drawer
+  sale_detail: { en: "Sale details", th: "รายละเอียดการขาย" },
+  sale_datetime: { en: "Sale date & time", th: "วันที่และเวลาขาย" },
+  edit_sale_time: { en: "Correct sale date/time", th: "แก้ไขวันที่/เวลาขาย" },
+  sale_time_saved: { en: "Sale time updated", th: "บันทึกเวลาขายใหม่แล้ว" },
+  payment_slip: { en: "Payment slip", th: "สลิปการชำระเงิน" },
+  no_slip: { en: "No slip uploaded", th: "ยังไม่มีสลิป" },
   keep: { en: "Keep", th: "เก็บไว้" },
   err_position_taken: { en: "That position is taken.", th: "ตำแหน่งนี้ถูกจองแล้ว" },
   booking_cancelled_refunded: { en: "Cancelled · credit refunded", th: "ยกเลิกแล้ว · คืนเครดิต" },

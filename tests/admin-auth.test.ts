@@ -33,6 +33,7 @@ import {
   updateInstructor,
 } from "@/app/actions/instructors";
 import { adjustCredits, getAdjustablePackages, getCustomerLedger } from "@/app/actions/admin-credits";
+import { updateSaleTime } from "@/app/actions/admin-sales";
 
 const ORIGINAL_DB_URL = process.env.DATABASE_URL;
 const ORIGINAL_ADMIN_AUTH = process.env.ADMIN_AUTH;
@@ -133,6 +134,8 @@ const GATED_ACTIONS: { name: string; call: () => Promise<{ ok: boolean; code?: s
       adjustCredits({ customerId: "bad", packageId: "bad", deltaHours: 0, note: "", idempotencyKey: "bad" }),
   },
   { name: "getAdjustablePackages", call: () => getAdjustablePackages("not-a-uuid") },
+  // Sale-time correction (Owner-only): malformed datetime — UNAUTHORIZED beats it.
+  { name: "updateSaleTime", call: () => updateSaleTime({ chargeId: "", soldAt: "not-a-date" }) },
 ];
 
 // Owner-only actions = every gated action EXCEPT setCheckIn (which is

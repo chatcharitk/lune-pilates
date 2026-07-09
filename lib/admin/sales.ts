@@ -20,7 +20,7 @@
 
 import { and, desc, eq, gte, lt } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
-import { charges, users } from "@/lib/db/schema";
+import { charges, paymentSlips, users } from "@/lib/db/schema";
 import type { Bilingual } from "@/lib/i18n";
 import type { PeriodBounds } from "@/lib/admin/period";
 import {
@@ -61,6 +61,8 @@ export interface SalesRow {
   amount: number;
   /** The charge lifecycle (all statuses are listed; the export shows every charge). */
   status: PaymentStatus;
+  /** true when a payment slip has been uploaded for this charge (viewable in the detail drawer). */
+  hasSlip: boolean;
 }
 
 /** A roll-up of a sales slice (pure, for an optional summary header). */
@@ -119,9 +121,11 @@ export async function listSales(range: PeriodBounds, now: Date = new Date()): Pr
       status: charges.status,
       createdAt: charges.createdAt,
       name: users.name,
+      slipId: paymentSlips.id,
     })
     .from(charges)
     .innerJoin(users, eq(charges.userId, users.id))
+    .leftJoin(paymentSlips, eq(paymentSlips.chargeId, charges.chargeId))
     .where(and(gte(charges.createdAt, range.start), lt(charges.createdAt, range.end)))
     .orderBy(desc(charges.createdAt));
 
@@ -136,6 +140,7 @@ export async function listSales(range: PeriodBounds, now: Date = new Date()): Pr
     method: normaliseMethod(r.method),
     amount: r.amount,
     status: normaliseStatus(r.status),
+    hasSlip: r.slipId !== null,
   }));
 }
 
@@ -163,6 +168,7 @@ async function mockListSales(range: PeriodBounds, now: Date): Promise<SalesRow[]
       method: p.method,
       amount: p.amount,
       status: p.status,
+      hasSlip: p.hasSlip,
     }))
     .sort((a, b) => new Date(b.when).getTime() - new Date(a.when).getTime());
 }

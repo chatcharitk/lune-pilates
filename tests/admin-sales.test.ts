@@ -52,6 +52,7 @@ describe("salesRowsToCsv (header + columns)", () => {
     method: "promptpay",
     amount: 5500,
     status: "paid",
+    hasSlip: false,
     ...over,
   });
 

@@ -315,6 +315,27 @@ export async function getSlip(raw: GetSlipInput): Promise<GetSlipResult> {
   }
   const { chargeId } = parsed.data;
 
+  // No-DB dev path: a placeholder slip so the admin viewers (Payments + Sales
+  // detail) render on mock data instead of rejecting at getDb().
+  if (!process.env.DATABASE_URL) {
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="240">` +
+      `<rect width="100%" height="100%" fill="#FBF6EF"/>` +
+      `<text x="200" y="115" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#8C7A63">MOCK SLIP</text>` +
+      `<text x="200" y="140" text-anchor="middle" font-family="monospace" font-size="12" fill="#9C8C77">${chargeId}</text>` +
+      `</svg>`;
+    return {
+      ok: true,
+      slip: {
+        dataUrl: `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`,
+        mimeType: "image/svg+xml",
+        sizeBytes: svg.length,
+        uploadedAt: new Date().toISOString(),
+        reviewDecision: null,
+      },
+    };
+  }
+
   const db = getDb();
   const [row] = await db
     .select({
