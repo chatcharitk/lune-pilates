@@ -50,6 +50,8 @@ import type {
   PaymentMethod,
   PaymentStatus,
 } from "@/lib/admin/payments";
+import type { SalesRow } from "@/lib/admin/sales";
+import { SaleDetailDrawer } from "./sale-detail-drawer";
 import { thb, type StrKey } from "@/lib/i18n";
 
 // ───────────────────────── helpers ─────────────────────────
@@ -94,7 +96,27 @@ export function PaymentsView({
   const [posOpen, setPosOpen] = useState(false);
   // The charge whose slip is being reviewed (drawer open when non-null).
   const [reviewRow, setReviewRow] = useState<PaymentRow | null>(null);
+  // The charge opened in the shared sale-detail drawer (row tap — the same drawer
+  // as the Sales-history screen, so details/slip/time-edit are reachable here too).
+  const [detailSale, setDetailSale] = useState<SalesRow | null>(null);
   const { stats, rows } = overview;
+
+  /** Reshape a Payments row to the shared SalesRow contract (same charge data). */
+  function toSalesRow(p: PaymentRow): SalesRow {
+    return {
+      id: p.id,
+      when: p.when,
+      whenDisplay: p.whenDisplay,
+      customerName: p.customer.name,
+      customerId: p.customer.userId,
+      packageLabel: p.packageLabel,
+      packageId: p.packageId,
+      method: p.method,
+      amount: p.amount,
+      status: p.status,
+      hasSlip: p.hasSlip,
+    };
+  }
 
   return (
     <div>
@@ -131,7 +153,11 @@ export function PaymentsView({
           {t("no_payments")}
         </p>
       ) : (
-        <PaymentsTable rows={rows} onReview={setReviewRow} />
+        <PaymentsTable
+          rows={rows}
+          onReview={setReviewRow}
+          onOpen={(p) => setDetailSale(toSalesRow(p))}
+        />
       )}
 
       {/* POS flow drawer */}
@@ -139,6 +165,9 @@ export function PaymentsView({
 
       {/* slip verification drawer */}
       <SlipReviewDrawer row={reviewRow} onClose={() => setReviewRow(null)} />
+
+      {/* shared sale detail (details / slip / sale-time correction) */}
+      <SaleDetailDrawer sale={detailSale} onClose={() => setDetailSale(null)} />
     </div>
   );
 }
@@ -153,9 +182,12 @@ const METHOD_LABEL: Record<PaymentMethod, StrKey> = {
 function PaymentsTable({
   rows,
   onReview,
+  onOpen,
 }: {
   rows: PaymentRow[];
   onReview: (row: PaymentRow) => void;
+  /** Row tap → open the shared sale-detail drawer. */
+  onOpen: (row: PaymentRow) => void;
 }) {
   const { t, tt } = useAdminLang();
 
@@ -200,7 +232,16 @@ function PaymentsTable({
             <div
               key={p.id}
               role="row"
-              className={`${grid} border-b border-line px-[18px] py-3 last:border-b-0`}
+              tabIndex={0}
+              onClick={() => onOpen(p)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onOpen(p);
+                }
+              }}
+              aria-label={`${p.customer.name} · ${thb(p.amount)}`}
+              className={`${grid} cursor-pointer border-b border-line px-[18px] py-3 transition-colors last:border-b-0 hover:bg-surface`}
             >
               {/* member */}
               <span role="cell" className="flex min-w-0 items-center gap-2.5">
@@ -248,7 +289,11 @@ function PaymentsTable({
                 {p.hasSlip ? (
                   <button
                     type="button"
-                    onClick={() => onReview(p)}
+                    onClick={(e) => {
+                      // The row itself opens the detail drawer — don't double-fire.
+                      e.stopPropagation();
+                      onReview(p);
+                    }}
                     className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line-strong px-2.5 font-body text-[12px] font-semibold text-ink-soft transition-colors hover:border-taupe hover:text-ink"
                   >
                     <EyeIcon />
