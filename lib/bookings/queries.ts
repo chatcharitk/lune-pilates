@@ -25,6 +25,7 @@ import type { Bilingual } from "@/lib/i18n";
 import type { BookingStatus, ClassType, ReformerPosition } from "@/lib/domain/types";
 import type { SessionUser } from "@/lib/auth/session";
 import { evaluateCancellation } from "@/lib/credits/policy";
+import { mockDataMode } from "@/lib/mock-mode";
 import {
   instructorMetaFor,
   metaFor,
@@ -156,7 +157,7 @@ export async function listMyBookings(
   viewer: SessionUser,
   now: Date = new Date(),
 ): Promise<MyBookings> {
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return mockListMyBookings(now);
   }
 
@@ -213,7 +214,7 @@ export async function getNextBooking(
   viewer: SessionUser,
   now: Date = new Date(),
 ): Promise<MyBooking | null> {
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     const { upcoming } = mockListMyBookings(now);
     return upcoming[0] ?? null;
   }

@@ -510,7 +510,13 @@ export async function rescheduleWithinTransaction(
  * optional refund happen atomically.
  */
 export async function cancelBooking(
-  params: { bookingId: string; actorUserId: string; refund: boolean },
+  params: {
+    bookingId: string;
+    actorUserId: string;
+    refund: boolean;
+    /** Optional audit note stored on the refund ledger row (e.g. "class cancelled by studio"). */
+    note?: string;
+  },
 ): Promise<{ ok: true; refunded: boolean } | { ok: false; code: "NOT_FOUND" | "NOT_LIVE" }> {
   const db = getDb();
   return db.transaction(async (tx) => {
@@ -543,6 +549,7 @@ export async function cancelBooking(
           actorUserId: params.actorUserId,
           bookingId: bk.id,
           reason: "cancel_refund",
+          note: params.note ?? null,
         });
         await tx
           .update(packages)

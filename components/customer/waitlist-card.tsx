@@ -155,14 +155,21 @@ function OfferedCard({
   async function confirm() {
     setPhase("submitting");
     setFailCode(null);
-    const res = await confirmWaitlistOffer({ waitlistId: entry.waitlistId });
-    if (res.ok) {
-      setPhase("done");
-      // The waitlist entry has become a real booking — re-fetch the server
-      // component so it leaves this section and joins Upcoming.
-      router.refresh();
-    } else {
-      setFailCode(res.code);
+    try {
+      const res = await confirmWaitlistOffer({ waitlistId: entry.waitlistId });
+      if (res.ok) {
+        setPhase("done");
+        // The waitlist entry has become a real booking — re-fetch the server
+        // component so it leaves this section and joins Upcoming.
+        router.refresh();
+      } else {
+        setFailCode(res.code);
+        setPhase("error");
+      }
+    } catch {
+      // A thrown action (network blip) → the keyed generic error state
+      // (INVALID_INPUT → err_generic), never an unhandled rejection.
+      setFailCode("INVALID_INPUT");
       setPhase("error");
     }
   }

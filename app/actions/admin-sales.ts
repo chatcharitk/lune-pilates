@@ -15,6 +15,7 @@ import { z } from "zod";
 import { getDb } from "@/lib/db/client";
 import { charges } from "@/lib/db/schema";
 import { requireOwner } from "@/lib/auth/admin";
+import { mockDataMode } from "@/lib/mock-mode";
 
 const updateSaleTimeInput = z.object({
   chargeId: z.string().min(1),
@@ -45,7 +46,7 @@ export async function updateSaleTime(raw: UpdateSaleTimeInput): Promise<UpdateSa
     return { ok: false, code: "INVALID_INPUT" };
   }
 
-  if (!process.env.DATABASE_URL) return { ok: true, soldAt: soldAt.toISOString() };
+  if (mockDataMode()) return { ok: true, soldAt: soldAt.toISOString() };
 
   const db = getDb();
   const updated = await db

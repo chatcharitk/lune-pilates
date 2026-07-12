@@ -1,14 +1,13 @@
 "use client";
 
 // Shared customer header (mirrors lune-ui.jsx `Header` / `BrandLockup` /
-// `LangToggle`): the LUNE wordmark lockup with the sparkle "E" motif, the EN/TH
-// language toggle, and a notification bell. Shown on the in-nav screens (home,
-// schedule, bookings, profile). The active language comes from the
-// CustomerLangProvider so the whole app switches together.
+// `LangToggle`): the LUNE wordmark lockup with the sparkle "E" motif and the
+// EN/TH language toggle. Shown on the in-nav screens (home, schedule, bookings,
+// profile). The active language comes from the CustomerLangProvider so the
+// whole app switches together.
 
 import { usePathname } from "next/navigation";
 import { useCustomerLang } from "./customer-context";
-import { Bell } from "./icons";
 import type { Lang } from "@/lib/i18n";
 
 // Route prefixes that render their own focused flow with a back button (no global
@@ -61,22 +60,13 @@ export function LangToggle() {
 
 export function Header() {
   const pathname = usePathname();
-  const { t } = useCustomerLang();
   if (isHidden(pathname)) return null;
 
+  // Notifications arrive via LINE push, not an in-app inbox — no bell here.
   return (
     <header className="flex shrink-0 items-center justify-between bg-cream px-[18px] pb-2.5 pt-6">
       <BrandLockup />
-      <div className="flex items-center gap-2">
-        <LangToggle />
-        <button
-          type="button"
-          aria-label={t("aria_notifications")}
-          className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-line bg-surface-2 text-ink-soft"
-        >
-          <Bell size={20} />
-        </button>
-      </div>
+      <LangToggle />
     </header>
   );
 }

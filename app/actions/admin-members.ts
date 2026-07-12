@@ -28,6 +28,7 @@ import { getDb } from "@/lib/db/client";
 import { households, users } from "@/lib/db/schema";
 import type { UserTier } from "@/lib/domain/types";
 import { requireOwner } from "@/lib/auth/admin";
+import { mockDataMode } from "@/lib/mock-mode";
 
 // ───────────────────────── input ─────────────────────────
 
@@ -96,7 +97,7 @@ export async function createCustomer(raw: CreateCustomerInput): Promise<CreateCu
   // A guest never joins a household — drop any supplied houseNumber up front.
   const houseNumber = input.tier === "member" ? input.houseNumber ?? null : null;
 
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     // UI dev against mock data — synthesize a deterministic-shaped id so the screen
     // can optimistically render the new row. No household is created in this path.
     return {

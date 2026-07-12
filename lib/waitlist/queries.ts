@@ -22,6 +22,7 @@ import { WAITLIST_HOLD_MINUTES } from "@/lib/domain/types";
 import type { SessionUser } from "@/lib/auth/session";
 import { emit } from "@/lib/events/bus";
 import { registerNotificationHandlers } from "@/lib/events/notifications";
+import { mockDataMode } from "@/lib/mock-mode";
 import {
   instructorMetaFor,
   metaFor,
@@ -269,7 +270,7 @@ export async function listMyWaitlist(
   // No-DB dev fallback (mirrors getNextBooking / getCreditOverview): the mock
   // session user holds no waitlist entries, so render the screen without a
   // database. The DB path below is the real one, gated behind the env.
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return [];
   }
 

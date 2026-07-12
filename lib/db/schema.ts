@@ -18,7 +18,7 @@ import {
 export const userTier = pgEnum("user_tier", ["member", "guest"]);
 export const packageCategory = pgEnum("package_category", ["group", "private", "rental"]);
 export const classType = pgEnum("class_type", ["group", "private", "duo", "trio", "rental"]);
-export const classStatus = pgEnum("class_status", ["draft", "published"]);
+export const classStatus = pgEnum("class_status", ["draft", "published", "cancelled"]);
 export const bookingStatus = pgEnum("booking_status", ["booked", "cancelled"]);
 export const waitlistStatus = pgEnum("waitlist_status", ["waiting", "offered", "claimed", "expired"]);
 export const reformerPosition = pgEnum("reformer_position", ["left", "middle", "right"]);
@@ -178,6 +178,9 @@ export const creditLedger = pgTable(
     // so a dropped-response retry can't double-apply. Null for every other row; the
     // partial unique index dedupes only the non-null adjustment keys.
     idempotencyKey: text("idempotency_key"),
+    // Free-text audit note (the owner's written reason on manual adjustments;
+    // "class cancelled by studio" on class-level cancels). Null otherwise.
+    note: text("note"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -299,20 +302,31 @@ export const bookings = pgTable(
 );
 
 // ───────────────────────── waitlist ─────────────────────────
-export const waitlist = pgTable("waitlist", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  classInstanceId: uuid("class_instance_id")
-    .notNull()
-    .references(() => classInstances.id),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id),
-  position: integer("position").notNull(),
-  status: waitlistStatus("status").notNull().default("waiting"),
-  offeredAt: timestamp("offered_at", { withTimezone: true }),
-  holdExpiresAt: timestamp("hold_expires_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const waitlist = pgTable(
+  "waitlist",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    classInstanceId: uuid("class_instance_id")
+      .notNull()
+      .references(() => classInstances.id),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    position: integer("position").notNull(),
+    status: waitlistStatus("status").notNull().default("waiting"),
+    offeredAt: timestamp("offered_at", { withTimezone: true }),
+    holdExpiresAt: timestamp("hold_expires_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // DB BACKSTOP mirroring bookings_one_live_per_user: at most one LIVE queue
+    // entry per (class, user). Partial on live statuses so historical
+    // claimed/expired rows never collide (re-joining after expiry stays legal).
+    uniqueIndex("waitlist_one_live_per_user")
+      .on(t.classInstanceId, t.userId)
+      .where(sql`${t.status} in ('waiting', 'offered')`),
+  ],
+);
 
 export type DbPackage = typeof packages.$inferSelect;
 export type DbClassInstance = typeof classInstances.$inferSelect;

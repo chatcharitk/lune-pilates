@@ -20,11 +20,12 @@
 // (UNAUTHORIZED). All money- and capacity-critical values are recomputed
 // server-side.
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getDb } from "@/lib/db/client";
-import { bookings, classInstances, classTemplates, instructors } from "@/lib/db/schema";
+import { bookings, classInstances, classTemplates, instructors, waitlist } from "@/lib/db/schema";
+import { cancelBooking } from "@/lib/credits/debit";
 import type { ClassType } from "@/lib/domain/types";
 import { CAPACITY, effectiveCapacity } from "@/lib/domain/types";
 import { computePublicVisibleAt } from "@/lib/schedule/visibility";
@@ -34,6 +35,7 @@ import { getTemplateSlotsByDow } from "@/lib/admin/schedule-template";
 import { emit } from "@/lib/events/bus";
 import { registerNotificationHandlers } from "@/lib/events/notifications";
 import { requireOwner } from "@/lib/auth/admin";
+import { mockDataMode } from "@/lib/mock-mode";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -81,7 +83,7 @@ export async function createClass(raw: CreateClassInput): Promise<CreateClassRes
 
   const weekStart = startOfWeekMonday(localDay(input.date));
 
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     // Mock path mirrors the DB path's contract: the class is live immediately,
     // so the one broadcast event fires here too.
     registerNotificationHandlers();
@@ -150,7 +152,7 @@ export async function updateClass(raw: UpdateClassInput): Promise<UpdateClassRes
   if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
   const input = parsed.data;
 
-  if (!process.env.DATABASE_URL) return { ok: true };
+  if (mockDataMode()) return { ok: true };
 
   const db = getDb();
   const [existing] = await db
@@ -212,7 +214,7 @@ export async function deleteClass(raw: DeleteClassInput): Promise<DeleteClassRes
   if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
   const { id } = parsed.data;
 
-  if (!process.env.DATABASE_URL) return { ok: true };
+  if (mockDataMode()) return { ok: true };
 
   const db = getDb();
   const [existing] = await db
@@ -231,6 +233,107 @@ export async function deleteClass(raw: DeleteClassInput): Promise<DeleteClassRes
   await db.delete(classInstances).where(eq(classInstances.id, id));
   revalidatePath("/admin/schedule");
   return { ok: true };
+}
+
+// ───────────────────────── cancel class (studio-side) ─────────────────────────
+
+const cancelClassInput = z.object({ id: z.string().uuid() });
+export type CancelClassInput = z.infer<typeof cancelClassInput>;
+
+export type CancelClassFailureCode =
+  | "UNAUTHORIZED"
+  | "INVALID_INPUT"
+  | "NOT_FOUND"
+  | "ALREADY_CANCELLED";
+
+export type CancelClassResult =
+  | { ok: true; cancelledBookings: number; refunded: number }
+  | { ok: false; code: CancelClassFailureCode };
+
+/**
+ * Cancel a WHOLE class ("instructor sick"): flip the instance to `cancelled`
+ * FIRST — the atomic debit re-checks `status = 'published'` under its row lock
+ * (lib/credits/debit.ts), so no new booking can land from that moment — then
+ * cancel every live booking WITH a full refund regardless of the 5h window
+ * (studio-side cancellation; the refund ledger row carries an audit note and is
+ * stamped with the booking's own user as actor — it is their credit coming
+ * back), and expire this class's live waitlist entries WITHOUT offering (never
+ * invite people onto a dying class). Emits ONE `class.cancelled` event.
+ *
+ * Each booking cancel is its own atomic transaction (the same `cancelBooking`
+ * primitive the rest of the app uses); a failure on one booking does not undo
+ * the others — the class is already unbookable, and re-running cancelClass is
+ * NOT possible (ALREADY_CANCELLED), so stragglers surface via the roster and
+ * can be cancelled individually. In practice per-booking failure means the row
+ * was already cancelled concurrently (NOT_LIVE), which is fine.
+ */
+export async function cancelClass(raw: CancelClassInput): Promise<CancelClassResult> {
+  if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
+
+  const parsed = cancelClassInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
+  const { id } = parsed.data;
+
+  if (mockDataMode()) return { ok: true, cancelledBookings: 0, refunded: 0 };
+
+  const db = getDb();
+
+  // Flip to cancelled, guarded on the current status so a second call reports
+  // ALREADY_CANCELLED instead of re-cancelling (single-statement compare-and-set).
+  const [existing] = await db
+    .select({ id: classInstances.id, status: classInstances.status, startsAt: classInstances.startsAt })
+    .from(classInstances)
+    .where(eq(classInstances.id, id))
+    .limit(1);
+  if (!existing) return { ok: false, code: "NOT_FOUND" };
+  if (existing.status === "cancelled") return { ok: false, code: "ALREADY_CANCELLED" };
+
+  const flipped = await db
+    .update(classInstances)
+    .set({ status: "cancelled" })
+    .where(and(eq(classInstances.id, id), ne(classInstances.status, "cancelled")))
+    .returning({ id: classInstances.id });
+  if (flipped.length === 0) return { ok: false, code: "ALREADY_CANCELLED" };
+
+  // Every live booking: cancel + refund the exact booked cost (atomic per booking).
+  const live = await db
+    .select({ bookingId: bookings.id, userId: bookings.userId })
+    .from(bookings)
+    .where(and(eq(bookings.classInstanceId, id), eq(bookings.status, "booked")));
+
+  let cancelled = 0;
+  let refunded = 0;
+  for (const b of live) {
+    const res = await cancelBooking({
+      bookingId: b.bookingId,
+      actorUserId: b.userId,
+      refund: true,
+      note: "class cancelled by studio",
+    });
+    if (res.ok) {
+      cancelled++;
+      if (res.refunded) refunded++;
+    }
+  }
+
+  // Expire the live queue WITHOUT offering — the seat pool no longer exists.
+  await db
+    .update(waitlist)
+    .set({ status: "expired" })
+    .where(and(eq(waitlist.classInstanceId, id), inArray(waitlist.status, ["waiting", "offered"])));
+
+  registerNotificationHandlers();
+  await emit({
+    type: "class.cancelled",
+    classInstanceId: id,
+    startsAt: existing.startsAt.toISOString(),
+    cancelledBookings: cancelled,
+  });
+
+  revalidatePath("/admin/schedule");
+  revalidatePath("/admin/today");
+  revalidatePath("/admin/bookings");
+  return { ok: true, cancelledBookings: cancelled, refunded };
 }
 
 // ───────────────────────── generate from baseline ─────────────────────────
@@ -279,7 +382,7 @@ export async function generateWeekFromBaseline(raw: WeekInput): Promise<Generate
   if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
   const weekStart = weekStartOf(parsed.data.weekStart);
 
-  if (!process.env.DATABASE_URL) return { ok: true, created: 0 };
+  if (mockDataMode()) return { ok: true, created: 0 };
 
   const db = getDb();
   const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 3_600_000);
@@ -361,7 +464,7 @@ export async function publishWeek(raw: WeekInput): Promise<PublishResult> {
   const weekStart = weekStartOf(parsed.data.weekStart);
   const now = new Date();
 
-  if (!process.env.DATABASE_URL) return { ok: true, published: 0 };
+  if (mockDataMode()) return { ok: true, published: 0 };
 
   const db = getDb();
   const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 3_600_000);
@@ -466,7 +569,7 @@ export async function createTemplateSlot(
   // Capacity may not exceed the type's hard reformer cap.
   if (input.capacity > CAPACITY[input.type]) return { ok: false, code: "INVALID_INPUT" };
 
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return { ok: true, id: "00000000-0000-4000-a000-0000000000c1" };
   }
 
@@ -522,7 +625,7 @@ export async function updateTemplateSlot(
 
   if (input.capacity > CAPACITY[input.type]) return { ok: false, code: "INVALID_INPUT" };
 
-  if (!process.env.DATABASE_URL) return { ok: true };
+  if (mockDataMode()) return { ok: true };
 
   const db = getDb();
   const instructorId = await resolveInstructor(input.type, input.instructorId ?? null);
@@ -568,7 +671,7 @@ export async function deleteTemplateSlot(
   if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
   const { id } = parsed.data;
 
-  if (!process.env.DATABASE_URL) return { ok: true };
+  if (mockDataMode()) return { ok: true };
 
   const db = getDb();
   const updated = await db

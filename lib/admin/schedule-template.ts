@@ -25,6 +25,7 @@ import {
   type InstructorMeta,
 } from "@/lib/schedule/queries";
 import { BASELINE_SLOTS, type BaselineSlot } from "@/lib/schedule/baseline";
+import { mockDataMode } from "@/lib/mock-mode";
 
 // ───────────────────────── contract ─────────────────────────
 
@@ -64,7 +65,7 @@ const byDowThenTime = (a: { dayOfWeek: number; time: string }, b: { dayOfWeek: n
  * editor renders without a database. Synthetic stable ids per slot.
  */
 export async function getScheduleTemplate(): Promise<TemplateSlot[]> {
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return BASELINE_SLOTS.map((s, i) => mockTemplateSlot(s, i)).sort(byDowThenTime);
   }
 
@@ -117,7 +118,7 @@ export async function getScheduleTemplate(): Promise<TemplateSlot[]> {
  * No-DB dev path: the BASELINE_SLOTS fallback (templateId null).
  */
 export async function getTemplateSlotsByDow(): Promise<Map<number, TemplateBaselineSlot[]>> {
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return groupBaselineFallback();
   }
 

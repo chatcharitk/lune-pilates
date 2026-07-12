@@ -20,6 +20,7 @@ import { z } from "zod";
 import { getDb } from "@/lib/db/client";
 import { bookings, classInstances } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/auth/admin";
+import { mockDataMode } from "@/lib/mock-mode";
 
 const setCheckInInput = z.object({
   bookingId: z.string().uuid(),
@@ -66,7 +67,7 @@ export async function setCheckIn(raw: SetCheckInInput): Promise<SetCheckInResult
   }
   const { bookingId, checkedIn } = parsed.data;
 
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     // UI dev against mock data — the client holds optimistic check-in state. The
     // mock screen is owner-shaped, so this path is owner-equivalent for both roles
     // (the real instructor scope check is enforced on the DB path below).

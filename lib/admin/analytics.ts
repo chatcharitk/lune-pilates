@@ -49,7 +49,8 @@ import {
   priorDayBounds,
   priorPeriodBounds,
 } from "@/lib/admin/period";
-import { formatStudioDate, studioParts } from "@/lib/time";
+import { addDays, formatStudioDate, studioParts, studioStartOfDay } from "@/lib/time";
+import { mockDataMode } from "@/lib/mock-mode";
 
 // ═════════════════════════ fixed-window constants ═════════════════════════
 // Every window other than the [Month to date | Today] toggle is a FIXED constant
@@ -239,9 +240,10 @@ function whenLabelFor(startsAt: Date): Bilingual {
 }
 
 /**
- * Turn a sparse map of "YYYY-MM-DD" → amount into a dense, oldest→newest series
- * of exactly `days` points ending on the day containing `now` (zero-filled).
- * Pure so it is shared by the DB and mock paths.
+ * Turn a sparse map of Bangkok-day "YYYY-MM-DD" → amount into a dense,
+ * oldest→newest series of exactly `days` points ending on the BANGKOK day
+ * containing `now` (zero-filled). Day keys and day edges are Asia/Bangkok wall
+ * clock, never the runtime TZ. Pure so it is shared by the DB and mock paths.
  */
 export function denseDailyRevenue(
   byDay: ReadonlyMap<string, number>,
@@ -249,18 +251,18 @@ export function denseDailyRevenue(
   days = SPARKLINE_DAYS,
 ): { dateIso: string; amount: number }[] {
   const out: { dateIso: string; amount: number }[] = [];
-  const base = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  const base = studioStartOfDay(now);
   for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(base.getTime() - i * 24 * 3_600_000);
-    const key = isoDateKey(d);
-    out.push({ dateIso: d.toISOString(), amount: byDay.get(key) ?? 0 });
+    const d = addDays(base, -i);
+    out.push({ dateIso: d.toISOString(), amount: byDay.get(studioDateKey(d)) ?? 0 });
   }
   return out;
 }
 
-/** "YYYY-MM-DD" local date key. */
-function isoDateKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+/** "YYYY-MM-DD" key of the BANGKOK calendar day containing `d` (host-TZ-free). */
+function studioDateKey(d: Date): string {
+  const { year, month0, day } = studioParts(d);
+  return `${year}-${String(month0 + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
 /**
@@ -302,7 +304,7 @@ export async function getDashboardOverview(now: Date = new Date()): Promise<Dash
 // ═════════════════════════ 01 · SALES ═════════════════════════
 
 async function buildSalesSection(now: Date): Promise<SalesSection> {
-  if (!process.env.DATABASE_URL) return mockSales(now);
+  if (mockDataMode()) return mockSales(now);
 
   const db = getDb();
   const { start: mStart, end: mEnd } = periodBounds(now);
@@ -317,8 +319,10 @@ async function buildSalesSection(now: Date): Promise<SalesSection> {
       .from(charges)
       .where(and(eq(charges.status, "paid"), gte(charges.createdAt, s), lt(charges.createdAt, e)));
 
-  // 14-day sparkline: paid revenue per day via date_trunc, zero-filled in JS.
-  const sparkStart = new Date(dStart.getTime() - (SPARKLINE_DAYS - 1) * 24 * 3_600_000);
+  // 14-day sparkline: paid revenue per BANGKOK day, zero-filled in JS. dStart is
+  // already the Bangkok day edge (dayBounds), so exact −24h steps stay aligned
+  // (ICT has no DST).
+  const sparkStart = addDays(dStart, -(SPARKLINE_DAYS - 1));
 
   // Revenue mix: paid charges this month grouped by packageId (→ category in JS).
   // Per-instructor: redeemed bookings this month, hours (Σ creditCost) + instructor type.
@@ -339,14 +343,19 @@ async function buildSalesSection(now: Date): Promise<SalesSection> {
     paidSum(pmStart, pmEnd),
     paidSum(dStart, dEnd),
     paidSum(pdStart, pdEnd),
+    // Bucket by the BANGKOK calendar day: `timestamptz AT TIME ZONE
+    // 'Asia/Bangkok'` yields the Bangkok wall-clock timestamp, so its ::date is
+    // the Bangkok day regardless of the session/server TimeZone (a bare
+    // date_trunc on timestamptz would bucket in the session TZ — UTC on Neon —
+    // shifting 00:00–07:00 ICT sales onto the prior day).
     db
       .select({
-        day: sql<string>`to_char(date_trunc('day', ${charges.createdAt}), 'YYYY-MM-DD')`,
+        day: sql<string>`to_char((${charges.createdAt} at time zone 'Asia/Bangkok')::date, 'YYYY-MM-DD')`,
         total: sql<number>`coalesce(sum(${charges.amount}), 0)::int`,
       })
       .from(charges)
       .where(and(eq(charges.status, "paid"), gte(charges.createdAt, sparkStart), lt(charges.createdAt, dEnd)))
-      .groupBy(sql`date_trunc('day', ${charges.createdAt})`),
+      .groupBy(sql`(${charges.createdAt} at time zone 'Asia/Bangkok')::date`),
     db
       .select({
         packageId: charges.packageId,
@@ -475,7 +484,7 @@ async function buildSalesSection(now: Date): Promise<SalesSection> {
 // ═════════════════════════ 02 · CAPACITY ═════════════════════════
 
 async function buildCapacitySection(now: Date): Promise<CapacitySection> {
-  if (!process.env.DATABASE_URL) return mockCapacity(now);
+  if (mockDataMode()) return mockCapacity(now);
 
   const db = getDb();
   const fillStart = new Date(now.getTime() - FILL_RATE_DAYS * 24 * 3_600_000);
@@ -598,7 +607,7 @@ export function buildAlert(
 // ═════════════════════════ 03 · RETENTION ═════════════════════════
 
 async function buildRetentionSection(now: Date): Promise<RetentionSection> {
-  if (!process.env.DATABASE_URL) return mockRetention(now);
+  if (mockDataMode()) return mockRetention(now);
 
   const db = getDb();
   const horizon = new Date(now.getTime() + EXPIRING_SOON_DAYS * 24 * 3_600_000);
@@ -713,11 +722,12 @@ void creditLedger;
 // authoritative one.
 
 function mockSales(now: Date): SalesSection {
-  // 14-day bars (prototype: thousands of ฿) → exact ฿ amounts, oldest→newest.
+  // 14-day bars (prototype: thousands of ฿) → exact ฿ amounts, oldest→newest,
+  // anchored to the BANGKOK day edges like the DB path.
   const bars = [12.1, 9.4, 14.8, 11.2, 16.0, 18.9, 22.4, 13.1, 15.6, 12.8, 17.2, 19.5, 14.9, 18.4];
-  const base = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  const base = studioStartOfDay(now);
   const dailyRevenue = bars.map((v, i) => ({
-    dateIso: new Date(base.getTime() - (bars.length - 1 - i) * 24 * 3_600_000).toISOString(),
+    dateIso: addDays(base, -(bars.length - 1 - i)).toISOString(),
     amount: Math.round(v * 1000),
   }));
 

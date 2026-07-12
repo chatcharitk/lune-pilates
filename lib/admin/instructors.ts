@@ -28,6 +28,7 @@ import type { ClassType } from "@/lib/domain/types";
 import { effectiveCapacity } from "@/lib/domain/types";
 import { instructorMetaFor, metaFor, type ClassTypeMeta } from "@/lib/schedule/queries";
 import { formatStudioTime, studioIsoDow, studioStartOfDay } from "@/lib/time";
+import { mockDataMode } from "@/lib/mock-mode";
 
 // ───────────────────────── contract (frontend imports these) ─────────────────────────
 
@@ -146,7 +147,7 @@ const byStart = (a: AvailabilityRange, b: AvailabilityRange): number => a.start.
 export async function getAdminInstructors(now: Date = new Date()): Promise<AdminInstructor[]> {
   const dayStart = startOfDay(now);
 
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return mockAdminInstructors(dayStart);
   }
 

@@ -32,6 +32,7 @@ import { getCustomerLedger as readCustomerLedger, type CustomerLedgerEntry } fro
 import { emit } from "@/lib/events/bus";
 import type { Bilingual } from "@/lib/i18n";
 import type { PackageCategory } from "@/lib/domain/types";
+import { mockDataMode } from "@/lib/mock-mode";
 
 const PG_UNIQUE_VIOLATION = "23505";
 /** True when `err` is a Postgres unique-violation (SQLSTATE 23505), at either the
@@ -105,8 +106,14 @@ export type AdjustCreditsResult =
 const adjustInput = z.object({
   customerId: z.string().uuid(),
   packageId: z.string().uuid(),
-  // Whole non-zero integer; the UI also guards != 0.
-  deltaHours: z.number().int().refine((n) => n !== 0, "delta must be non-zero"),
+  // Whole non-zero integer, capped ±100 (audit: a fat-fingered ±1,000,000 must
+  // not become one ledger row; ±100 covers any legitimate single correction).
+  deltaHours: z
+    .number()
+    .int()
+    .min(-100)
+    .max(100)
+    .refine((n) => n !== 0, "delta must be non-zero"),
   note: z.string().trim().min(1).max(500),
   idempotencyKey: z.string().uuid(),
 });
@@ -130,7 +137,7 @@ export async function getAdjustablePackages(
     return { ok: false, code: "INVALID_INPUT" };
   }
 
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return mockGetAdjustablePackages(customerId);
   }
 
@@ -181,7 +188,7 @@ export async function adjustCredits(raw: AdjustCreditsInput): Promise<AdjustCred
   if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
   const input = parsed.data;
 
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return mockAdjustCredits(input);
   }
 
@@ -245,6 +252,9 @@ export async function adjustCredits(raw: AdjustCreditsInput): Promise<AdjustCred
         bookingId: null,
         reason: "adjustment",
         idempotencyKey: input.idempotencyKey,
+        // The owner's written reason lives ON the money row (audit: it previously
+        // rode only the notification event and was lost).
+        note: input.note,
       });
       await tx.update(packages).set({ hoursLeft: next }).where(eq(packages.id, pkg.id));
 

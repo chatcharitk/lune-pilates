@@ -6,6 +6,19 @@ export type DomainEvent =
   | { type: "booking.confirmed"; bookingId: string; userId: string; classInstanceId: string }
   | { type: "booking.cancelled"; bookingId: string; userId: string; refunded: boolean }
   | { type: "waitlist.offered"; waitlistId: string; userId: string; holdExpiresAt: string }
+  | {
+      /**
+       * The studio cancelled a whole class (owner action): every live booking was
+       * refunded and the waitlist expired without offers. Listeners notify the
+       * affected customers; the truth (cancelled status + refund ledger rows) is
+       * already in the model.
+       */
+      type: "class.cancelled";
+      classInstanceId: string;
+      startsAt: string;
+      /** How many live bookings were cancelled (and refunded). */
+      cancelledBookings: number;
+    }
   | { type: "credit.low"; householdId: string; hoursLeft: number }
   | { type: "credit.expiring"; packageId: string; expiresAt: string; daysLeft: number }
   | {

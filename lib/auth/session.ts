@@ -17,6 +17,7 @@ import { eq } from "drizzle-orm";
 import type { UserTier } from "@/lib/domain/types";
 import { getDb } from "@/lib/db/client";
 import { households, users } from "@/lib/db/schema";
+import { mockDataMode } from "@/lib/mock-mode";
 
 /** The authenticated customer, resolved server-side. */
 export interface SessionUser {
@@ -61,7 +62,7 @@ const MOCK_SESSION_USER: SessionUser = {
  * member is missing) — never returns an untyped or guessed identity.
  */
 export async function getCurrentUser(): Promise<SessionUser> {
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return MOCK_SESSION_USER;
   }
 

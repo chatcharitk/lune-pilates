@@ -88,15 +88,22 @@ export function CancelSheet({
     if (!booking) return;
     setPhase("submitting");
     setFailCode(null);
-    const res = await cancelBookingAction({ bookingId: booking.bookingId });
-    if (res.ok) {
-      // A successful self-cancel is ALWAYS free/refunded (it can only happen ≥5h
-      // before class), so the done screen has no "kept" branch.
-      setPhase("done");
-      // Re-fetch the server component so the cancelled booking leaves the list.
-      router.refresh();
-    } else {
-      setFailCode(res.code);
+    try {
+      const res = await cancelBookingAction({ bookingId: booking.bookingId });
+      if (res.ok) {
+        // A successful self-cancel is ALWAYS free/refunded (it can only happen ≥5h
+        // before class), so the done screen has no "kept" branch.
+        setPhase("done");
+        // Re-fetch the server component so the cancelled booking leaves the list.
+        router.refresh();
+      } else {
+        setFailCode(res.code);
+        setPhase("error");
+      }
+    } catch {
+      // A thrown action (network blip) → the keyed generic error state
+      // (INVALID_INPUT → err_generic), never an unhandled rejection.
+      setFailCode("INVALID_INPUT");
       setPhase("error");
     }
   }

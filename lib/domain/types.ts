@@ -5,7 +5,7 @@
 export type UserTier = "member" | "guest";
 export type PackageCategory = "group" | "private" | "rental";
 export type ClassType = "group" | "private" | "duo" | "trio" | "rental";
-export type ClassStatus = "draft" | "published";
+export type ClassStatus = "draft" | "published" | "cancelled";
 export type BookingStatus = "booked" | "cancelled";
 export type WaitlistStatus = "waiting" | "offered" | "claimed" | "expired";
 export type ReformerPosition = "left" | "middle" | "right";

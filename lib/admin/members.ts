@@ -31,6 +31,7 @@ import { getDb } from "@/lib/db/client";
 import { creditLedger, households, packages, users } from "@/lib/db/schema";
 import type { PackageCategory, UserTier } from "@/lib/domain/types";
 import { loadPoolOwner } from "@/lib/credits/selectPackage";
+import { mockDataMode } from "@/lib/mock-mode";
 
 // ───────────────────────── tunables ─────────────────────────
 
@@ -115,6 +116,8 @@ export interface CustomerLedgerEntry {
   /** Signed integer credit delta (−cost on book, +cost on refund, +N on purchase). */
   delta: number;
   reason: LedgerReason;
+  /** Free-text audit note (the owner's adjustment reason; class-cancel refunds), or null. */
+  note: string | null;
   /**
    * The pool balance AFTER this row, i.e. the running sum of all deltas up to AND
    * including this row (computed ascending by createdAt, then surfaced newest-first).
@@ -218,7 +221,7 @@ function byNameThenId<T extends { name: string; phone: string; id: string }>(a: 
  * without a database. The DB path is authoritative.
  */
 export async function listCustomers(filter: ListCustomersFilter = {}, now: Date = new Date()): Promise<AdminCustomer[]> {
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return mockListCustomers(filter, now);
   }
 
@@ -299,7 +302,7 @@ export async function getCustomerDetail(
   userId: string,
   now: Date = new Date(),
 ): Promise<AdminCustomerDetail | null> {
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return mockCustomerDetail(userId, now);
   }
 
@@ -389,7 +392,7 @@ export async function getCustomerLedger(
   customerId: string,
   now: Date = new Date(),
 ): Promise<CustomerLedgerEntry[]> {
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return mockCustomerLedger();
   }
 
@@ -414,6 +417,7 @@ export async function getCustomerLedger(
       createdAt: creditLedger.createdAt,
       delta: creditLedger.delta,
       reason: creditLedger.reason,
+      note: creditLedger.note,
     })
     .from(creditLedger)
     .where(inArray(creditLedger.packageId, pkgIds))
@@ -428,7 +432,7 @@ export async function getCustomerLedger(
  * here but kept off the signature — balances are pure delta sums.
  */
 function toLedgerEntries(
-  rows: readonly { id: string; createdAt: Date; delta: number; reason: string }[],
+  rows: readonly { id: string; createdAt: Date; delta: number; reason: string; note?: string | null }[],
 ): CustomerLedgerEntry[] {
   let running = 0;
   // Accumulate ascending, stamping each row's post-balance.
@@ -439,6 +443,7 @@ function toLedgerEntries(
       createdAt: r.createdAt.toISOString(),
       delta: r.delta,
       reason: r.reason as LedgerReason,
+      note: r.note ?? null,
       balanceAfter: running,
     };
   });

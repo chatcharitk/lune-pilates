@@ -110,8 +110,10 @@ Entities (see spec §5): `Household`, `User(tier: member|guest, household_id?)`,
    `expires_at > now()`, insert a `−cost` ledger row stamped with `actor_user_id`, decrement
    `hours_left`, insert the booking — **all or nothing**. No double-debit, no booking without
    debit, no debit without booking. Concurrency-safe (row lock / serializable).
-   **Credit cost per booking (decided 2026-06-17):** Group = 1.0, Private/Duo/Trio = 1.5,
-   Rental = 1.0 (review). Balances/costs are `numeric(4,1)` — see §8.
+   **Credit cost per booking (decided 2026-07-04, supersedes 2026-06-17):** WHOLE-INTEGER
+   credits — Group = 1, Rental = 1, Private/Duo/Trio = **2**. Balances/costs are `integer`
+   columns — see §8. A first-ever paid purchase of the 1-hour drop-in grants +1 free trial
+   hour (1+1 promo, ledger reason "promo").
 2. **Household pool is shared & consistent.** Every member of a house number reads the same
    balance; one member's booking is immediately visible to the rest. Balance = derivable from
    the ledger (ledger is the truth; `hours_left` is a cache that must always reconcile).
@@ -119,8 +121,12 @@ Entities (see spec §5): `Household`, `User(tier: member|guest, household_id?)`,
 4. **Tiered visibility is computed, not duplicated.** One `ClassInstance`. Bookable query:
    `status='published' AND starts_at > now() AND (viewer.tier='member' OR now() >= public_visible_at)`.
    `members_visible_at = published_at`; `public_visible_at = starts_at − N` (N tunable per type).
-5. **Schedule edits are per-week, never mutate the baseline template.** Publish flips instances
-   to `published` and emits one broadcast event.
+5. **Schedule edits are per-week, never mutate the recurring template.** The template is
+   EDITABLE data (`class_templates`, admin "Manage template"; `BASELINE_SLOTS` is only the
+   seed + empty-table fallback). Instances are **born published** (create/generate publish
+   immediately — the separate publish step was removed 2026-07-04) and each publish-equivalent
+   emits one broadcast event. A class can be **cancelled** (status `cancelled`): all live
+   bookings refund, the waitlist expires without offers, and the class stops being bookable.
 6. **Waitlist writes a Waitlist row, never a booking.** Joining is allowed only when the class is
    full; no charge. On a freed seat, offer the head of the queue a **30-minute window** to confirm
    and notify them; on timeout, cascade to the next head. The window is a FIFO **notification
@@ -128,17 +134,15 @@ Entities (see spec §5): `Household`, `User(tier: member|guest, household_id?)`,
    seat stays openly bookable, so confirming runs the normal atomic booking and may fail
    `CLASS_FULL` if a walk-up booked it first. No auto-charge — claiming debits only on confirm.
    Expiry + cascade run via a cron sweep (`/api/cron/waitlist-sweep`), with lazy expiry on read.
-7. **Cancellation policy — dynamic window (decided 2026-06-19).** The free cancel/reschedule
-   window is fixed **at booking time** by how far ahead the booking was made and stored on the
-   booking as `free_cancel_hours` (5 | 1):
-   - booked **≥ 5h** before class → free until **5h** before;
-   - booked **< 5h** before (last-minute) → free until **1h** before.
-   Inside the window, cancel/reschedule is free; outside, the booking's credit cost is **kept
-   (deducted)**. A free cancel returns the **exact cost** booked (a `+cost` ledger row) — never a
-   hardcoded 1. The applicable policy is shown to the customer on the "You're booked" success
-   screen. **Reschedule is allowed only within the free window** (a free move — refund the old
-   cost, debit the new, net-zero for same-cost types); past the window, reschedule is blocked and
-   only cancellation (with deduction) remains.
+7. **Cancellation policy — FIXED window (decided 2026-06-28, supersedes 2026-06-19).** One
+   fixed free-cancel window for every booking: a customer may cancel **only while ≥ 5h before
+   class starts**, and that cancel refunds the **exact cost** booked (a `+cost` ledger row) —
+   never a hardcoded 1. **Inside 5h, customer cancellation is blocked entirely** (no
+   deduct-and-cancel path). `free_cancel_hours` is stamped 5 on every booking as an audit
+   field only. **Customer reschedule was removed** (decided 2026-06-28) — all moves go through
+   the front desk (`adminReschedule`, Owner-only, may bypass the window). Admin cancels are
+   never window-blocked; the window only decides the DEFAULT refund, which the owner can
+   override, and a class-level `cancelClass` refunds everyone regardless.
 8. **Capacity.** Group/Trio/Rental cap 3, Duo cap 2, Private cap 1. Reformer max 3 per class.
 
 **Automation/CRM** is a *thin listener* on domain events already in the model (publish,
@@ -178,10 +182,10 @@ devs address findings.
 
 ## 8. House rules
 
-- TypeScript strict; no `any` in domain logic. **Credit balances and costs are `numeric(4,1)`
-  (half-hour granularity, decided 2026-06-17)** — Group booking = 1.0, Private/Duo/Trio = 1.5.
-  Read `numeric` columns back as JS numbers (`{ mode: "number" }`), never as strings, and keep all
-  cost/refund math server-side. Never trust client-supplied balances or prices — recompute server-side.
+- TypeScript strict; no `any` in domain logic. **Credit balances and costs are whole-INTEGER
+  columns (decided 2026-07-04, supersedes the 2026-06-17 `numeric(4,1)` decision)** — Group/Rental
+  booking = 1, Private/Duo/Trio = 2. Keep all cost/refund math server-side. Never trust
+  client-supplied balances or prices — recompute server-side.
 - All business rules (debit, visibility, policy, capacity) enforced **server-side**; the client
   only renders and requests.
 - Keep integration adapters behind interfaces so mock↔real is a one-file swap.

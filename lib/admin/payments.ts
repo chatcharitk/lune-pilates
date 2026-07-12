@@ -32,6 +32,7 @@ import { getCatalogItem } from "@/lib/catalog/packages";
 import type { Bilingual } from "@/lib/i18n";
 import { PERIOD, periodBounds } from "@/lib/admin/period";
 import { formatStudioDate, studioInstant, studioParts, studioStartOfDay } from "@/lib/time";
+import { mockDataMode } from "@/lib/mock-mode";
 
 // ───────────────────────── period ─────────────────────────
 // The accounting window the stat tiles roll up (CURRENT CALENDAR MONTH) now
@@ -206,7 +207,7 @@ export function whenDisplay(when: Date, now: Date = new Date()): string {
  * authoritative.
  */
 export async function listPayments(now: Date = new Date()): Promise<PaymentRow[]> {
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return mockListPayments(now);
   }
 
@@ -254,7 +255,7 @@ export async function listPayments(now: Date = new Date()): Promise<PaymentRow[]
 export async function getPaymentsStats(now: Date = new Date()): Promise<PaymentsStats> {
   const { start, end } = periodBounds(now);
 
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     const rows = mockListPayments(now).filter((r) => inPeriod(r.when, start, end));
     return summarisePayments(rows, MOCK_NEW_MEMBERS);
   }

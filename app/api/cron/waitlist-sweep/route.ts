@@ -10,16 +10,25 @@
 // 30 minutes, so even a 1–5 minute cadence keeps offers fresh. The route is
 // idempotent — running it more often only ever no-ops on already-swept rows.
 //
-// AUTH: requires a shared secret in the `Authorization: Bearer <CRON_SECRET>`
-// header, the `x-cron-secret` header, or a `?secret=` query param, matched against
-// the `CRON_SECRET` env var. Fails CLOSED: if `CRON_SECRET` is unset the route
-// refuses to run (503) rather than sweeping unauthenticated.
+// AUTH: requires a shared secret in the `Authorization: Bearer <CRON_SECRET>` or
+// `x-cron-secret` HEADER, matched timing-safely against the `CRON_SECRET` env
+// var. HEADERS ONLY — the former `?secret=` query-param form was removed (audit:
+// query strings land verbatim in access/proxy logs). Fails CLOSED: if
+// `CRON_SECRET` is unset the route refuses to run (503).
 
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { sweepWaitlist } from "@/lib/waitlist/queries";
 
 // Always run dynamically (this mutates data); never cache.
 export const dynamic = "force-dynamic";
+
+/** Constant-time string compare (length-guarded — timingSafeEqual throws on mismatch). */
+function safeEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  return ab.length === bb.length && timingSafeEqual(ab, bb);
+}
 
 function isAuthorized(req: Request): boolean {
   const expected = process.env.CRON_SECRET;
@@ -28,9 +37,11 @@ function isAuthorized(req: Request): boolean {
   const auth = req.headers.get("authorization");
   const bearer = auth?.startsWith("Bearer ") ? auth.slice("Bearer ".length) : null;
   const headerSecret = req.headers.get("x-cron-secret");
-  const querySecret = new URL(req.url).searchParams.get("secret");
 
-  return bearer === expected || headerSecret === expected || querySecret === expected;
+  return (
+    (bearer !== null && safeEqual(bearer, expected)) ||
+    (headerSecret !== null && safeEqual(headerSecret, expected))
+  );
 }
 
 async function handle(req: Request): Promise<NextResponse> {

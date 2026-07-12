@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { requireAdmin, requireOwner } from "@/lib/auth/admin";
 import { setCheckIn } from "@/app/actions/admin";
 import {
+  cancelClass,
   createClass,
   createTemplateSlot,
   deleteClass,
@@ -69,6 +70,8 @@ const GATED_ACTIONS: { name: string; call: () => Promise<{ ok: boolean; code?: s
       updateClass({ id: "bad", time: "bad", type: "group", durationMin: 60, capacity: 3, instructorId: null }),
   },
   { name: "deleteClass", call: () => deleteClass({ id: "not-a-uuid" }) },
+  // Class-level cancel (Owner-only): malformed uuid — UNAUTHORIZED beats it.
+  { name: "cancelClass", call: () => cancelClass({ id: "not-a-uuid" }) },
   // Template CRUD (Owner-only): malformed input (bad dayOfWeek/time/uuid) —
   // UNAUTHORIZED can only come from the requireOwner gate running first.
   {

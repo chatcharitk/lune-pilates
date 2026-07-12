@@ -36,6 +36,7 @@ import {
   type ClassTypeMeta,
   type InstructorMeta,
 } from "@/lib/schedule/queries";
+import { mockDataMode } from "@/lib/mock-mode";
 import {
   addDays,
   formatStudioTime,
@@ -305,7 +306,7 @@ export async function getAdminBookingsOverview(
   filter: AdminBookingsFilter = {},
   now: Date = new Date(),
 ): Promise<AdminBookingsOverview> {
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return mockAdminBookingsOverview(filter, now);
   }
   const [bookingList, waitlistGroups] = await Promise.all([
@@ -325,7 +326,7 @@ export async function getAdminBookings(
   filter: AdminBookingsFilter = {},
   now: Date = new Date(),
 ): Promise<AdminBooking[]> {
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return mockAdminBookingsOverview(filter, now).bookings;
   }
 
@@ -412,7 +413,7 @@ export async function getAdminBookings(
  * longer free a seat to offer).
  */
 export async function getAdminWaitlist(now: Date = new Date()): Promise<AdminWaitlistClass[]> {
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return mockAdminBookingsOverview({}, now).waitlist;
   }
 

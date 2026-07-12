@@ -14,6 +14,7 @@ import { Dot, Drawer } from "./ui";
 import { TemplateEditor } from "./template-editor";
 import { ClassRosterDrawer } from "./class-roster-drawer";
 import {
+  cancelClass,
   createClass,
   deleteClass,
   generateWeekFromBaseline,
@@ -70,6 +71,12 @@ export function ScheduleView({
   const [pending, startTransition] = useTransition();
   const [templateOpen, setTemplateOpen] = useState(false);
   const [rosterId, setRosterId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  function flash(msg: string) {
+    setToast(msg);
+    window.setTimeout(() => setToast(null), 3200);
+  }
 
   const weekStart = useMemo(() => new Date(schedule.weekStart), [schedule.weekStart]);
   const totalClasses = schedule.days.reduce((a, d) => a + d.classes.length, 0);
@@ -118,6 +125,15 @@ export function ScheduleView({
       <h1 className="mb-2.5 font-head text-xl font-semibold tracking-tight text-ink">
         {t("admin_schedule")}
       </h1>
+
+      {toast && (
+        <div
+          role="status"
+          className="mb-3 rounded-xl bg-sage/15 px-4 py-2.5 font-body text-[13px] font-semibold text-sage-deep"
+        >
+          {toast}
+        </div>
+      )}
 
       {/* actions — all three on one line (owner-only chrome) */}
       {!readOnly && (
@@ -198,9 +214,15 @@ export function ScheduleView({
         )
       ) : (
         <ul className="flex flex-col gap-1.5">
-          {day.classes.map((c) => (
+          {day.classes.map((c) => {
+                const cancelled = c.status === "cancelled";
+                return (
                 <li key={c.id}>
-                  <div className="flex min-h-[56px] items-center gap-1 rounded-2xl border border-line bg-surface-2 py-1.5 pl-1 pr-1.5 shadow-soft md:pr-2">
+                  <div
+                    className={`flex min-h-[56px] items-center gap-1 rounded-2xl border border-line bg-surface-2 py-1.5 pl-1 pr-1.5 shadow-soft md:pr-2 ${
+                      cancelled ? "opacity-60" : ""
+                    }`}
+                  >
                     <button
                       type="button"
                       onClick={() => setRosterId(c.id)}
@@ -214,9 +236,18 @@ export function ScheduleView({
                       <div className="min-w-0 flex-1">
                         <div className="flex min-w-0 items-center gap-1.5">
                           <Dot type={c.type} size={7} />
-                          <span className="truncate font-head text-[13.5px] font-semibold leading-tight text-ink">
+                          <span
+                            className={`truncate font-head text-[13.5px] font-semibold leading-tight ${
+                              cancelled ? "text-muted line-through" : "text-ink"
+                            }`}
+                          >
                             {tt(c.typeMeta.label)}
                           </span>
+                          {cancelled && (
+                            <span className="shrink-0 rounded-full bg-rose/20 px-2 py-0.5 font-body text-[10px] font-bold text-[#a56a52]">
+                              {t("status_cancelled")}
+                            </span>
+                          )}
                         </div>
                         <div className="mt-0.5 flex min-w-0 items-center gap-1.5 font-body text-[11.5px] text-ink-soft">
                           <span className={`min-w-0 truncate ${c.instructor ? "" : "text-muted"}`}>
@@ -229,7 +260,7 @@ export function ScheduleView({
                         </div>
                       </div>
                     </button>
-                    {!readOnly && (
+                    {!readOnly && !cancelled && (
                       <button
                         type="button"
                         onClick={() => setEditor({ mode: "edit", cls: c })}
@@ -242,7 +273,8 @@ export function ScheduleView({
                     )}
                   </div>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
 
@@ -253,6 +285,11 @@ export function ScheduleView({
           onClose={() => setEditor(null)}
           onSaved={() => {
             setEditor(null);
+            router.refresh();
+          }}
+          onCancelled={(n) => {
+            setEditor(null);
+            flash(t("class_cancelled_toast").replace("{n}", String(n)));
             router.refresh();
           }}
         />
@@ -277,6 +314,7 @@ const FAILURE_STR: Record<string, StrKey> = {
   CAPACITY_BELOW_BOOKED: "err_capacity_below_booked",
   HAS_BOOKINGS: "err_has_bookings",
   INVALID_INSTRUCTOR: "err_invalid_instructor",
+  ALREADY_CANCELLED: "err_already_cancelled",
 };
 
 function ClassEditor({
@@ -284,11 +322,13 @@ function ClassEditor({
   dayDate,
   onClose,
   onSaved,
+  onCancelled,
 }: {
   state: EditorState;
   dayDate: string;
   onClose: () => void;
   onSaved: () => void;
+  onCancelled: (refundedBookings: number) => void;
 }) {
   const { t, tt, lang } = useAdminLang();
   const isNew = state.mode === "new";
@@ -300,6 +340,7 @@ function ClassEditor({
   const [instructorId, setInstructorId] = useState<string | null>(c?.instructorId ?? null);
   const [capacity, setCapacity] = useState<number>(c?.capacity ?? CAPACITY.group);
   const [errorKey, setErrorKey] = useState<StrKey | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const maxCap = CAPACITY[type];
@@ -326,6 +367,18 @@ function ClassEditor({
       const res = await deleteClass({ id: c!.id });
       if (res.ok) onSaved();
       else setErrorKey(FAILURE_STR[res.code] ?? "err_generic");
+    });
+  }
+
+  function cancelWholeClass() {
+    setErrorKey(null);
+    startTransition(async () => {
+      const res = await cancelClass({ id: c!.id });
+      if (res.ok) onCancelled(res.cancelledBookings);
+      else {
+        setConfirmCancel(false);
+        setErrorKey(FAILURE_STR[res.code] ?? "err_generic");
+      }
     });
   }
 
@@ -434,14 +487,53 @@ function ClassEditor({
       </Field>
 
       {!isNew && (
-        <button
-          type="button"
-          onClick={remove}
-          disabled={pending}
-          className="mt-2 w-full rounded-xl border border-rose/40 py-3 font-body text-sm font-semibold text-[#a56a52] disabled:opacity-50"
-        >
-          {t("delete_class")}
-        </button>
+        <div className="mt-2 flex flex-col gap-2">
+          {c!.booked === 0 && (
+            <button
+              type="button"
+              onClick={remove}
+              disabled={pending}
+              className="w-full rounded-xl border border-rose/40 py-3 font-body text-sm font-semibold text-[#a56a52] disabled:opacity-50"
+            >
+              {t("delete_class")}
+            </button>
+          )}
+          {(c!.booked > 0 || c!.status === "published") &&
+            (confirmCancel ? (
+              <div className="rounded-xl border border-rose/40 bg-rose/10 p-3.5">
+                <p className="mb-3 font-body text-[13px] font-medium text-ink">
+                  {t("cancel_class_confirm")}
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmCancel(false)}
+                    disabled={pending}
+                    className="h-10 flex-1 rounded-xl border border-line-strong font-body text-[13px] font-semibold text-ink disabled:opacity-50"
+                  >
+                    {t("back")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelWholeClass}
+                    disabled={pending}
+                    className="h-10 flex-1 rounded-xl bg-[#a56a52] font-body text-[13px] font-semibold text-cream disabled:opacity-50"
+                  >
+                    {t("cancel_class")}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmCancel(true)}
+                disabled={pending}
+                className="w-full rounded-xl bg-rose/15 py-3 font-body text-sm font-semibold text-[#a56a52] disabled:opacity-50"
+              >
+                {t("cancel_class")}
+              </button>
+            ))}
+        </div>
       )}
     </Drawer>
   );

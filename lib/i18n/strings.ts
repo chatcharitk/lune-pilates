@@ -557,6 +557,12 @@ export const STR = {
   no_instructor: { en: "No instructor", th: "ไม่ระบุผู้สอน" },
   save_class: { en: "Save class", th: "บันทึก" },
   delete_class: { en: "Delete class", th: "ลบคลาส" },
+  // cancel_class { en:"Cancel class", th:"ยกเลิกคลาส" } already exists in the customer section above.
+  cancel_class_confirm: {
+    en: "Cancel this class? Everyone booked gets their credit back.",
+    th: "ยกเลิกคลาสนี้? ผู้จองทุกคนจะได้รับเครดิตคืน",
+  },
+  class_cancelled_toast: { en: "Class cancelled · {n} refunded", th: "ยกเลิกคลาสแล้ว · คืนเครดิต {n} คน" },
   people_max_reformers: { en: "people · max 3 reformers", th: "คน · สูงสุด 3 เครื่อง" },
   booked_label: { en: "booked", th: "จองแล้ว" },
   cls_short: { en: "cls", th: "คลาส" },
@@ -573,6 +579,7 @@ export const STR = {
   // schedule status + publish
   status_draft: { en: "Draft", th: "ฉบับร่าง" },
   status_published: { en: "Published", th: "เผยแพร่แล้ว" },
+  status_cancelled: { en: "Cancelled", th: "ยกเลิกแล้ว" },
   publish_week: { en: "Publish week", th: "เผยแพร่สัปดาห์" },
   // {n} draft instances not yet visible to anyone.
   n_unpublished: { en: "{n} unpublished", th: "ยังไม่เผยแพร่ {n}" },
@@ -607,6 +614,10 @@ export const STR = {
   err_invalid_instructor: {
     en: "Please choose a valid instructor.",
     th: "กรุณาเลือกผู้สอนที่ถูกต้อง",
+  },
+  err_already_cancelled: {
+    en: "This class is already cancelled.",
+    th: "คลาสนี้ถูกยกเลิกไปแล้ว",
   },
 
   // ───────────────────────── admin Schedule template editor (recurring weekly template) ─────────────────────────

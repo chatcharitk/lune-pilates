@@ -42,6 +42,7 @@ import type { Bilingual } from "@/lib/i18n";
 import { emit } from "@/lib/events/bus";
 import { registerNotificationHandlers } from "@/lib/events/notifications";
 import { and, eq, ne } from "drizzle-orm";
+import { mockDataMode } from "@/lib/mock-mode";
 
 // ───────────────────────── create checkout ─────────────────────────
 
@@ -117,7 +118,7 @@ export async function createCheckout(raw: CreateCheckoutInput): Promise<CreateCh
   // owner and recipient are all server-derived; the client never gets to set them.
   // (No-DB dev path: skip persisting — the mock provider's QR still renders, so the
   // whole checkout UI is exercisable without a database.)
-  if (process.env.DATABASE_URL) {
+  if (!mockDataMode()) {
     await getDb()
       .insert(charges)
       .values({
@@ -208,7 +209,7 @@ export async function uploadPaymentSlip(
 
   // No-DB dev path: accept the slip so the upload → under-review UI is exercisable
   // on mock data (nothing persists; production always has a database).
-  if (!process.env.DATABASE_URL) return { ok: true };
+  if (mockDataMode()) return { ok: true };
 
   // The charge intent persisted at checkout is authoritative. Look it up by the
   // provider's chargeId; if there is no binding, this charge was never opened here.
@@ -347,7 +348,7 @@ export async function confirmPayment(raw: ConfirmPaymentInput): Promise<ConfirmP
 
   // No-DB dev path: report "paid" so the mock flow completes end-to-end (QR → slip
   // → under-review poll → credited screen). No credit moves — mock only.
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return { ok: true, status: "paid", rejectionReason: null };
   }
 

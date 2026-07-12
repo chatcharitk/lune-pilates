@@ -30,6 +30,7 @@ import {
   startsAtFor,
 } from "@/lib/schedule/baseline";
 import { addDays, formatStudioTime, studioStartOfDay } from "@/lib/time";
+import { mockDataMode } from "@/lib/mock-mode";
 import {
   getTemplateSlotsByDow,
   type TemplateBaselineSlot,
@@ -205,7 +206,7 @@ export async function getWeekSchedule(
   const weekStart = startOfWeekMonday(anyDate);
   const scopeInstructorId = opts?.instructorId;
 
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     const week = mockWeekSchedule(weekStart);
     if (!scopeInstructorId) return week;
     // Instructor scope on the mock: keep only their classes per day.

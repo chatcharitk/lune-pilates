@@ -17,7 +17,6 @@
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { getCurrentUser } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/client";
 import { bookings, classInstances } from "@/lib/db/schema";
 import { CAPACITY, type ClassType, type ReformerPosition } from "@/lib/domain/types";
@@ -40,6 +39,7 @@ import { registerNotificationHandlers } from "@/lib/events/notifications";
 import { offerNextWaitlistSeat } from "@/lib/waitlist/queries";
 import { getAdminBookings } from "@/lib/admin/bookings";
 import { requireOwner } from "@/lib/auth/admin";
+import { mockDataMode } from "@/lib/mock-mode";
 
 // ───────────────────────── admin cancel ─────────────────────────
 
@@ -104,7 +104,7 @@ export async function adminCancelBooking(raw: AdminCancelBookingInput): Promise<
   const { bookingId, refund: override } = parsed.data;
   const now = new Date();
 
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     // UI dev against mock data — mirror the read model's OWN cancellation verdict
     // (mock↔read-model parity) so the toast matches what the drawer showed. The
     // mock seeds include same-day classes, so we must NOT assume a free cancel.
@@ -125,10 +125,6 @@ export async function adminCancelBooking(raw: AdminCancelBookingInput): Promise<
     };
   }
 
-  // Front desk acts on the customer's behalf; the actor stamped on the ledger row
-  // is the admin session user (so the audit trail shows who issued the cancel).
-  const admin = await getCurrentUser();
-
   const loaded = await loadBookingForAdminCancel(bookingId);
   if (!loaded) {
     return { ok: false, code: "NOT_FOUND" };
@@ -144,10 +140,15 @@ export async function adminCancelBooking(raw: AdminCancelBookingInput): Promise<
   // Default to the policy verdict; an explicit admin boolean overrides it.
   const doRefund = override ?? policy.free;
 
+  // Ledger actor = the booking's own customer (it is THEIR credit moving back —
+  // same semantics as adminBookForCustomer). The old code stamped the mock
+  // CUSTOMER session here (audit HIGH: every refund attributed to "Pim", and
+  // getCurrentUser() would crash inside an admin action under real LIFF auth).
   const cancelled = await cancelBooking({
     bookingId,
-    actorUserId: admin.id,
+    actorUserId: loaded.bookingUserId,
     refund: doRefund,
+    note: "cancelled by front desk",
   });
   if (!cancelled.ok) {
     return { ok: false, code: cancelled.code };
@@ -228,7 +229,7 @@ export async function adminOfferWaitlistSeat(
   const { classInstanceId } = parsed.data;
   const now = new Date();
 
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return {
       ok: true,
       outcome: {
@@ -313,7 +314,7 @@ export async function adminBookForCustomer(
   const input = parsed.data;
   const now = new Date();
 
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return {
       ok: true,
       bookingId: "00000000-0000-4000-8000-0000000000b1",
@@ -446,7 +447,7 @@ export async function adminReschedule(raw: AdminRescheduleInput): Promise<AdminR
   const input = parsed.data;
   const now = new Date();
 
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return {
       ok: true,
       newBookingId: "00000000-0000-4000-8000-0000000000b2",
@@ -644,7 +645,7 @@ export async function adminSetBookingPosition(
   if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
   const { bookingId, position } = parsed.data;
 
-  if (!process.env.DATABASE_URL) return { ok: true, position };
+  if (mockDataMode()) return { ok: true, position };
 
   const db = getDb();
   const [row] = await db

@@ -34,6 +34,7 @@ import { creditPackage, ownerForPool, type CreditOwner } from "@/lib/credits/cre
 import { emit } from "@/lib/events/bus";
 import { registerNotificationHandlers } from "@/lib/events/notifications";
 import { requireOwner } from "@/lib/auth/admin";
+import { mockDataMode } from "@/lib/mock-mode";
 
 // ───────────────────────── approve slip ─────────────────────────
 
@@ -317,7 +318,7 @@ export async function getSlip(raw: GetSlipInput): Promise<GetSlipResult> {
 
   // No-DB dev path: a placeholder slip so the admin viewers (Payments + Sales
   // detail) render on mock data instead of rejecting at getDb().
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     const svg =
       `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="240">` +
       `<rect width="100%" height="100%" fill="#FBF6EF"/>` +

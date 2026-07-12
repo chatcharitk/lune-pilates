@@ -19,6 +19,7 @@ import {
   type InstructorMeta,
 } from "@/lib/schedule/queries";
 import type { AdminAttendee, AdminWaitEntry } from "./today";
+import { mockDataMode } from "@/lib/mock-mode";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -47,11 +48,12 @@ export interface AdminClassRoster {
  * gate (position/cancel are owner-only; check-in is instructor-allowed & scoped).
  */
 export async function getClassRoster(classInstanceId: string): Promise<AdminClassRoster | null> {
-  if (!(await requireAdmin())) return null;
+  const session = await requireAdmin();
+  if (!session) return null;
 
   // No-DB dev path first (mock class ids may not be UUIDs — short-circuit before
   // any strict parse, per the mock-id note).
-  if (!process.env.DATABASE_URL) return mockClassRoster(classInstanceId);
+  if (mockDataMode()) return mockClassRoster(classInstanceId);
 
   if (!UUID_RE.test(classInstanceId)) return null;
 
@@ -75,6 +77,13 @@ export async function getClassRoster(classInstanceId: string): Promise<AdminClas
 
   const c = classRows[0];
   if (!c) return null;
+
+  // INSTRUCTOR SCOPE (audit: a least-privilege instructor session could read any
+  // class's roster incl. every customer's phone number). Mirror setCheckIn's rule:
+  // an instructor may open only THEIR OWN class's roster; owners are unscoped.
+  if (session.role === "instructor" && c.instructorId !== session.instructorId) {
+    return null;
+  }
 
   // Live attendees + member/household context, and the FIFO waitlist (waiting +
   // offered) — both keyed only on this class id, so one parallel round trip.

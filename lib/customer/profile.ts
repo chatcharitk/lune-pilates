@@ -23,6 +23,7 @@ import type { UserTier } from "@/lib/domain/types";
 import { getCurrentUser, type SessionUser } from "@/lib/auth/session";
 import { getCreditOverview } from "@/lib/credits/selectPackage";
 import { getMockSession } from "@/lib/mock/session";
+import { mockDataMode } from "@/lib/mock-mode";
 
 /** A person sharing the household pool (invariant 2 — one shared house number). */
 export interface Housemate {
@@ -161,7 +162,7 @@ function buildMockPurchase(id: string, itemId: string, price: number, iso: strin
  * No-DB dev fallback returns the mock so the Profile screen renders without a database.
  */
 export async function getProfileOverview(now: Date = new Date()): Promise<ProfileOverview> {
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return mockProfileOverview();
   }
 

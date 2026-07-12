@@ -10,7 +10,8 @@
 import { eq } from "drizzle-orm";
 import { getLineClient } from "@/lib/line";
 import { getDb } from "@/lib/db/client";
-import { users } from "@/lib/db/schema";
+import { bookings, users } from "@/lib/db/schema";
+import { formatStudioTime } from "@/lib/time";
 import { on } from "./bus";
 
 /**
@@ -57,7 +58,7 @@ export function registerNotificationHandlers(): void {
   const line = getLineClient();
 
   on("schedule.published", async () => {
-    await line.broadcast("Next week's schedule is live — book now.");
+    await line.broadcast("ตารางคลาสสัปดาห์ใหม่เปิดให้จองแล้วค่ะ 🌙");
   });
 
   on("waitlist.offered", async (e) => {
@@ -66,7 +67,7 @@ export function registerNotificationHandlers(): void {
     if (lineId) {
       await line.push(
         lineId,
-        `A spot opened — confirm within 30 min to claim it. Hold expires ${e.holdExpiresAt}.`,
+        `มีที่ว่างในคลาสที่คุณต่อคิวไว้! กดยืนยันภายใน 30 นาทีเพื่อรับสิทธิ์นะคะ`,
       );
     }
   });
@@ -77,7 +78,7 @@ export function registerNotificationHandlers(): void {
     const lineIds = await lineIdsForHousehold(e.householdId);
     await Promise.all(
       lineIds.map((lineId) =>
-        line.push(lineId, `Your household pool is down to ${e.hoursLeft} hr — top up.`),
+        line.push(lineId, `เครดิตของบ้านเหลือ ${e.hoursLeft} ชั่วโมงแล้ว เติมแพ็กเกจได้ในแอปเลยค่ะ`),
       ),
     );
   });
@@ -90,7 +91,7 @@ export function registerNotificationHandlers(): void {
     if (lineId) {
       await line.push(
         lineId,
-        `We received your payment slip for ฿${e.amount.toLocaleString("en-US")} — it's now under review.`,
+        `ได้รับสลิปการชำระเงิน ฿${e.amount.toLocaleString("en-US")} แล้ว กำลังตรวจสอบ จะแจ้งผลเร็วๆ นี้ค่ะ`,
       );
     }
   });
@@ -101,10 +102,10 @@ export function registerNotificationHandlers(): void {
     // users.id UUID — resolve the linked LINE id before pushing.
     const lineId = await lineIdForUser(e.userId);
     if (lineId) {
-      const tail = e.reason ? ` (${e.reason})` : "";
+      const tail = e.reason ? ` (เหตุผล: ${e.reason})` : "";
       await line.push(
         lineId,
-        `Your payment slip couldn't be verified${tail}. Please re-upload a clearer slip.`,
+        `สลิปการชำระเงินตรวจสอบไม่ผ่าน${tail} กรุณาอัปโหลดสลิปอีกครั้งนะคะ`,
       );
     }
   });
@@ -120,12 +121,35 @@ export function registerNotificationHandlers(): void {
       lineIds.map((lineId) =>
         line.push(
           lineId,
-          `Your credit balance was adjusted by ${sign}${e.delta} hr (now ${e.hoursLeft} hr). ${e.note}`,
+          `เครดิตของคุณถูกปรับ ${sign}${e.delta} ชั่วโมง (คงเหลือ ${e.hoursLeft} ชั่วโมง) — ${e.note}`,
         ),
       ),
     );
   });
 
-  // booking.confirmed / booking.cancelled / credit.expiring handlers attach the
-  // same way once we have the recipient's linked LINE id available.
+  on("class.cancelled", async (e) => {
+    // The studio cancelled a whole class: notify everyone whose booking on it was
+    // just cancelled (their refunds are already in the ledger — this is the notice).
+    if (!process.env.DATABASE_URL) return;
+    const rows = await getDb()
+      .select({ userId: bookings.userId })
+      .from(bookings)
+      .where(eq(bookings.classInstanceId, e.classInstanceId));
+    const userIds = [...new Set(rows.map((r) => r.userId))];
+    const when = formatStudioTime(new Date(e.startsAt));
+    await Promise.all(
+      userIds.map(async (userId) => {
+        const lineId = await lineIdForUser(userId);
+        if (lineId) {
+          await line.push(
+            lineId,
+            `ขออภัยค่ะ คลาสเวลา ${when} ถูกยกเลิกโดยสตูดิโอ เครดิตของคุณถูกคืนเรียบร้อยแล้ว`,
+          );
+        }
+      }),
+    );
+  });
+
+  // booking.confirmed / credit.expiring handlers attach the same way once we
+  // have the recipient's linked LINE id available.
 }

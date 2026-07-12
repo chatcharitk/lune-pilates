@@ -23,6 +23,7 @@ import { getDb } from "@/lib/db/client";
 import { charges, paymentSlips, users } from "@/lib/db/schema";
 import type { Bilingual } from "@/lib/i18n";
 import type { PeriodBounds } from "@/lib/admin/period";
+import { mockDataMode } from "@/lib/mock-mode";
 import {
   listPayments,
   normaliseMethod,
@@ -106,7 +107,7 @@ export function summariseSales(rows: readonly SalesRow[]): SalesSummary {
  * range. The DB path is authoritative.
  */
 export async function listSales(range: PeriodBounds, now: Date = new Date()): Promise<SalesRow[]> {
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return await mockListSales(range, now);
   }
 

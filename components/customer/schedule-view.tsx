@@ -23,7 +23,7 @@ import {
   type PartOfDay,
   type WeekDay,
 } from "./schedule-helpers";
-import { ChevronLeft, ChevronRight, Sparkle } from "./icons";
+import { ChevronRight, Sparkle } from "./icons";
 
 const PODS: PartOfDay[] = ["morning", "afternoon", "evening"];
 
@@ -60,24 +60,9 @@ export function ScheduleView({
           </h1>
         </div>
 
-        <div className="flex items-center justify-between px-[18px] pb-1.5 pt-2">
+        {/* The schedule is a rolling 7 days by design — no week paging. */}
+        <div className="flex items-center px-[18px] pb-1.5 pt-2">
           <span className="font-body text-[13.5px] font-semibold text-ink-soft">{tt(month)}</span>
-          <div className="flex gap-1.5">
-            <button
-              type="button"
-              aria-label={t("prev_week")}
-              className="grid h-[34px] w-[34px] place-items-center rounded-full border border-line bg-surface-2 text-ink-soft"
-            >
-              <ChevronLeft size={17} />
-            </button>
-            <button
-              type="button"
-              aria-label={t("next_week")}
-              className="grid h-[34px] w-[34px] place-items-center rounded-full border border-line bg-surface-2 text-ink-soft"
-            >
-              <ChevronRight size={17} />
-            </button>
-          </div>
         </div>
 
         {/* day chips */}

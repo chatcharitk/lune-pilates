@@ -1,6 +1,11 @@
 // No-DB unit tests for the admin Sales history + CSV export (Group D #1): the pure
 // CSV escaping/column order, the date-range bounds, and the no-DB listSales shape.
 // The owner-gate + live data are covered by the route handler / integration paths.
+//
+// TZ DISCIPLINE: every window is a BANGKOK wall-clock window, so all anchors here
+// are explicit instants (Z / +07:00) and all assertions read Bangkok parts via
+// studioParts or compare exact instants — the suite must pass identically under
+// the host TZ and under TZ=UTC (Vercel).
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { csvCell, salesRowsToCsv } from "@/lib/admin/csv";
@@ -13,6 +18,7 @@ import {
   yearBounds,
 } from "@/lib/admin/period";
 import { listSales, type SalesRow } from "@/lib/admin/sales";
+import { studioParts } from "@/lib/time";
 
 describe("csvCell (RFC 4180 escaping)", () => {
   it("passes plain values through verbatim", () => {
@@ -74,73 +80,68 @@ describe("salesRowsToCsv (header + columns)", () => {
 });
 
 describe("rangeBounds (half-open [start, end), end inclusive day)", () => {
-  it("spans the given days with an exclusive end = endDay + 1", () => {
+  it("spans the given days with an exclusive end = endDay + 1 (Bangkok days)", () => {
     const { start, end } = rangeBounds("2026-06-01", "2026-06-15");
-    expect(start.getFullYear()).toBe(2026);
-    expect(start.getMonth()).toBe(5); // June
-    expect(start.getDate()).toBe(1);
-    expect(end.getMonth()).toBe(5);
-    expect(end.getDate()).toBe(16); // 15th inclusive → 16th 00:00 exclusive
+    const s = studioParts(start);
+    const e = studioParts(end);
+    expect([s.year, s.month0, s.day, s.hour]).toEqual([2026, 5, 1, 0]);
+    expect([e.month0, e.day, e.hour]).toEqual([5, 16, 0]); // 15th inclusive → 16th 00:00 exclusive
   });
-  it("defaults to first-of-month → tomorrow when unset", () => {
-    const now = new Date(2026, 5, 20, 14, 30);
+  it("defaults to first-of-month → tomorrow when unset (Bangkok wall clock)", () => {
+    const now = new Date("2026-06-20T14:30:00+07:00"); // explicit Bangkok instant
     const { start, end } = rangeBounds(undefined, undefined, now);
-    expect(start.getDate()).toBe(1);
-    expect(start.getMonth()).toBe(5);
-    expect(end.getDate()).toBe(21); // today (20th) inclusive → 21st exclusive
+    const s = studioParts(start);
+    const e = studioParts(end);
+    expect([s.month0, s.day]).toEqual([5, 1]);
+    expect(e.day).toBe(21); // today (20th) inclusive → 21st exclusive
   });
 });
 
 describe("sales preset range helpers (pure, half-open [start, end))", () => {
-  // A fixed Wednesday for deterministic week math.
-  const wed = new Date(2026, 5, 24, 14, 30); // 2026-06-24 is a Wednesday
+  // A fixed Wednesday (Bangkok wall clock) for deterministic week math.
+  const wed = new Date("2026-06-24T14:30:00+07:00"); // 2026-06-24 is a Wednesday
 
-  it("todayBounds is [00:00 today, 00:00 tomorrow)", () => {
+  it("todayBounds is [00:00 today, 00:00 tomorrow) in Bangkok", () => {
     const { start, end } = todayBounds(wed);
-    expect(start.getFullYear()).toBe(2026);
-    expect(start.getMonth()).toBe(5);
-    expect(start.getDate()).toBe(24);
-    expect(start.getHours()).toBe(0);
-    expect(end.getDate()).toBe(25);
-    expect(end.getHours()).toBe(0);
+    const s = studioParts(start);
+    const e = studioParts(end);
+    expect([s.year, s.month0, s.day, s.hour]).toEqual([2026, 5, 24, 0]);
+    expect([e.day, e.hour]).toEqual([25, 0]);
   });
 
-  it("weekBounds spans Monday → next Monday (Mon-first)", () => {
+  it("weekBounds spans Monday → next Monday (Mon-first, Bangkok)", () => {
     const { start, end } = weekBounds(wed);
+    const s = studioParts(start);
+    const e = studioParts(end);
     // Monday of the week containing Wed 2026-06-24 is 2026-06-22.
-    expect(start.getDate()).toBe(22);
-    expect(start.getDay()).toBe(1); // Monday
-    expect(start.getHours()).toBe(0);
+    expect([s.day, s.isoDow, s.hour]).toEqual([22, 1, 0]);
     // Next Monday = 2026-06-29 (exclusive).
-    expect(end.getDate()).toBe(29);
-    expect(end.getDay()).toBe(1);
+    expect([e.day, e.isoDow]).toEqual([29, 1]);
     // Exactly 7 days wide.
     expect((end.getTime() - start.getTime()) / (24 * 3_600_000)).toBe(7);
   });
 
   it("weekBounds treats a Sunday as the LAST day of its Mon-first week", () => {
-    const sun = new Date(2026, 5, 28, 9, 0); // 2026-06-28 is a Sunday
+    const sun = new Date("2026-06-28T09:00:00+07:00"); // 2026-06-28 is a Sunday
     const { start, end } = weekBounds(sun);
-    expect(start.getDate()).toBe(22); // still that Monday
-    expect(end.getDate()).toBe(29); // next Monday
+    expect(studioParts(start).day).toBe(22); // still that Monday
+    expect(studioParts(end).day).toBe(29); // next Monday
   });
 
-  it("monthBounds = first-of-month → first-of-next-month", () => {
+  it("monthBounds = first-of-month → first-of-next-month (Bangkok)", () => {
     const { start, end } = monthBounds(wed);
-    expect(start.getDate()).toBe(1);
-    expect(start.getMonth()).toBe(5); // June
-    expect(end.getDate()).toBe(1);
-    expect(end.getMonth()).toBe(6); // July
+    const s = studioParts(start);
+    const e = studioParts(end);
+    expect([s.day, s.month0]).toEqual([1, 5]); // June
+    expect([e.day, e.month0]).toEqual([1, 6]); // July
   });
 
-  it("yearBounds = Jan 1 → next-year Jan 1", () => {
+  it("yearBounds = Jan 1 → next-year Jan 1 (Bangkok)", () => {
     const { start, end } = yearBounds(wed);
-    expect(start.getFullYear()).toBe(2026);
-    expect(start.getMonth()).toBe(0);
-    expect(start.getDate()).toBe(1);
-    expect(end.getFullYear()).toBe(2027);
-    expect(end.getMonth()).toBe(0);
-    expect(end.getDate()).toBe(1);
+    const s = studioParts(start);
+    const e = studioParts(end);
+    expect([s.year, s.month0, s.day]).toEqual([2026, 0, 1]);
+    expect([e.year, e.month0, e.day]).toEqual([2027, 0, 1]);
   });
 
   it("presetRange returns matching yyyy-mm-dd from/to strings (inclusive end day)", () => {

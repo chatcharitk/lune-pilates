@@ -25,6 +25,7 @@ import { instructorAvailability, instructors } from "@/lib/db/schema";
 import { WEEKDAYS, type Weekday } from "@/lib/admin/instructors";
 import { slugifyInstructorId } from "@/lib/admin/instructor-id";
 import { requireOwner } from "@/lib/auth/admin";
+import { mockDataMode } from "@/lib/mock-mode";
 
 /** Sentinel to roll the replace transaction back when the instructor is missing/inactive. */
 class UnknownInstructorError extends Error {}
@@ -119,7 +120,7 @@ export async function setInstructorAvailability(
     })),
   );
 
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     // UI dev against mock data — validation passed, nothing to persist.
     return { ok: true };
   }
@@ -221,7 +222,7 @@ export async function createInstructor(raw: CreateInstructorInput): Promise<Crea
 
   const base = slugifyInstructorId(name);
 
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     // UI dev against mock data — synthesize the slug id (deterministic for a usable
     // name, random fallback otherwise). Nothing is persisted.
     return { ok: true, id: base || randomSuffix() };
@@ -277,7 +278,7 @@ export async function updateInstructor(raw: UpdateInstructorInput): Promise<Upda
   if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
   const { id, name, nameTh, tag } = parsed.data;
 
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return { ok: true, id };
   }
 
@@ -322,7 +323,7 @@ export async function setInstructorActive(
   if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
   const { id, active } = parsed.data;
 
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return { ok: true, id, active };
   }
 

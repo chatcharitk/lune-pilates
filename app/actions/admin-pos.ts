@@ -46,6 +46,7 @@ import { creditPackage, ownerForPool, type CreditOwner } from "@/lib/credits/cre
 import { emit } from "@/lib/events/bus";
 import { registerNotificationHandlers } from "@/lib/events/notifications";
 import { requireOwner } from "@/lib/auth/admin";
+import { mockDataMode } from "@/lib/mock-mode";
 
 // ───────────────────────── shared owner resolution ─────────────────────────
 
@@ -156,7 +157,7 @@ export async function posSellPackage(raw: PosSellPackageInput): Promise<PosSellP
     return { ok: false, code: "UNKNOWN_PACKAGE" };
   }
 
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     // UI dev against mock data — synthesize a believable sale for the chosen tender.
     if (method === "cash") {
       return {
@@ -356,7 +357,7 @@ export async function posConfirmPayment(
   const { chargeId } = parsed.data;
   const now = new Date();
 
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return {
       ok: true,
       receipt: {

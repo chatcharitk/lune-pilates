@@ -18,6 +18,7 @@ import { studioInstant, studioParts, studioStartOfDay } from "@/lib/time";
 import { bookings, classInstances, households, instructors, users, waitlist } from "@/lib/db/schema";
 import type { ClassType, ReformerPosition } from "@/lib/domain/types";
 import { effectiveCapacity } from "@/lib/domain/types";
+import { mockDataMode } from "@/lib/mock-mode";
 import {
   instructorMetaFor,
   metaFor,
@@ -135,7 +136,7 @@ export async function getTodayOverview(
   const dayStart = startOfDay(now);
   const scopeInstructorId = opts?.instructorId;
 
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return mockTodayOverview(dayStart, scopeInstructorId);
   }
 

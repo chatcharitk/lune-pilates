@@ -20,6 +20,7 @@ import { packages, users } from "@/lib/db/schema";
 import type { ClassType, PackageCategory } from "@/lib/domain/types";
 import type { SessionUser } from "@/lib/auth/session";
 import { getMockSession } from "@/lib/mock/session";
+import { mockDataMode } from "@/lib/mock-mode";
 
 /**
  * The package-ownership filter for `viewer`'s pool: a member with a household
@@ -252,7 +253,7 @@ export async function getPoolBalance(
   classType: ClassType,
   now: Date = new Date(),
 ): Promise<number> {
-  if (!process.env.DATABASE_URL) return getMockSession().credits;
+  if (mockDataMode()) return getMockSession().credits;
   const db = getDb();
   const rows = await db
     .select({ hoursLeft: packages.hoursLeft })
@@ -288,7 +289,7 @@ export async function getCreditOverview(
   now: Date = new Date(),
 ): Promise<CreditOverview> {
   const isHouseholdPool = viewer.tier === "member" && viewer.householdId !== null;
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     const mock = getMockSession();
     return { hours: mock.credits, nearestExpiry: null, isHouseholdPool: mock.isHouseholdPool };
   }

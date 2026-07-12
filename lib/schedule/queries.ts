@@ -21,6 +21,7 @@ import { selectUsablePackageRow } from "@/lib/credits/selectPackage";
 import { getMockSession } from "@/lib/mock/session";
 import { addDays, studioInstant, studioParts, studioStartOfWeekMonday } from "@/lib/time";
 import { isBookableForViewer } from "./visibility";
+import { mockDataMode } from "@/lib/mock-mode";
 
 // ───────────────────────── shared shapes ─────────────────────────
 
@@ -156,7 +157,7 @@ export async function getUsableBalance(
   now: Date = new Date(),
   minHours = 0,
 ): Promise<number | null> {
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return getMockSession().credits;
   }
   const pkg = await selectUsablePackageRow(viewer, classType, now, minHours);
@@ -224,7 +225,7 @@ export interface ListBookableArgs {
  */
 export async function listBookableClasses(args: ListBookableArgs): Promise<BookableClass[]> {
   const now = args.now ?? new Date();
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return mockListBookableClasses(args.viewer, args.weekStart, now);
   }
 
@@ -309,7 +310,7 @@ export async function getClassDetail(
   viewer: ClassViewer,
   now: Date = new Date(),
 ): Promise<ClassDetail | null> {
-  if (!process.env.DATABASE_URL) {
+  if (mockDataMode()) {
     return mockGetClassDetail(classInstanceId, viewer, now);
   }
 

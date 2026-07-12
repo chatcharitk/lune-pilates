@@ -156,13 +156,20 @@ export function BookingPanel({
       usesPositions && detail.positions[selected]
         ? detail.positions[selected].position
         : undefined;
-    const res = await bookClass({ classInstanceId: detail.id, position });
-    if (res.ok) {
-      setBalanceAfter(res.hoursLeft);
-      setFreeCancelHours(res.freeCancelHours);
-      setPhase("booked");
-    } else {
-      setFailCode(res.code);
+    try {
+      const res = await bookClass({ classInstanceId: detail.id, position });
+      if (res.ok) {
+        setBalanceAfter(res.hoursLeft);
+        setFreeCancelHours(res.freeCancelHours);
+        setPhase("booked");
+      } else {
+        setFailCode(res.code);
+        setPhase("error");
+      }
+    } catch {
+      // A thrown action (network blip / unexpected server error) must surface the
+      // keyed generic error, not reject unhandled. INVALID_INPUT → err_generic.
+      setFailCode("INVALID_INPUT");
       setPhase("error");
     }
   }
@@ -173,12 +180,18 @@ export function BookingPanel({
   async function joinWl() {
     setWlPhase("joining");
     setWlFailCode(null);
-    const res = await joinWaitlist({ classInstanceId: detail.id });
-    if (res.ok) {
-      setWlPosition(res.position);
-      setWlPhase("joined");
-    } else {
-      setWlFailCode(res.code);
+    try {
+      const res = await joinWaitlist({ classInstanceId: detail.id });
+      if (res.ok) {
+        setWlPosition(res.position);
+        setWlPhase("joined");
+      } else {
+        setWlFailCode(res.code);
+        setWlPhase("error");
+      }
+    } catch {
+      // Network blip → the same keyed generic error state (INVALID_INPUT → err_generic).
+      setWlFailCode("INVALID_INPUT");
       setWlPhase("error");
     }
   }

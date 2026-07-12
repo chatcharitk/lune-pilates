@@ -24,16 +24,17 @@ import { requireOwner } from "@/lib/auth/admin";
 import { rangeBounds } from "@/lib/admin/period";
 import { listSales } from "@/lib/admin/sales";
 import { salesRowsToCsv } from "@/lib/admin/csv";
+import { addDays, studioParts } from "@/lib/time";
 
 // PII + always-fresh: never statically optimised, never cached.
 export const dynamic = "force-dynamic";
 
-/** Local `yyyy-mm-dd` of a Date, for the download filename. */
+/** BANGKOK `yyyy-mm-dd` of an instant, for the download filename — the range
+ * bounds are Bangkok day edges (rangeBounds), so the label must read them in
+ * Bangkok too, not the runtime TZ (UTC on Vercel would shift every day −1). */
 function ymd(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  const { year, month0, day } = studioParts(d);
+  return `${year}-${String(month0 + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
 export async function GET(req: Request): Promise<NextResponse> {
@@ -50,9 +51,10 @@ export async function GET(req: Request): Promise<NextResponse> {
   const csv = salesRowsToCsv(await listSales(range), "en");
 
   // The filename labels the INCLUSIVE day range. `range.end` is the EXCLUSIVE upper
-  // bound (start-of-(lastDay + 1)), so the inclusive last day is end − 1 day.
+  // bound (Bangkok start-of-(lastDay + 1)), so the inclusive last day is end − 1 day
+  // (exact 24h is safe — ICT has no DST).
   const startLabel = ymd(range.start);
-  const endLabel = ymd(new Date(range.end.getTime() - 24 * 3_600_000));
+  const endLabel = ymd(addDays(range.end, -1));
 
   // UTF-8 BOM (﻿) so Excel detects UTF-8 and renders Thai labels/names correctly.
   const body = "﻿" + csv;

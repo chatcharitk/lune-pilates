@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
+  // No maximumScale: pinch-zoom must stay available (WCAG 1.4.4).
   // Extend under the notch/home-indicator so env(safe-area-inset-*) is non-zero
   // on iOS — the fixed bottom nav + checkout bars pad against it.
   viewportFit: "cover",

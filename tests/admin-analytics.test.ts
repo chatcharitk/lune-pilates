@@ -11,6 +11,7 @@
 //     denseDailyRevenue, withMixPct) and the period helpers (periodBounds,
 //     priorPeriodBounds, pctDelta) are correct.
 
+import { studioParts } from "@/lib/time";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   buildAlert,
@@ -40,18 +41,18 @@ const now = new Date("2026-06-30T12:00:00+07:00");
 // ───────────────────────── period helpers (pure) ─────────────────────────
 
 describe("period helpers", () => {
-  it("periodBounds is [first-of-month, first-of-next-month)", () => {
-    const { start, end } = periodBounds(new Date("2026-06-15T08:00:00"));
-    expect(start.getMonth()).toBe(5); // June
-    expect(start.getDate()).toBe(1);
-    expect(end.getMonth()).toBe(6); // July
-    expect(end.getDate()).toBe(1);
+  it("periodBounds is [first-of-month, first-of-next-month) in Bangkok", () => {
+    const { start, end } = periodBounds(new Date("2026-06-15T08:00:00+07:00"));
+    const s = studioParts(start);
+    const e = studioParts(end);
+    expect([s.month0, s.day]).toEqual([5, 1]); // June 1, Bangkok
+    expect([e.month0, e.day]).toEqual([6, 1]); // July 1, Bangkok
   });
 
   it("priorPeriodBounds is the previous month, contiguous with the current", () => {
-    const cur = periodBounds(new Date("2026-06-15T08:00:00"));
-    const prev = priorPeriodBounds(new Date("2026-06-15T08:00:00"));
-    expect(prev.start.getMonth()).toBe(4); // May
+    const cur = periodBounds(new Date("2026-06-15T08:00:00+07:00"));
+    const prev = priorPeriodBounds(new Date("2026-06-15T08:00:00+07:00"));
+    expect(studioParts(prev.start).month0).toBe(4); // May, Bangkok
     expect(prev.end.getTime()).toBe(cur.start.getTime());
   });
 

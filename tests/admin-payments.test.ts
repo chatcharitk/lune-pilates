@@ -7,6 +7,7 @@
 //   - method/status normalisation fails safe;
 //   - the period bounds are a clean [month start, next month start).
 
+import { studioParts } from "@/lib/time";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   getPaymentsOverview,
@@ -116,13 +117,12 @@ describe("packageLabelFor", () => {
 });
 
 describe("periodBounds", () => {
-  it("is [first-of-month 00:00, first-of-next-month 00:00)", () => {
-    const { start, end } = periodBounds(new Date("2026-06-22T12:00:00"));
-    expect(start.getFullYear()).toBe(2026);
-    expect(start.getMonth()).toBe(5); // June (0-based)
-    expect(start.getDate()).toBe(1);
-    expect(end.getMonth()).toBe(6); // July
-    expect(end.getDate()).toBe(1);
+  it("is [first-of-month 00:00, first-of-next-month 00:00) in Bangkok", () => {
+    const { start, end } = periodBounds(new Date("2026-06-22T12:00:00+07:00"));
+    const s = studioParts(start);
+    const e = studioParts(end);
+    expect([s.year, s.month0, s.day, s.hour]).toEqual([2026, 5, 1, 0]); // June 1, Bangkok
+    expect([e.month0, e.day, e.hour]).toEqual([6, 1, 0]); // July 1, Bangkok
     expect(end.getTime()).toBeGreaterThan(start.getTime());
   });
 });

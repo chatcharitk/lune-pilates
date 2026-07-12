@@ -6,7 +6,7 @@ import type { ClassType, UserTier } from "@/lib/domain/types";
 import { DEFAULT_PUBLIC_LEAD_HOURS } from "@/lib/domain/types";
 
 export interface VisibilityInput {
-  status: "draft" | "published";
+  status: "draft" | "published" | "cancelled";
   startsAt: Date;
   publicVisibleAt: Date | null;
 }

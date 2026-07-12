@@ -43,7 +43,13 @@ the `bookings` one-live-per-(class,user) / per-position partial unique indexes.
 > from a local terminal against the target `DATABASE_URL`, not from CI.
 
 `db:seed` creates 3 instructors (+ weekly availability), household A-114, member Pim,
-a 7.5h shared group pool, a published week of group classes, and instructor availability.
+a shared group pool, a published week of group classes, and instructor availability.
+
+> ⚠️ **Do NOT run the full seed against a database serving real customers** — it
+> plants the DEMO member "Pim" with free spendable credits (and today's mock session
+> resolves every visitor to that identity). Before real launch: split reference data
+> (instructors, template) from demo data, and delete the demo household/member/package
+> rows from prod. Tracked as a Phase-2 launch task.
 
 ---
 
@@ -58,11 +64,14 @@ Notes:
 - **Schedule is daily (`0 3 * * *`) for Hobby-plan compatibility** — Hobby rejects any
   cron that runs more than once/day. On **Vercel Pro**, change it back to `*/5 * * * *`
   (every 5 min) for fresher waitlist cascades.
-- The hold is 30 min and reads **lazily self-expire**, so a daily sweep is only a
-  backstop — offers still expire on read and the queue still works between runs.
-- An external scheduler works too (e.g. every 5 min on a free cron service): `GET`/`POST`
-  the route with the secret as `Authorization: Bearer <CRON_SECRET>`, `x-cron-secret:
-  <secret>`, or `?secret=<secret>`.
+- ⚠️ **A daily sweep is NOT enough for real customers.** Reads lazily self-expire the
+  *display* of a lapsed 30-min offer, but the **cascade to the next person in the queue
+  runs only inside the sweep** (or on another freed seat). With a daily cron, person #2
+  can wait ~24h for their turn. **Before launch**: either Vercel Pro `*/5 * * * *` or a
+  free external scheduler (e.g. cron-job.org) hitting the route every 5 minutes.
+- External scheduler calls: `GET`/`POST` the route with the secret as
+  `Authorization: Bearer <CRON_SECRET>` or `x-cron-secret: <secret>` (headers ONLY —
+  the query-param form was removed so secrets never land in request logs).
 
 ---
 
