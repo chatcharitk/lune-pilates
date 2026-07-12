@@ -1,6 +1,7 @@
 import type { SlipStorage } from "./types";
 import { MockSlipStorage } from "./mock";
 import { VercelBlobStorage } from "./blob";
+import { R2SlipStorage } from "./r2";
 
 let _storage: SlipStorage | null = null;
 
@@ -16,6 +17,9 @@ let _storage: SlipStorage | null = null;
  *   - "blob"         → Vercel Blob (bytes in Blob, resolved server-side; needs
  *                      BLOB_READ_WRITE_TOKEN — checked here so a misconfig fails on
  *                      first construction, not on the first upload).
+ *   - "r2"           → Cloudflare R2 (S3-compatible private bucket, resolved
+ *                      server-side; needs R2_ACCOUNT_ID / R2_ACCESS_KEY_ID /
+ *                      R2_SECRET_ACCESS_KEY / R2_BUCKET — validated at construction).
  *   - any other value → throw.
  */
 export function getSlipStorage(): SlipStorage {
@@ -31,10 +35,15 @@ export function getSlipStorage(): SlipStorage {
         );
       }
       _storage = new VercelBlobStorage();
+    } else if (mode === "r2") {
+      // Constructor validates the four R2_* env vars and throws if any is missing —
+      // a misconfig fails on first construction, not on the first upload.
+      _storage = new R2SlipStorage();
     } else {
       throw new Error(
         `STORAGE_MODE=${mode} is not a known slip store. ` +
-          `Use "mock" (dev) or "blob" (Vercel Blob), or wire a new store in lib/storage/index.ts.`,
+          `Use "mock" (dev), "blob" (Vercel Blob), or "r2" (Cloudflare R2), ` +
+          `or wire a new store in lib/storage/index.ts.`,
       );
     }
   }
