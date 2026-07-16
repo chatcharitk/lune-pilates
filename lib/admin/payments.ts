@@ -60,8 +60,11 @@ export type PaymentMethod = "promptpay" | "cash";
  *   awaiting_review → slip uploaded, awaiting the front desk's verification
  *                     (amber / uncollected — NOT revenue until approved);
  *   rejected        → slip rejected, no credit (red / uncollected).
+ *   cancelled       → the sale was voided by the front desk (any unused credit
+ *                     reversed); contributes to NO money tile (neither revenue nor
+ *                     pending) — see app/actions/admin-sales.ts → cancelSale.
  */
-export type PaymentStatus = "paid" | "pending" | "awaiting_review" | "rejected";
+export type PaymentStatus = "paid" | "pending" | "awaiting_review" | "rejected" | "cancelled";
 
 /** One row in the admin payments table. */
 export interface PaymentRow {
@@ -137,6 +140,8 @@ export function normaliseStatus(status: string): PaymentStatus {
       return "awaiting_review";
     case "rejected":
       return "rejected";
+    case "cancelled":
+      return "cancelled";
     default:
       return "pending";
   }

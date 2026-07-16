@@ -15,6 +15,7 @@ import { z } from "zod";
 import { getDb } from "@/lib/db/client";
 import { charges } from "@/lib/db/schema";
 import { requireOwner } from "@/lib/auth/admin";
+import { applySaleCancellation } from "@/lib/credits/cancelSale";
 import { mockDataMode } from "@/lib/mock-mode";
 
 const updateSaleTimeInput = z.object({
@@ -62,4 +63,53 @@ export async function updateSaleTime(raw: UpdateSaleTimeInput): Promise<UpdateSa
   revalidatePath("/admin/payments");
   revalidatePath("/admin/dashboard");
   return { ok: true, soldAt: soldAt.toISOString() };
+}
+
+// ───────────────────────── cancel (void) a sale ─────────────────────────
+
+const cancelSaleInput = z.object({
+  chargeId: z.string().min(1),
+  /** Optional audit note (the owner's reason), stored on the reversal ledger row. */
+  reason: z.string().max(500).optional(),
+});
+export type CancelSaleInput = z.infer<typeof cancelSaleInput>;
+
+export type CancelSaleFailureCode =
+  | "UNAUTHORIZED"
+  | "INVALID_INPUT"
+  | "NOT_FOUND"
+  // The sale is already cancelled (idempotent guard — nothing more to reverse).
+  | "ALREADY_CANCELLED";
+
+export type CancelSaleResult =
+  | { ok: true; wasPaid: boolean; reversedHours: number; spentHours: number }
+  | { ok: false; code: CancelSaleFailureCode };
+
+/**
+ * Void a sale and reverse any unused credit it granted (Owner-only). Money-critical:
+ * the reversal is delegated to the atomic, row-locked `applySaleCancellation`
+ * primitive (append-only ledger, never negative). Refreshes the sales/payments/
+ * dashboard views. No-DB dev path echoes a success so the drawer works on mock data.
+ */
+export async function cancelSale(raw: CancelSaleInput): Promise<CancelSaleResult> {
+  if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
+
+  const parsed = cancelSaleInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
+
+  if (mockDataMode()) return { ok: true, wasPaid: false, reversedHours: 0, spentHours: 0 };
+
+  const note = parsed.data.reason?.trim() ? parsed.data.reason.trim() : undefined;
+  const outcome = await applySaleCancellation({ chargeId: parsed.data.chargeId, note });
+  if (!outcome.ok) return { ok: false, code: outcome.code };
+
+  revalidatePath("/admin/sales");
+  revalidatePath("/admin/payments");
+  revalidatePath("/admin/dashboard");
+  return {
+    ok: true,
+    wasPaid: outcome.wasPaid,
+    reversedHours: outcome.reversedHours,
+    spentHours: outcome.spentHours,
+  };
 }

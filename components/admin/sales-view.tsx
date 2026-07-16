@@ -29,6 +29,7 @@ const STATUS_BADGE: Record<PaymentStatus, { tone: BadgeTone; key: StrKey }> = {
   pending: { tone: "amber", key: "pending" },
   awaiting_review: { tone: "amber", key: "status_in_review" },
   rejected: { tone: "rose", key: "status_rejected" },
+  cancelled: { tone: "neutral", key: "status_cancelled" },
 };
 
 const METHOD_LABEL: Record<PaymentMethod, StrKey> = {

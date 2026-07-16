@@ -17,7 +17,8 @@ import {
   weekBounds,
   yearBounds,
 } from "@/lib/admin/period";
-import { listSales, type SalesRow } from "@/lib/admin/sales";
+import { listSales, summariseSales, type SalesRow } from "@/lib/admin/sales";
+import { normaliseStatus } from "@/lib/admin/payments";
 import { studioParts } from "@/lib/time";
 
 describe("csvCell (RFC 4180 escaping)", () => {
@@ -172,6 +173,38 @@ describe("sales preset range helpers (pure, half-open [start, end))", () => {
     const rt = rangeBounds(p.fromDay, p.toDay, wed);
     expect(rt.start.getTime()).toBe(p.start.getTime());
     expect(rt.end.getTime()).toBe(p.end.getTime());
+  });
+});
+
+describe("cancelled sale status (void)", () => {
+  const row = (over: Partial<SalesRow>): SalesRow => ({
+    id: "c1",
+    when: "2026-06-20T09:12:00.000Z",
+    whenDisplay: "09:12",
+    customerName: "พิม",
+    customerId: "u1",
+    packageLabel: { en: "10 hours", th: "10 ชั่วโมง" },
+    packageId: "p10",
+    method: "promptpay",
+    amount: 5500,
+    status: "paid",
+    hasSlip: false,
+    ...over,
+  });
+
+  it("normaliseStatus maps the stored 'cancelled' value through", () => {
+    expect(normaliseStatus("cancelled")).toBe("cancelled");
+  });
+
+  it("a cancelled sale counts toward NEITHER revenue nor pending", () => {
+    const s = summariseSales([
+      row({ id: "a", status: "paid", amount: 5500 }),
+      row({ id: "b", status: "cancelled", amount: 9000 }),
+      row({ id: "c", status: "awaiting_review", amount: 2950 }),
+    ]);
+    expect(s.count).toBe(3); // still listed
+    expect(s.revenuePaid).toBe(5500); // the cancelled 9000 is NOT revenue
+    expect(s.pending).toBe(2950); // nor pending
   });
 });
 

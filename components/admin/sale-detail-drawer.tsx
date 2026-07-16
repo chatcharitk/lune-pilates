@@ -13,7 +13,7 @@ import { useRouter } from "next/navigation";
 import { useAdminLang } from "./admin-context";
 import { Avatar, Badge, Drawer, type BadgeTone } from "./ui";
 import { getSlip } from "@/app/actions/admin-payments";
-import { updateSaleTime } from "@/app/actions/admin-sales";
+import { cancelSale, updateSaleTime } from "@/app/actions/admin-sales";
 import type { SalesRow, PaymentMethod, PaymentStatus } from "@/lib/admin/sales";
 import { thb, type StrKey } from "@/lib/i18n";
 import { formatStudioDate, formatStudioTime, studioInstant, studioParts } from "@/lib/time";
@@ -24,6 +24,7 @@ const STATUS_BADGE: Record<PaymentStatus, { tone: BadgeTone; key: StrKey }> = {
   pending: { tone: "amber", key: "pending" },
   awaiting_review: { tone: "amber", key: "status_in_review" },
   rejected: { tone: "rose", key: "status_rejected" },
+  cancelled: { tone: "neutral", key: "status_cancelled" },
 };
 
 const METHOD_LABEL: Record<PaymentMethod, StrKey> = {
@@ -47,12 +48,22 @@ export function SaleDetailDrawer({ sale, onClose }: { sale: SalesRow | null; onC
   const [timeValue, setTimeValue] = useState("");
   const [toast, setToast] = useState<StrKey | null>(null);
   const [pending, startTransition] = useTransition();
+  // Cancel-sale flow: a confirm panel with an optional reason, a second transition
+  // (so it doesn't disable the time-edit save), and a note shown when the void left
+  // already-used credits in place.
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelNote, setCancelNote] = useState<StrKey | null>(null);
+  const [cancelPending, startCancel] = useTransition();
 
   // On open (keyed by the sale ID, not the row object — router.refresh() swaps the
   // row objects, and re-running then would wipe the success toast and refetch the
   // slip): prefill the Bangkok wall-clock date/time inputs and fetch the slip.
   const saleId = sale?.id ?? null;
   useEffect(() => {
+    setConfirmingCancel(false);
+    setCancelReason("");
+    setCancelNote(null);
     if (!sale) {
       setSlip(null);
       setToast(null);
@@ -98,7 +109,27 @@ export function SaleDetailDrawer({ sale, onClose }: { sale: SalesRow | null; onC
     });
   }
 
+  function doCancel() {
+    if (!sale || cancelPending) return;
+    setToast(null);
+    setCancelNote(null);
+    startCancel(async () => {
+      const res = await cancelSale({ chargeId: sale.id, reason: cancelReason.trim() || undefined });
+      if (res.ok) {
+        setConfirmingCancel(false);
+        setToast("sale_cancelled_toast");
+        // If the void left already-used credits in place, tell the owner.
+        if (res.spentHours > 0) setCancelNote("cancel_sale_spent_warning");
+        router.refresh();
+      } else {
+        setToast(res.code === "ALREADY_CANCELLED" ? "sale_already_cancelled" : "err_generic");
+      }
+    });
+  }
+
   const badge = sale ? STATUS_BADGE[sale.status] : null;
+  const isCancelled = sale?.status === "cancelled";
+  const toastOk = toast === "sale_time_saved" || toast === "sale_cancelled_toast";
 
   return (
     <Drawer open={sale !== null} onClose={onClose} title={t("sale_detail")}>
@@ -107,12 +138,17 @@ export function SaleDetailDrawer({ sale, onClose }: { sale: SalesRow | null; onC
           {toast && (
             <div
               role="status"
-              className={`mb-4 rounded-xl px-3.5 py-2.5 font-body text-[13px] font-semibold ${
-                toast === "sale_time_saved" ? "bg-sage/15 text-sage-deep" : "bg-rose/15 text-[#a56a52]"
+              className={`mb-2 rounded-xl px-3.5 py-2.5 font-body text-[13px] font-semibold ${
+                toastOk ? "bg-sage/15 text-sage-deep" : "bg-rose/15 text-[#a56a52]"
               }`}
             >
               {t(toast)}
             </div>
+          )}
+          {cancelNote && (
+            <p className="mb-4 rounded-xl bg-cream-2 px-3.5 py-2.5 font-body text-[12.5px] text-ink-soft">
+              {t(cancelNote)}
+            </p>
           )}
 
           {/* record */}
@@ -193,9 +229,72 @@ export function SaleDetailDrawer({ sale, onClose }: { sale: SalesRow | null; onC
               {t("err_generic")}
             </p>
           )}
+
+          {/* cancel (void) the sale — Owner action, reverses any unused credit */}
+          {!isCancelled && (
+            <div className="mt-6 border-t border-line pt-4">
+              {!confirmingCancel ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmingCancel(true);
+                    setToast(null);
+                  }}
+                  className="inline-flex h-11 items-center gap-2 rounded-xl border border-rose/40 bg-rose/10 px-4 font-body text-sm font-semibold text-[#a56a52]"
+                >
+                  <TrashMark />
+                  {t("cancel_sale")}
+                </button>
+              ) : (
+                <div className="rounded-2xl border border-rose/30 bg-rose/[0.06] p-4">
+                  <p className="font-body text-sm font-semibold text-ink">{t("cancel_sale_confirm_title")}</p>
+                  <p className="mt-1 font-body text-[13px] text-ink-soft">{t("cancel_sale_confirm_body")}</p>
+                  <label className="mt-3 block">
+                    <span className="mb-1 block font-body text-[12px] font-medium text-muted">
+                      {t("cancel_sale_reason_label")}
+                    </span>
+                    <input
+                      type="text"
+                      value={cancelReason}
+                      onChange={(e) => setCancelReason(e.target.value)}
+                      placeholder={t("cancel_sale_reason_ph")}
+                      maxLength={500}
+                      className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3 font-body text-sm text-ink"
+                    />
+                  </label>
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={doCancel}
+                      disabled={cancelPending}
+                      className="inline-flex h-11 items-center rounded-xl bg-[#a56a52] px-4 font-body text-sm font-semibold text-cream disabled:opacity-50"
+                    >
+                      {cancelPending ? t("loading") : t("cancel_sale_confirm_btn")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmingCancel(false)}
+                      disabled={cancelPending}
+                      className="inline-flex h-11 items-center rounded-xl border border-line-strong bg-surface px-4 font-body text-sm font-semibold text-ink-soft disabled:opacity-50"
+                    >
+                      {t("cancel_sale_keep_btn")}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </Drawer>
+  );
+}
+
+function TrashMark({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
+    </svg>
   );
 }
 
