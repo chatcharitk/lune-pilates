@@ -2,7 +2,7 @@ import { CustomerLangProvider } from "@/components/customer/customer-context";
 import { BottomNav } from "@/components/customer/bottom-nav";
 import { Header } from "@/components/customer/header";
 import { LiffGate } from "@/components/customer/liff-gate";
-import { resolveCustomerSessionUid } from "@/lib/auth/session";
+import { resolveActiveCustomerUid } from "@/lib/auth/session";
 
 // Customer surface shell (LINE LIFF, mobile). Wraps every customer screen in the
 // CustomerLangProvider so the EN/TH toggle (in the shared Header) switches the
@@ -15,7 +15,9 @@ import { resolveCustomerSessionUid } from "@/lib/auth/session";
 // so the gate never shows and the app renders exactly as before.
 export default async function CustomerLayout({ children }: { children: React.ReactNode }) {
   if (process.env.LINE_MODE === "live") {
-    const uid = await resolveCustomerSessionUid();
+    // Resolves null when the session's customer was removed/deleted — so a stale
+    // cookie shows the login gate (clean re-login) instead of crashing a page.
+    const uid = await resolveActiveCustomerUid();
     if (!uid) {
       return (
         <CustomerLangProvider>

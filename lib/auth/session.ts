@@ -136,6 +136,32 @@ export async function resolveCustomerSessionUid(): Promise<string | null> {
   }
 }
 
+/**
+ * Like `resolveCustomerSessionUid`, but ALSO confirms the session's user still
+ * exists and is active. Returns null for a cookie whose customer was removed
+ * (deactivated) or deleted — so the layout shows the login gate (a clean re-login)
+ * instead of rendering the app and letting getCurrentUser throw into the error
+ * boundary. Never throws. Used by the customer layout gate in live mode.
+ */
+export async function resolveActiveCustomerUid(): Promise<string | null> {
+  const uid = await resolveCustomerSessionUid();
+  if (!uid) return null;
+  // No-DB dev never gates on active (there is no real users row to check).
+  if (mockDataMode()) return uid;
+  try {
+    const db = getDb();
+    const [row] = await db
+      .select({ active: users.active })
+      .from(users)
+      .where(eq(users.id, uid))
+      .limit(1);
+    return row?.active ? uid : null;
+  } catch {
+    // A DB hiccup shouldn't hard-error the gate; treat as signed-out (safe default).
+    return null;
+  }
+}
+
 /** Load a SessionUser by users.id (+ its household house number). */
 async function loadSessionUserById(uid: string): Promise<SessionUser> {
   const db = getDb();
