@@ -1,12 +1,30 @@
 import { CustomerLangProvider } from "@/components/customer/customer-context";
 import { BottomNav } from "@/components/customer/bottom-nav";
 import { Header } from "@/components/customer/header";
+import { LiffGate } from "@/components/customer/liff-gate";
+import { resolveCustomerSessionUid } from "@/lib/auth/session";
 
 // Customer surface shell (LINE LIFF, mobile). Wraps every customer screen in the
 // CustomerLangProvider so the EN/TH toggle (in the shared Header) switches the
 // whole app together — chrome + content — mirroring the admin AdminShell. The
 // bottom nav reads its labels from the same context.
-export default function CustomerLayout({ children }: { children: React.ReactNode }) {
+//
+// LINE-login gate (LINE_MODE=live): when there is no valid customer session cookie,
+// render the LIFF login gate instead of the app (still inside the language provider
+// so its copy is bilingual). In dev / non-live mode the mock session always resolves,
+// so the gate never shows and the app renders exactly as before.
+export default async function CustomerLayout({ children }: { children: React.ReactNode }) {
+  if (process.env.LINE_MODE === "live") {
+    const uid = await resolveCustomerSessionUid();
+    if (!uid) {
+      return (
+        <CustomerLangProvider>
+          <LiffGate liffId={process.env.LIFF_ID ?? ""} />
+        </CustomerLangProvider>
+      );
+    }
+  }
+
   return (
     <CustomerLangProvider>
       <div className="mx-auto flex min-h-dvh max-w-[440px] flex-col bg-cream">

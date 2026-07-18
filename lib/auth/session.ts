@@ -14,10 +14,16 @@
 // household. The session is resolved server-side here and passed down.
 
 import { eq } from "drizzle-orm";
+import { cookies } from "next/headers";
 import type { UserTier } from "@/lib/domain/types";
 import { getDb } from "@/lib/db/client";
 import { households, users } from "@/lib/db/schema";
 import { mockDataMode } from "@/lib/mock-mode";
+import {
+  CUSTOMER_COOKIE,
+  customerSessionSecret,
+  verifyCustomerSession,
+} from "@/lib/auth/customer-session";
 
 /** The authenticated customer, resolved server-side. */
 export interface SessionUser {
@@ -66,6 +72,19 @@ export async function getCurrentUser(): Promise<SessionUser> {
     return MOCK_SESSION_USER;
   }
 
+  // Live LINE mode: the customer is whoever the signed session cookie names (set by
+  // the LIFF login, app/actions/line-auth.ts). Pages only render behind the layout's
+  // session gate, so a valid cookie is present here; a missing one is an error state.
+  if (process.env.LINE_MODE === "live") {
+    const uid = await resolveCustomerSessionUid();
+    if (!uid) {
+      throw new Error("getCurrentUser: no customer session (LINE login required).");
+    }
+    return loadSessionUserById(uid);
+  }
+
+  // Non-live DB path (staging / demo with a DB but LINE not yet live): the seeded
+  // member, resolved by the mock LINE identity — unchanged from before.
   const db = getDb();
   const [row] = await db
     .select({
@@ -86,6 +105,49 @@ export async function getCurrentUser(): Promise<SessionUser> {
     );
   }
 
+  return {
+    id: row.id,
+    name: row.name,
+    tier: row.tier,
+    householdId: row.householdId,
+    houseNumber: row.houseNumber ?? null,
+  };
+}
+
+/**
+ * The users.id of the current customer from the signed session cookie, or null when
+ * there is no valid session. Used by the customer layout to decide between rendering
+ * the app and rendering the LIFF login gate. Never throws.
+ */
+export async function resolveCustomerSessionUid(): Promise<string | null> {
+  const store = await cookies();
+  const token = store.get(CUSTOMER_COOKIE)?.value;
+  if (!token) return null;
+  try {
+    return verifyCustomerSession(token, customerSessionSecret())?.uid ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Load a SessionUser by users.id (+ its household house number). */
+async function loadSessionUserById(uid: string): Promise<SessionUser> {
+  const db = getDb();
+  const [row] = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      tier: users.tier,
+      householdId: users.householdId,
+      houseNumber: households.houseNumber,
+    })
+    .from(users)
+    .leftJoin(households, eq(users.householdId, households.id))
+    .where(eq(users.id, uid))
+    .limit(1);
+  if (!row) {
+    throw new Error("getCurrentUser: customer session references a missing user.");
+  }
   return {
     id: row.id,
     name: row.name,

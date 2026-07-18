@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const ORIGINAL_PAYMENTS_MODE = process.env.PAYMENTS_MODE;
 const ORIGINAL_LINE_MODE = process.env.LINE_MODE;
+const ORIGINAL_LINE_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 
 beforeEach(() => {
   vi.resetModules(); // fresh singleton per case
@@ -22,6 +23,8 @@ afterEach(() => {
   else process.env.PAYMENTS_MODE = ORIGINAL_PAYMENTS_MODE;
   if (ORIGINAL_LINE_MODE === undefined) delete process.env.LINE_MODE;
   else process.env.LINE_MODE = ORIGINAL_LINE_MODE;
+  if (ORIGINAL_LINE_TOKEN === undefined) delete process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  else process.env.LINE_CHANNEL_ACCESS_TOKEN = ORIGINAL_LINE_TOKEN;
 });
 
 describe("getPaymentProvider — mode gating (fail closed)", () => {
@@ -69,15 +72,25 @@ describe("getLineClient — mode gating (fail closed)", () => {
     expect(getLineClient()).toBeDefined();
   });
 
-  it("THROWS when LINE_MODE=live (no live client wired)", async () => {
+  it("LINE_MODE=live constructs the live client — fails closed WITHOUT a token", async () => {
     process.env.LINE_MODE = "live";
+    delete process.env.LINE_CHANNEL_ACCESS_TOKEN;
     const { getLineClient } = await import("@/lib/line");
-    expect(() => getLineClient()).toThrow(/no live LINE client is configured/);
+    expect(() => getLineClient()).toThrow(/LINE_CHANNEL_ACCESS_TOKEN/);
+  });
+
+  it("LINE_MODE=live returns the live client when a token is set", async () => {
+    process.env.LINE_MODE = "live";
+    process.env.LINE_CHANNEL_ACCESS_TOKEN = "tok123";
+    const { getLineClient } = await import("@/lib/line");
+    const client = getLineClient();
+    expect(typeof client.push).toBe("function");
+    expect(typeof client.broadcast).toBe("function");
   });
 
   it("THROWS on any unrecognised LINE_MODE (fail closed)", async () => {
     process.env.LINE_MODE = "real";
     const { getLineClient } = await import("@/lib/line");
-    expect(() => getLineClient()).toThrow();
+    expect(() => getLineClient()).toThrow(/not a known mode/);
   });
 });

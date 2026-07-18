@@ -12,6 +12,33 @@ export const STR = {
   nav_bookings: { en: "Bookings", th: "การจอง" },
   nav_profile: { en: "Profile", th: "โปรไฟล์" },
 
+  // LINE LIFF login gate (customer)
+  liff_loading: { en: "Loading…", th: "กำลังโหลด…" },
+  liff_open_in_line_title: { en: "Open in the LINE app", th: "เปิดผ่านแอป LINE" },
+  liff_open_in_line_body: {
+    en: "This app runs inside the studio's LINE. Please open it from LINE to sign in and book classes.",
+    th: "แอปนี้ใช้งานผ่าน LINE ของสตูดิโอ กรุณาเปิดจาก LINE เพื่อเข้าสู่ระบบและจองคลาส",
+  },
+  liff_open_in_line_button: { en: "Open in LINE", th: "เปิดใน LINE" },
+  liff_phone_title: { en: "Confirm your phone number", th: "ยืนยันเบอร์โทรศัพท์" },
+  liff_phone_body: {
+    en: "Enter the phone number you registered with the studio to link your account and see your credits.",
+    th: "กรอกเบอร์โทรที่ลงทะเบียนกับสตูดิโอ เพื่อเชื่อมบัญชีและดูเครดิตของคุณ",
+  },
+  liff_phone_label: { en: "Phone number", th: "เบอร์โทรศัพท์" },
+  liff_phone_placeholder: { en: "08XXXXXXXX", th: "08XXXXXXXX" },
+  liff_phone_submit: { en: "Confirm", th: "ยืนยัน" },
+  liff_phone_invalid: {
+    en: "That phone number looks invalid. Please check and try again.",
+    th: "เบอร์โทรไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง",
+  },
+  liff_phone_taken: {
+    en: "This number is already linked to another LINE account. Please contact the studio.",
+    th: "เบอร์นี้เชื่อมกับบัญชี LINE อื่นแล้ว กรุณาติดต่อสตูดิโอ",
+  },
+  liff_error: { en: "Something went wrong. Please try again.", th: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" },
+  liff_retry: { en: "Try again", th: "ลองอีกครั้ง" },
+
   // greetings
   greet_morning: { en: "Hello", th: "สวัสดีคุณ" },
   greet_afternoon: { en: "Good afternoon", th: "สวัสดีตอนบ่าย" },

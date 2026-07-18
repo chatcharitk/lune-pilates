@@ -1,5 +1,6 @@
 import type { LineClient } from "./types";
 import { MockLineClient } from "./mock";
+import { LiveLineClient } from "./live";
 
 let _line: LineClient | null = null;
 
@@ -17,14 +18,17 @@ let _line: LineClient | null = null;
 export function getLineClient(): LineClient {
   if (!_line) {
     const mode = process.env.LINE_MODE ?? "mock";
-    if (mode !== "mock") {
-      // When the real LINE Messaging API client is wired, construct it for "live" here.
+    if (mode === "live") {
+      // Real Messaging API client (validates the access token at construction).
+      _line = new LiveLineClient();
+    } else if (mode === "mock") {
+      _line = new MockLineClient();
+    } else {
+      // Fail closed: an unknown mode must never silently degrade to the mock.
       throw new Error(
-        `LINE_MODE=${mode} but no live LINE client is configured. ` +
-          `Set LINE_MODE=mock for v1, or wire a real client in lib/line/index.ts.`,
+        `LINE_MODE=${mode} is not a known mode. Use "mock" (dev) or "live".`,
       );
     }
-    _line = new MockLineClient();
   }
   return _line;
 }
