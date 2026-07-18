@@ -21,13 +21,14 @@
 // Creating a customer grants NO credits — the balance is 0 until they buy a package
 // (no fabricated package row).
 
-import { and, eq, gt, inArray } from "drizzle-orm";
+import { and, eq, gt, inArray, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getDb } from "@/lib/db/client";
 import { bookings, classInstances, households, users, waitlist } from "@/lib/db/schema";
 import type { UserTier } from "@/lib/domain/types";
 import { cancelBooking } from "@/lib/credits/debit";
+import { normalizeThaiPhone } from "@/lib/util/phone";
 import { requireOwner } from "@/lib/auth/admin";
 import { mockDataMode } from "@/lib/mock-mode";
 
@@ -212,6 +213,72 @@ function isUniquePhoneViolation(err: unknown): boolean {
 function mockUuid(): string {
   // A fixed-but-valid synthesized id; the no-DB path is UI-only and never persisted.
   return "00000000-0000-4000-8000-0000000000c1";
+}
+
+// ───────────────────────── edit a customer's name / phone ─────────────────────────
+
+const updateCustomerInput = z.object({
+  userId: z.string().uuid(),
+  name: z.string().trim().min(1).max(120),
+  /** Stored canonical when it's a valid Thai mobile (so LINE phone-matching lines up),
+   *  else the trimmed value verbatim. Phone is UNIQUE in the schema. */
+  phone: z.string().trim().min(1).max(40),
+});
+export type UpdateCustomerInput = z.infer<typeof updateCustomerInput>;
+
+export type UpdateCustomerFailureCode =
+  | "UNAUTHORIZED"
+  | "INVALID_INPUT"
+  | "NOT_FOUND"
+  // Another customer already uses this phone number.
+  | "PHONE_TAKEN";
+
+export type UpdateCustomerResult = { ok: true } | { ok: false; code: UpdateCustomerFailureCode };
+
+/**
+ * Edit a customer's display name and phone number (Owner-only). The phone is
+ * canonicalised to 0XXXXXXXXX when it's a valid Thai mobile (so the LINE-login
+ * phone match keeps working), otherwise stored trimmed. Uniqueness is enforced both
+ * with a pre-check and by catching the unique-violation on write. No-DB dev path
+ * echoes success so the drawer works on mock data.
+ */
+export async function updateCustomer(raw: UpdateCustomerInput): Promise<UpdateCustomerResult> {
+  if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
+
+  const parsed = updateCustomerInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
+
+  if (mockDataMode()) return { ok: true };
+
+  const { userId, name } = parsed.data;
+  const phone = normalizeThaiPhone(parsed.data.phone) ?? parsed.data.phone.trim();
+
+  const db = getDb();
+  const [existing] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!existing) return { ok: false, code: "NOT_FOUND" };
+
+  // Pre-check uniqueness against every OTHER user (the unique index has no partial
+  // filter, so a deactivated user's "removed-…" phone can't collide with a real one).
+  const [clash] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.phone, phone), ne(users.id, userId)))
+    .limit(1);
+  if (clash) return { ok: false, code: "PHONE_TAKEN" };
+
+  try {
+    await db.update(users).set({ name, phone }).where(eq(users.id, userId));
+  } catch (err) {
+    if (isUniquePhoneViolation(err)) return { ok: false, code: "PHONE_TAKEN" };
+    throw err;
+  }
+
+  revalidatePath("/admin/members");
+  return { ok: true };
 }
 
 // ───────────────────────── remove (deactivate) a customer ─────────────────────────

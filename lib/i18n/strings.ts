@@ -844,6 +844,8 @@ export const STR = {
   // toasts / errors
   toast_customer_added: { en: "Customer added", th: "เพิ่มลูกค้าแล้ว" },
   toast_customer_removed: { en: "Customer removed", th: "ลบลูกค้าแล้ว" },
+  toast_customer_updated: { en: "Customer updated", th: "บันทึกข้อมูลลูกค้าแล้ว" },
+  edit_customer: { en: "Edit name / phone", th: "แก้ไขชื่อ / เบอร์โทร" },
   remove_customer: { en: "Remove customer", th: "ลบลูกค้า" },
   remove_customer_confirm_title: { en: "Remove this customer?", th: "ลบลูกค้ารายนี้?" },
   remove_customer_confirm_body: {

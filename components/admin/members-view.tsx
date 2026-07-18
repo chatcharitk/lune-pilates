@@ -14,7 +14,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminLang } from "./admin-context";
 import { Avatar, Badge, Drawer, MiniStat, Sparkle } from "./ui";
-import { createCustomer, removeCustomer } from "@/app/actions/admin-members";
+import { createCustomer, removeCustomer, updateCustomer } from "@/app/actions/admin-members";
 import {
   adjustCredits,
   getAdjustablePackages,
@@ -216,6 +216,10 @@ export function MembersView({
         isOwner={isOwner}
         onClose={() => setOpenId(null)}
         onAdjusted={() => flash("toast_credit_adjusted")}
+        onEdited={() => {
+          setOpenId(null);
+          flash("toast_customer_updated");
+        }}
         onRemoved={() => {
           setOpenId(null);
           flash("toast_customer_removed");
@@ -242,6 +246,7 @@ function CustomerDrawer({
   isOwner,
   onClose,
   onAdjusted,
+  onEdited,
   onRemoved,
 }: {
   customer: AdminCustomer | null;
@@ -249,6 +254,7 @@ function CustomerDrawer({
   isOwner: boolean;
   onClose: () => void;
   onAdjusted: () => void;
+  onEdited: () => void;
   onRemoved: () => void;
 }) {
   const { t, lang } = useAdminLang();
@@ -297,6 +303,9 @@ function CustomerDrawer({
               sub={customer.house ? t("in_house").replace("{n}", String(housemates.length)) : undefined}
             />
           </div>
+
+          {/* edit name / phone — OWNER-ONLY */}
+          {isOwner && <EditCustomerControl customer={customer} onEdited={onEdited} />}
 
           {/* adjust credits — OWNER-ONLY (Group D #8). The money is the server's:
               this never optimistically mutates the balance, it router.refresh()es
@@ -364,6 +373,109 @@ function CustomerDrawer({
         </div>
       )}
     </Drawer>
+  );
+}
+
+/** Owner-only inline editor for a customer's name + phone (updateCustomer). Re-seeds
+ *  its fields whenever the drawer switches customers; router.refresh()es on save. */
+function EditCustomerControl({
+  customer,
+  onEdited,
+}: {
+  customer: AdminCustomer;
+  onEdited: () => void;
+}) {
+  const { t } = useAdminLang();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(customer.name);
+  const [phone, setPhone] = useState(customer.phone);
+  const [pending, startTransition] = useTransition();
+  const [errorKey, setErrorKey] = useState<StrKey | null>(null);
+
+  // Reset when the drawer opens a different customer (or their data changed).
+  useEffect(() => {
+    setName(customer.name);
+    setPhone(customer.phone);
+    setOpen(false);
+    setErrorKey(null);
+  }, [customer.id, customer.name, customer.phone]);
+
+  function save() {
+    if (pending) return;
+    setErrorKey(null);
+    startTransition(async () => {
+      const res = await updateCustomer({ userId: customer.id, name: name.trim(), phone: phone.trim() });
+      if (res.ok) {
+        router.refresh();
+        onEdited();
+      } else {
+        setErrorKey(res.code === "PHONE_TAKEN" ? "err_phone_taken" : "err_generic");
+      }
+    });
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex h-11 items-center gap-2 self-start rounded-xl border border-line-strong bg-surface px-4 font-body text-sm font-semibold text-ink"
+      >
+        {t("edit_customer")}
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl border border-line bg-surface-2 p-4">
+      <p className="font-body text-[11.5px] font-semibold uppercase tracking-[0.06em] text-muted">
+        {t("edit_customer")}
+      </p>
+      <Field label={t("customer_name")}>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder={t("ph_customer_name")}
+          disabled={pending}
+          className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink placeholder:text-muted disabled:opacity-60"
+        />
+      </Field>
+      <Field label={t("phone_label")}>
+        <input
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          inputMode="tel"
+          placeholder={t("ph_phone")}
+          disabled={pending}
+          className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink placeholder:text-muted disabled:opacity-60"
+        />
+      </Field>
+      {errorKey && <p className="font-body text-[13px] text-rose">{t(errorKey)}</p>}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={save}
+          disabled={pending || name.trim() === "" || phone.trim() === ""}
+          className="inline-flex h-11 items-center rounded-xl bg-ink px-4 font-body text-sm font-semibold text-cream disabled:opacity-50"
+        >
+          {pending ? t("loading") : t("save")}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(false);
+            setName(customer.name);
+            setPhone(customer.phone);
+            setErrorKey(null);
+          }}
+          disabled={pending}
+          className="inline-flex h-11 items-center rounded-xl border border-line-strong bg-surface px-4 font-body text-sm font-semibold text-ink-soft disabled:opacity-50"
+        >
+          {t("cancel")}
+        </button>
+      </div>
+    </div>
   );
 }
 
