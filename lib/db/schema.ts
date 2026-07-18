@@ -38,6 +38,13 @@ export const users = pgTable("users", {
   tier: userTier("tier").notNull().default("guest"),
   householdId: uuid("household_id").references(() => households.id),
   lineUserId: text("line_user_id").unique(),
+  // The member's LINE profile photo URL (from LIFF login), refreshed on each login.
+  // Null until they sign in via LINE; the UI falls back to an initial.
+  linePictureUrl: text("line_picture_url"),
+  // Soft-delete flag. An admin "remove customer" flips this false (and anonymises PII
+  // + unlinks LINE) rather than deleting the row — the append-only ledger and the
+  // financial history reference this id and must be preserved for the books.
+  active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -173,7 +180,7 @@ export const creditLedger = pgTable(
       .notNull()
       .references(() => users.id),
     bookingId: uuid("booking_id"),
-    reason: text("reason").notNull(), // "booking" | "cancel_refund" | "purchase" | "promo" | "adjustment"
+    reason: text("reason").notNull(), // "booking" | "cancel_refund" | "purchase" | "promo" | "adjustment" | "purchase_cancelled"
     // Client-supplied retry token for manual owner adjustments (reason="adjustment")
     // so a dropped-response retry can't double-apply. Null for every other row; the
     // partial unique index dedupes only the non-null adjustment keys.

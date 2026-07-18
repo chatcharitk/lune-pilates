@@ -61,6 +61,8 @@ export interface ProfileOverview {
     tier: UserTier;
     /** House number for a member with a household; null for guests (invariant 3). */
     houseNumber: string | null;
+    /** LINE profile photo URL, or null (UI falls back to an initial). */
+    avatarUrl: string | null;
   };
   /** The shared-pool balance summary — single-sourced from `getCreditOverview`. */
   balance: {
@@ -115,6 +117,7 @@ function mockProfileOverview(): ProfileOverview {
       name: viewerName,
       tier: session.isMember ? "member" : "guest",
       houseNumber: session.house,
+      avatarUrl: null,
     },
     balance: {
       hours: session.credits,
@@ -182,6 +185,7 @@ export async function getProfileOverview(now: Date = new Date()): Promise<Profil
       name: viewer.name,
       tier: viewer.tier,
       houseNumber: viewer.houseNumber,
+      avatarUrl: viewer.avatarUrl ?? null,
     },
     balance: {
       hours: credit.hours,

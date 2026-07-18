@@ -71,6 +71,8 @@ export async function establishLineSession(raw: unknown): Promise<EstablishLineS
     .limit(1);
 
   if (existing) {
+    // Refresh their LINE photo on each sign-in.
+    await db.update(users).set({ linePictureUrl: identity.pictureUrl }).where(eq(users.id, existing.id));
     await setCustomerSession(existing.id);
     return { ok: true, status: "signed_in" };
   }
@@ -114,6 +116,7 @@ export async function linkLineByPhone(raw: unknown): Promise<LinkLineByPhoneResu
     .where(eq(users.lineUserId, identity.lineUserId))
     .limit(1);
   if (alreadyLinked) {
+    await db.update(users).set({ linePictureUrl: identity.pictureUrl }).where(eq(users.id, alreadyLinked.id));
     await setCustomerSession(alreadyLinked.id);
     return { ok: true };
   }
@@ -128,8 +131,11 @@ export async function linkLineByPhone(raw: unknown): Promise<LinkLineByPhoneResu
     if (byPhone.lineUserId && byPhone.lineUserId !== identity.lineUserId) {
       return { ok: false, code: "PHONE_TAKEN" };
     }
-    // Unlinked (or already ours) → link the LINE id onto the existing record.
-    await db.update(users).set({ lineUserId: identity.lineUserId }).where(eq(users.id, byPhone.id));
+    // Unlinked (or already ours) → link the LINE id + photo onto the existing record.
+    await db
+      .update(users)
+      .set({ lineUserId: identity.lineUserId, linePictureUrl: identity.pictureUrl })
+      .where(eq(users.id, byPhone.id));
     await setCustomerSession(byPhone.id);
     return { ok: true };
   }
@@ -143,6 +149,7 @@ export async function linkLineByPhone(raw: unknown): Promise<LinkLineByPhoneResu
         name: identity.displayName.trim() || phone,
         tier: "guest",
         lineUserId: identity.lineUserId,
+        linePictureUrl: identity.pictureUrl,
       })
       .returning({ id: users.id });
     await setCustomerSession(created!.id);

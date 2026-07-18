@@ -74,9 +74,21 @@ describe("verifyLiffIdToken (mocked fetch)", () => {
     );
   }
 
-  it("returns identity for a valid token with matching aud", async () => {
+  it("returns identity (incl. picture) for a valid token with matching aud", async () => {
+    stubFetch(200, { sub: "Uabc", name: "Pim", picture: "https://cdn.line/p.jpg", aud: "2010746679" });
+    expect(await verifyLiffIdToken("tok")).toEqual({
+      lineUserId: "Uabc",
+      displayName: "Pim",
+      pictureUrl: "https://cdn.line/p.jpg",
+    });
+  });
+  it("returns null pictureUrl when the token has no picture claim", async () => {
     stubFetch(200, { sub: "Uabc", name: "Pim", aud: "2010746679" });
-    expect(await verifyLiffIdToken("tok")).toEqual({ lineUserId: "Uabc", displayName: "Pim" });
+    expect(await verifyLiffIdToken("tok")).toEqual({
+      lineUserId: "Uabc",
+      displayName: "Pim",
+      pictureUrl: null,
+    });
   });
   it("rejects an aud that isn't our channel", async () => {
     stubFetch(200, { sub: "Uabc", name: "Pim", aud: "9999" });

@@ -54,7 +54,12 @@ export default async function HomePage() {
 
   return (
     <HomeView
-      viewer={{ name: viewer.name, tier: viewer.tier, houseNumber: viewer.houseNumber }}
+      viewer={{
+        name: viewer.name,
+        tier: viewer.tier,
+        houseNumber: viewer.houseNumber,
+        avatarUrl: viewer.avatarUrl ?? null,
+      }}
       overview={{
         hours: overview.hours,
         nearestExpiryIso: overview.nearestExpiry ? overview.nearestExpiry.toISOString() : null,

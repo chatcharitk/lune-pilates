@@ -242,7 +242,8 @@ export async function listCustomers(filter: ListCustomersFilter = {}, now: Date 
         house: households.houseNumber,
       })
       .from(users)
-      .leftJoin(households, eq(users.householdId, households.id)),
+      .leftJoin(households, eq(users.householdId, households.id))
+      .where(eq(users.active, true)),
     db
       .select({
         ownerHouseholdId: packages.ownerHouseholdId,

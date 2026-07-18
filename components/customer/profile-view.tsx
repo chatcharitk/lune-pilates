@@ -41,9 +41,18 @@ export function ProfileView({ overview }: { overview: ProfileOverview }) {
 
       {/* identity */}
       <div className="mb-[18px] flex items-center gap-3.5">
-        <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-taupe font-head text-[24px] font-semibold text-surface-2">
-          {avatarInitial}
-        </span>
+        {identity.avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- external LINE CDN photo, not an optimizable asset
+          <img
+            src={identity.avatarUrl}
+            alt={identity.name}
+            className="h-14 w-14 shrink-0 rounded-full object-cover"
+          />
+        ) : (
+          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-taupe font-head text-[24px] font-semibold text-surface-2">
+            {avatarInitial}
+          </span>
+        )}
         <div className="min-w-0">
           <div className="font-head text-xl font-semibold text-ink">{identity.name}</div>
           <div className="mt-1 flex flex-wrap items-center gap-1.5">

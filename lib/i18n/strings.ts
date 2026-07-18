@@ -843,6 +843,15 @@ export const STR = {
   no_members: { en: "No customers match your search", th: "ไม่พบลูกค้าที่ตรงกับการค้นหา" },
   // toasts / errors
   toast_customer_added: { en: "Customer added", th: "เพิ่มลูกค้าแล้ว" },
+  toast_customer_removed: { en: "Customer removed", th: "ลบลูกค้าแล้ว" },
+  remove_customer: { en: "Remove customer", th: "ลบลูกค้า" },
+  remove_customer_confirm_title: { en: "Remove this customer?", th: "ลบลูกค้ารายนี้?" },
+  remove_customer_confirm_body: {
+    en: "Their upcoming bookings will be cancelled and refunded to the pool, their LINE account unlinked, and personal details removed. Payment and credit history is kept for the records. This can't be undone.",
+    th: "การจองที่กำลังจะมาถึงจะถูกยกเลิกและคืนเครดิตเข้าพูล บัญชี LINE จะถูกยกเลิกการเชื่อมต่อ และข้อมูลส่วนตัวจะถูกลบ ประวัติการชำระเงินและเครดิตจะถูกเก็บไว้สำหรับบัญชี การกระทำนี้ไม่สามารถย้อนกลับได้",
+  },
+  remove_customer_confirm_btn: { en: "Remove customer", th: "ยืนยันลบ" },
+  remove_customer_already: { en: "This customer is already removed", th: "ลูกค้ารายนี้ถูกลบไปแล้ว" },
   err_phone_taken: {
     en: "That phone number is already registered.",
     th: "เบอร์โทรนี้ถูกใช้ไปแล้ว",

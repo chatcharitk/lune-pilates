@@ -21,12 +21,13 @@
 // Creating a customer grants NO credits — the balance is 0 until they buy a package
 // (no fabricated package row).
 
-import { eq } from "drizzle-orm";
+import { and, eq, gt, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getDb } from "@/lib/db/client";
-import { households, users } from "@/lib/db/schema";
+import { bookings, classInstances, households, users, waitlist } from "@/lib/db/schema";
 import type { UserTier } from "@/lib/domain/types";
+import { cancelBooking } from "@/lib/credits/debit";
 import { requireOwner } from "@/lib/auth/admin";
 import { mockDataMode } from "@/lib/mock-mode";
 
@@ -211,4 +212,98 @@ function isUniquePhoneViolation(err: unknown): boolean {
 function mockUuid(): string {
   // A fixed-but-valid synthesized id; the no-DB path is UI-only and never persisted.
   return "00000000-0000-4000-8000-0000000000c1";
+}
+
+// ───────────────────────── remove (deactivate) a customer ─────────────────────────
+
+const removeCustomerInput = z.object({ userId: z.string().uuid() });
+export type RemoveCustomerInput = z.infer<typeof removeCustomerInput>;
+
+export type RemoveCustomerFailureCode =
+  | "UNAUTHORIZED"
+  | "INVALID_INPUT"
+  | "NOT_FOUND"
+  | "ALREADY_REMOVED";
+
+export type RemoveCustomerResult =
+  | { ok: true; cancelledBookings: number }
+  | { ok: false; code: RemoveCustomerFailureCode };
+
+/**
+ * Remove a customer — Owner-only. A SOFT delete (the row is never dropped: the
+ * append-only ledger + charges/packages reference this id and must survive for the
+ * books, CLAUDE.md §5). It:
+ *   1. cancels the customer's FUTURE booked classes, refunding each to its pool (so a
+ *      member's household keeps those credits, and the seats free up);
+ *   2. expires any live waitlist entries (no offers cascade to a removed person);
+ *   3. deactivates + anonymises the row: active=false, LINE unlinked + photo cleared,
+ *      left the household, name/phone scrubbed (frees the phone for re-registration).
+ * A removed customer disappears from the Members list; a stale LINE session is treated
+ * as signed-out (getCurrentUser), so logging in again re-registers them as a guest.
+ */
+export async function removeCustomer(raw: RemoveCustomerInput): Promise<RemoveCustomerResult> {
+  if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
+
+  const parsed = removeCustomerInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
+  const { userId } = parsed.data;
+
+  if (mockDataMode()) return { ok: true, cancelledBookings: 0 };
+
+  const db = getDb();
+  const [u] = await db
+    .select({ id: users.id, active: users.active })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!u) return { ok: false, code: "NOT_FOUND" };
+  if (!u.active) return { ok: false, code: "ALREADY_REMOVED" };
+
+  const now = new Date();
+
+  // 1) Cancel FUTURE booked classes, refunding to the pool (actor = the customer, so
+  //    the credit returns to their own/household pool — same semantics as an admin cancel).
+  const future = await db
+    .select({ id: bookings.id })
+    .from(bookings)
+    .innerJoin(classInstances, eq(bookings.classInstanceId, classInstances.id))
+    .where(
+      and(
+        eq(bookings.userId, userId),
+        eq(bookings.status, "booked"),
+        gt(classInstances.startsAt, now),
+      ),
+    );
+  let cancelledBookings = 0;
+  for (const b of future) {
+    const res = await cancelBooking({
+      bookingId: b.id,
+      actorUserId: userId,
+      refund: true,
+      note: "account removed by studio",
+    });
+    if (res.ok) cancelledBookings += 1;
+  }
+
+  // 2) Expire live waitlist entries.
+  await db
+    .update(waitlist)
+    .set({ status: "expired" })
+    .where(and(eq(waitlist.userId, userId), inArray(waitlist.status, ["waiting", "offered"])));
+
+  // 3) Deactivate + anonymise. Financial rows keep referencing this id (audit intact).
+  await db
+    .update(users)
+    .set({
+      active: false,
+      lineUserId: null,
+      linePictureUrl: null,
+      householdId: null,
+      name: "(removed)",
+      phone: `removed-${userId}`,
+    })
+    .where(eq(users.id, userId));
+
+  revalidatePath("/admin/members");
+  return { ok: true, cancelledBookings };
 }

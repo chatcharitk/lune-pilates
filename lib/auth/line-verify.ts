@@ -10,6 +10,8 @@ export interface LineIdentity {
   lineUserId: string;
   /** The member's LINE display name (JWT `name`), best-effort ("" if absent). */
   displayName: string;
+  /** The member's LINE profile photo URL (JWT `picture`), or null if absent. */
+  pictureUrl: string | null;
 }
 
 /** POST the id token to LINE's verify endpoint. Returns null on any failure so a
@@ -39,7 +41,7 @@ export async function verifyLiffIdToken(idToken: string): Promise<LineIdentity |
   } catch {
     return null;
   }
-  const obj = data as { sub?: unknown; name?: unknown; aud?: unknown };
+  const obj = data as { sub?: unknown; name?: unknown; picture?: unknown; aud?: unknown };
   // Defensive: the endpoint already checks aud, but confirm it matches our channel.
   if (typeof obj?.sub !== "string" || (typeof obj.aud === "string" && obj.aud !== clientId)) {
     return null;
@@ -47,5 +49,6 @@ export async function verifyLiffIdToken(idToken: string): Promise<LineIdentity |
   return {
     lineUserId: obj.sub,
     displayName: typeof obj.name === "string" ? obj.name : "",
+    pictureUrl: typeof obj.picture === "string" ? obj.picture : null,
   };
 }

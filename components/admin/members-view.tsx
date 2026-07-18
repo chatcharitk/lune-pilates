@@ -14,7 +14,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminLang } from "./admin-context";
 import { Avatar, Badge, Drawer, MiniStat, Sparkle } from "./ui";
-import { createCustomer } from "@/app/actions/admin-members";
+import { createCustomer, removeCustomer } from "@/app/actions/admin-members";
 import {
   adjustCredits,
   getAdjustablePackages,
@@ -216,6 +216,10 @@ export function MembersView({
         isOwner={isOwner}
         onClose={() => setOpenId(null)}
         onAdjusted={() => flash("toast_credit_adjusted")}
+        onRemoved={() => {
+          setOpenId(null);
+          flash("toast_customer_removed");
+        }}
       />
 
       <AddCustomerDrawer
@@ -238,12 +242,14 @@ function CustomerDrawer({
   isOwner,
   onClose,
   onAdjusted,
+  onRemoved,
 }: {
   customer: AdminCustomer | null;
   all: AdminCustomer[];
   isOwner: boolean;
   onClose: () => void;
   onAdjusted: () => void;
+  onRemoved: () => void;
 }) {
   const { t, lang } = useAdminLang();
 
@@ -352,9 +358,82 @@ function CustomerDrawer({
               </div>
             )}
           </div>
+
+          {/* remove customer — OWNER-ONLY danger zone (soft delete / deactivate) */}
+          {isOwner && <RemoveCustomerControl customer={customer} onRemoved={onRemoved} />}
         </div>
       )}
     </Drawer>
+  );
+}
+
+/** Owner-only "remove customer" danger zone: a two-step confirm calling removeCustomer,
+ *  then router.refresh() so the deactivated customer drops out of the list. */
+function RemoveCustomerControl({
+  customer,
+  onRemoved,
+}: {
+  customer: AdminCustomer;
+  onRemoved: () => void;
+}) {
+  const { t } = useAdminLang();
+  const router = useRouter();
+  const [confirming, setConfirming] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [errorKey, setErrorKey] = useState<StrKey | null>(null);
+
+  function doRemove() {
+    if (pending) return;
+    setErrorKey(null);
+    startTransition(async () => {
+      const res = await removeCustomer({ userId: customer.id });
+      if (res.ok) {
+        router.refresh();
+        onRemoved();
+      } else {
+        setErrorKey(res.code === "ALREADY_REMOVED" ? "remove_customer_already" : "err_generic");
+      }
+    });
+  }
+
+  return (
+    <div className="border-t border-line pt-4">
+      {!confirming ? (
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          className="inline-flex h-11 items-center gap-2 rounded-xl border border-rose/40 bg-rose/10 px-4 font-body text-sm font-semibold text-[#a56a52]"
+        >
+          {t("remove_customer")}
+        </button>
+      ) : (
+        <div className="rounded-2xl border border-rose/30 bg-rose/[0.06] p-4">
+          <p className="font-body text-sm font-semibold text-ink">{t("remove_customer_confirm_title")}</p>
+          <p className="mt-1 font-body text-[13px] leading-relaxed text-ink-soft">
+            {t("remove_customer_confirm_body")}
+          </p>
+          {errorKey && <p className="mt-2 font-body text-[13px] text-rose">{t(errorKey)}</p>}
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={doRemove}
+              disabled={pending}
+              className="inline-flex h-11 items-center rounded-xl bg-[#a56a52] px-4 font-body text-sm font-semibold text-cream disabled:opacity-50"
+            >
+              {pending ? t("loading") : t("remove_customer_confirm_btn")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              disabled={pending}
+              className="inline-flex h-11 items-center rounded-xl border border-line-strong bg-surface px-4 font-body text-sm font-semibold text-ink-soft disabled:opacity-50"
+            >
+              {t("cancel")}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

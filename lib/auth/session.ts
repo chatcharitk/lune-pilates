@@ -34,6 +34,9 @@ export interface SessionUser {
   householdId: string | null;
   /** House number of the household (null for guests) — for the shared-pool marker. */
   houseNumber: string | null;
+  /** LINE profile photo URL, or null (UI falls back to an initial). Optional so
+   *  internal SessionUser-shaped helpers/tests need not supply it. */
+  avatarUrl?: string | null;
 }
 
 /**
@@ -56,6 +59,7 @@ const MOCK_SESSION_USER: SessionUser = {
   tier: "member",
   householdId: "00000000-0000-4000-8000-0000000000a1",
   houseNumber: "A-114",
+  avatarUrl: null,
 };
 
 /**
@@ -93,6 +97,7 @@ export async function getCurrentUser(): Promise<SessionUser> {
       tier: users.tier,
       householdId: users.householdId,
       houseNumber: households.houseNumber,
+      avatarUrl: users.linePictureUrl,
     })
     .from(users)
     .leftJoin(households, eq(users.householdId, households.id))
@@ -111,6 +116,7 @@ export async function getCurrentUser(): Promise<SessionUser> {
     tier: row.tier,
     householdId: row.householdId,
     houseNumber: row.houseNumber ?? null,
+    avatarUrl: row.avatarUrl ?? null,
   };
 }
 
@@ -140,6 +146,8 @@ async function loadSessionUserById(uid: string): Promise<SessionUser> {
       tier: users.tier,
       householdId: users.householdId,
       houseNumber: households.houseNumber,
+      avatarUrl: users.linePictureUrl,
+      active: users.active,
     })
     .from(users)
     .leftJoin(households, eq(users.householdId, households.id))
@@ -148,11 +156,17 @@ async function loadSessionUserById(uid: string): Promise<SessionUser> {
   if (!row) {
     throw new Error("getCurrentUser: customer session references a missing user.");
   }
+  // A removed (deactivated) customer with a stale cookie is treated as signed-out:
+  // throwing sends them back through the login gate, where they re-register as a guest.
+  if (!row.active) {
+    throw new Error("getCurrentUser: customer account has been removed.");
+  }
   return {
     id: row.id,
     name: row.name,
     tier: row.tier,
     householdId: row.householdId,
     houseNumber: row.houseNumber ?? null,
+    avatarUrl: row.avatarUrl ?? null,
   };
 }

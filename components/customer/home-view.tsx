@@ -34,7 +34,7 @@ import { formatStudioDate } from "@/lib/time";
 
 export interface HomeViewProps {
   /** Viewer identity (display only — server-resolved). */
-  viewer: { name: string; tier: "member" | "guest"; houseNumber: string | null };
+  viewer: { name: string; tier: "member" | "guest"; houseNumber: string | null; avatarUrl: string | null };
   /** Server-resolved pool summary. `nearestExpiryIso` null when the pool is empty. */
   overview: { hours: number; nearestExpiryIso: string | null; isHouseholdPool: boolean };
   /** The viewer's soonest upcoming booking, or null to hide the card. */
@@ -73,9 +73,18 @@ export function HomeView({ viewer, overview, next, hasOffer, week }: HomeViewPro
           </h1>
         </div>
         <div className="relative shrink-0">
-          <span className="grid h-[52px] w-[52px] place-items-center rounded-full border-2 border-surface-2 bg-taupe font-head text-xl font-semibold text-surface-2 shadow-md">
-            {avatarInitial}
-          </span>
+          {viewer.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- external LINE CDN photo, not an optimizable asset
+            <img
+              src={viewer.avatarUrl}
+              alt={viewer.name}
+              className="h-[52px] w-[52px] rounded-full border-2 border-surface-2 object-cover shadow-md"
+            />
+          ) : (
+            <span className="grid h-[52px] w-[52px] place-items-center rounded-full border-2 border-surface-2 bg-taupe font-head text-xl font-semibold text-surface-2 shadow-md">
+              {avatarInitial}
+            </span>
+          )}
           <span
             className="absolute -bottom-0.5 -right-0.5 grid h-[20px] w-[20px] place-items-center rounded-full border-[2.5px] border-cream font-body text-[9px] font-extrabold tracking-[-0.5px] text-white"
             style={{ background: "#06C755" }}
