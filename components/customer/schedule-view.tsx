@@ -200,7 +200,7 @@ function SessionRow({ c, lang }: { c: BookableClass; lang: Lang }) {
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- static studio asset in /public */}
         <img
-          src={studioImage(c.id)}
+          src={studioImage(c.type)}
           alt=""
           className="absolute inset-0 h-full w-full object-cover"
           onError={(e) => {
@@ -231,7 +231,7 @@ function SessionRow({ c, lang }: { c: BookableClass; lang: Lang }) {
           </span>
         </div>
         <div className="font-head text-[17px] font-semibold leading-[1.1] text-ink">
-          {tt(c.typeMeta.label)}
+          {c.name || tt(c.typeMeta.label)}
         </div>
         {c.instructor && (
           <div className="mt-[3px] font-body text-[12.5px] text-ink-soft">

@@ -26,7 +26,8 @@ function isHidden(pathname: string): boolean {
 export function BrandLockup() {
   return (
     <BrandLogo
-      imgHeight={30}
+      imgHeight={34}
+      variant="mark"
       fallback={
         <span className="font-brand text-[26px] font-semibold leading-none tracking-[0.18em] text-taupe-deep">
           LUN<span className="lune-spark">E</span>

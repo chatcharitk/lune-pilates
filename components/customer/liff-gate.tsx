@@ -87,7 +87,8 @@ export function LiffGate({ liffId }: { liffId: string }) {
     <div className="flex min-h-dvh flex-col items-center justify-center bg-cream px-6 py-10">
       <div className="w-full max-w-[360px] text-center">
         <BrandLogo
-          imgHeight={72}
+          imgHeight={88}
+          variant="mark"
           className="mx-auto"
           fallback={
             <span className="font-brand text-4xl font-semibold tracking-[0.18em] text-taupe-deep">

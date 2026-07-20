@@ -1,21 +1,23 @@
 // Studio photography used on class cards + the class-detail hero. The files live in
-// public/studio/studio-1.jpg … studio-N.jpg (drop the renders there). A class is
-// assigned ONE photo deterministically from its id, so the same class always shows
-// the same image (stable across renders) while the set varies across the schedule.
+// public/studio/studio-1.jpg … studio-N.jpg. Each class TYPE has a fixed photo
+// (decided 2026-07-20): group uses the group-reformer room, private/duo/trio use the
+// private-studio shot. Rental is hidden from booking for now, but keeps a photo for
+// any legacy data.
 //
 // Rendered as an <img> layered OVER the existing gradient, so if a file is missing
 // the gradient shows through — the UI degrades to exactly its prior look.
 
-export const STUDIO_IMAGE_COUNT = 4;
+import type { ClassType } from "@/lib/domain/types";
 
-/** A stable `/studio/studio-N.jpg` path chosen from `seed` (e.g. a class id). */
-export function studioImage(seed: string): string {
-  // FNV-1a — a tiny, stable string hash (deterministic across server/client).
-  let h = 0x811c9dc5;
-  for (let i = 0; i < seed.length; i++) {
-    h ^= seed.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  const n = ((h >>> 0) % STUDIO_IMAGE_COUNT) + 1;
-  return `/studio/studio-${n}.jpg`;
+const BY_TYPE: Record<ClassType, string> = {
+  group: "/studio/studio-2.jpg",
+  private: "/studio/studio-1.jpg",
+  duo: "/studio/studio-1.jpg",
+  trio: "/studio/studio-1.jpg",
+  rental: "/studio/studio-3.jpg",
+};
+
+/** The studio photo for a class type. */
+export function studioImage(type: ClassType): string {
+  return BY_TYPE[type] ?? "/studio/studio-1.jpg";
 }

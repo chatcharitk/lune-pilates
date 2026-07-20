@@ -235,6 +235,8 @@ export const classTemplates = pgTable("class_templates", {
   time: text("time").notNull(), // "08:00"
   durationMin: integer("duration_min").notNull().default(60),
   type: classType("type").notNull(),
+  // Optional custom display name set by the owner; null → the type label is shown.
+  name: text("name"),
   capacity: integer("capacity").notNull(),
   instructorId: text("instructor_id").references(() => instructors.id),
   active: boolean("active").notNull().default(true),
@@ -246,6 +248,9 @@ export const classInstances = pgTable("class_instances", {
   startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
   durationMin: integer("duration_min").notNull().default(60),
   type: classType("type").notNull(),
+  // Optional custom display name (copied from the template on generate, or set per
+  // class in the admin schedule editor); null → the type label is shown.
+  name: text("name"),
   capacity: integer("capacity").notNull(),
   instructorId: text("instructor_id").references(() => instructors.id),
   status: classStatus("status").notNull().default("draft"),
@@ -280,7 +285,7 @@ export const bookings = pgTable(
     // (CLAUDE.md §5 invariant 7, decided 2026-06-28), so this is always stamped 5 at
     // booking time and read back for the record — it is no longer a live per-booking
     // input. A cancel is free (and only allowed) when hoursUntilStart >= 5.
-    freeCancelHours: integer("free_cancel_hours").notNull().default(5),
+    freeCancelHours: integer("free_cancel_hours").notNull().default(6),
     status: bookingStatus("status").notNull().default("booked"),
     // Front-desk roster check-in (admin Today screen). Null = not yet checked in;
     // stamped with the instant the attendee was checked in. A booking is "checked

@@ -50,7 +50,7 @@ export function ClassDetailView({ detail, cost, balanceBefore, usesPositions }: 
       <div className="relative h-[168px] shrink-0 bg-gradient-to-b from-taupe/40 via-taupe/20 to-cream">
         {/* eslint-disable-next-line @next/next/no-img-element -- static studio asset in /public */}
         <img
-          src={studioImage(detail.id)}
+          src={studioImage(detail.type)}
           alt=""
           aria-hidden="true"
           className="absolute inset-0 h-full w-full object-cover"
@@ -89,7 +89,7 @@ export function ClassDetailView({ detail, cost, balanceBefore, usesPositions }: 
 
           {/* title */}
           <h1 className="mb-1 font-head text-[28px] font-semibold leading-[1.05] tracking-[0.01em] text-ink">
-            {tt(detail.typeMeta.label)}
+            {detail.name || tt(detail.typeMeta.label)}
           </h1>
 
           {/* fact grid */}

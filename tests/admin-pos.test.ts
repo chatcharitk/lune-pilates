@@ -99,7 +99,7 @@ describe("posSellPackage (no-DB contract)", () => {
     const res = await posSellPackage({ customerId: CUSTOMER, packageId: "p15", method: "promptpay", idempotencyKey: IDEM });
     expect(res.ok).toBe(true);
     if (res.ok && res.sale.method === "promptpay") {
-      expect(res.sale.amount).toBe(7500);
+      expect(res.sale.amount).toBe(10000); // p15 repriced to 20h @ ฿10,000 (2026-07-20)
       expect(res.sale.qrPayload).toContain("MOCKPROMPTPAY");
       expect(res.sale.chargeId).toBeTruthy();
     } else {

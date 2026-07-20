@@ -32,13 +32,14 @@ export function effectiveCapacity(capacity: number, type: ClassType): number {
 
 /**
  * Free cancellation window, in hours, before class start (CLAUDE.md §5 invariant 7,
- * fixed window decided 2026-06-28). This is a SINGLE fixed window for EVERY booking:
- * a customer self-cancel is free (cost refunded) only when made at least this many
- * hours before start (inclusive at exactly 5h); within the window the cancel is
- * BLOCKED entirely (there is no customer late-cancel-with-deduction path). Stamped
- * on the booking as an audit constant, not a per-booking live input.
+ * fixed window decided 2026-06-28; widened 5h → 6h 2026-07-20). This is a SINGLE
+ * fixed window for EVERY booking: a customer self-cancel is free (cost refunded)
+ * only when made at least this many hours before start (inclusive at exactly 6h);
+ * within the window the cancel is BLOCKED entirely (there is no customer
+ * late-cancel-with-deduction path). Stamped on the booking as an audit constant,
+ * not a per-booking live input.
  */
-export const FREE_CANCEL_HOURS = 5;
+export const FREE_CANCEL_HOURS = 6;
 
 /** Waitlist confirm hold, in minutes, once a freed seat is offered. */
 export const WAITLIST_HOLD_MINUTES = 30;

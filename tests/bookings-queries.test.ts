@@ -78,20 +78,22 @@ describe("toMyBooking (pure shaping)", () => {
     expect(b.cancellation.refundCredits).toBe(0);
   });
 
-  it("treats exactly 5 hours before start as FREE (boundary, inclusive)", () => {
-    const row = baseRow({ startsAt: new Date(NOW.getTime() + 5 * 3_600_000) });
+  it("treats exactly 6 hours before start as FREE (boundary, inclusive)", () => {
+    const row = baseRow({ startsAt: new Date(NOW.getTime() + 6 * 3_600_000) });
     const b = toMyBooking(row, NOW);
     expect(b.cancellation.free).toBe(true);
-    expect(b.cancellation.hoursUntilStart).toBeCloseTo(5, 5);
+    expect(b.cancellation.hoursUntilStart).toBeCloseTo(6, 5);
+    // The FIELD echoes the booking's stamped audit value (the fixture's 5); the FREE
+    // verdict above uses the current fixed window (6h) independently of the stamp.
     expect(b.cancellation.freeCancelHours).toBe(5);
   });
 
-  it("judges by the FIXED 5h window, ignoring a booking's stamped hours: NOT free 4h out", () => {
-    // The policy is a single fixed 5h window (CLAUDE.md §5 inv 7, decided 2026-06-28):
-    // 4h out is inside the window → not free, regardless of the stamped audit value.
+  it("judges by the FIXED 6h window, ignoring a booking's stamped hours: NOT free 5h out", () => {
+    // The policy is a single fixed 6h window (CLAUDE.md §5 inv 7, widened 2026-07-20):
+    // 5h out is inside the window → not free, regardless of the stamped audit value.
     const row = baseRow({
       freeCancelHours: 1,
-      startsAt: new Date(NOW.getTime() + 4 * 3_600_000),
+      startsAt: new Date(NOW.getTime() + 5 * 3_600_000),
     });
     const b = toMyBooking(row, NOW);
     expect(b.cancellation.free).toBe(false);

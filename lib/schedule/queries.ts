@@ -50,6 +50,8 @@ export interface BookableClass {
   durationMin: number;
   type: ClassType;
   typeMeta: ClassTypeMeta;
+  /** Optional custom class name; null → show the type label. */
+  name: string | null;
   instructor: InstructorMeta | null;
   capacity: number;
   booked: number;
@@ -245,6 +247,7 @@ export async function listBookableClasses(args: ListBookableArgs): Promise<Booka
       startsAt: classInstances.startsAt,
       durationMin: classInstances.durationMin,
       type: classInstances.type,
+      name: classInstances.name,
       capacity: classInstances.capacity,
       status: classInstances.status,
       publicVisibleAt: classInstances.publicVisibleAt,
@@ -286,6 +289,7 @@ export async function listBookableClasses(args: ListBookableArgs): Promise<Booka
         durationMin: r.durationMin,
         type: r.type,
         typeMeta: metaFor(r.type),
+        name: r.name,
         instructor: instructorMetaFor(
           r.instructorId,
           r.instructorName ?? undefined,
@@ -325,6 +329,7 @@ export async function getClassDetail(
         startsAt: classInstances.startsAt,
         durationMin: classInstances.durationMin,
         type: classInstances.type,
+        name: classInstances.name,
         capacity: classInstances.capacity,
         status: classInstances.status,
         publicVisibleAt: classInstances.publicVisibleAt,
@@ -367,6 +372,7 @@ export async function getClassDetail(
     durationMin: cls.durationMin,
     type: cls.type,
     typeMeta: metaFor(cls.type),
+    name: cls.name ?? null,
     instructor: instructorMetaFor(
       cls.instructorId,
       cls.instructorName ?? undefined,
@@ -453,6 +459,7 @@ function mockToBookable(weekStart: Date, seed: MockSessionSeed): BookableClass {
     durationMin: seed.dur,
     type: seed.type,
     typeMeta: metaFor(seed.type),
+    name: null,
     instructor: instructorMetaFor(seed.instr),
     capacity,
     booked,

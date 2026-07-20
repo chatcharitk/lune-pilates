@@ -162,8 +162,8 @@ describe("listPayments (no-DB mock)", () => {
   it("each row carries a resolved bilingual label + the raw packageId", async () => {
     const rows = await listPayments(now);
     const p15 = rows.find((r) => r.packageId === "p15")!;
-    expect(p15.packageLabel).toEqual({ en: "15 hours", th: "15 ชั่วโมง" });
-    expect(p15.amount).toBe(7500);
+    expect(p15.packageLabel).toEqual({ en: "20 hours", th: "20 ชั่วโมง" });
+    expect(p15.amount).toBe(7500); // amount stamped on the mock charge fixture (pre-repricing)
   });
 
   it("includes a cash row + a pending row (both tenders/states render)", async () => {

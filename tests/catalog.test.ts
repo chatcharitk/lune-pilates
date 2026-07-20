@@ -93,14 +93,14 @@ describe("getCatalogItem (server-side price/hours source of truth)", () => {
 });
 
 describe("listPackageCatalog", () => {
-  it("groups items under the three categories in display order", () => {
+  it("groups items under the visible categories in display order (rental hidden)", () => {
     const cats = listPackageCatalog();
-    expect(cats.map((c) => c.id)).toEqual(["group", "private", "rental"]);
+    expect(cats.map((c) => c.id)).toEqual(["group", "private"]);
   });
 
   it("every item's id resolves back through getCatalogItem to the same object", () => {
     const all = listPackageCatalog().flatMap((c) => c.items);
-    expect(all.length).toBe(13); // 4 group + 6 private + 3 rental (lune-data.jsx)
+    expect(all.length).toBe(10); // 4 group + 6 private (rental hidden 2026-07-20)
     for (const item of all) {
       expect(getCatalogItem(item.id)).toBe(item);
     }

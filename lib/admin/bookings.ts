@@ -603,7 +603,7 @@ function mockAdminBookingsOverview(
       status: seed.status,
       checkedInAt: seed.checkedIn ? now : null,
       creditCost: seed.type === "group" || seed.type === "rental" ? 1 : 2,
-      freeCancelHours: 5,
+      freeCancelHours: 6,
     };
   });
 

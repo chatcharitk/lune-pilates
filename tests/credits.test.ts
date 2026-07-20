@@ -54,24 +54,24 @@ describe("capacity helpers", () => {
   });
 });
 
-describe("evaluateCancellation (fixed 5h free window)", () => {
-  it("≥5h before start: free AND cancellable", () => {
+describe("evaluateCancellation (fixed 6h free window)", () => {
+  it("≥6h before start: free AND cancellable", () => {
+    const out = evaluateCancellation(future(7), NOW);
+    expect(out.status).toBe("free");
+    expect(out.free).toBe(true);
+    expect(out.cancellable).toBe(true);
+  });
+
+  it("exactly 6h before start: free (inclusive boundary)", () => {
     const out = evaluateCancellation(future(6), NOW);
     expect(out.status).toBe("free");
     expect(out.free).toBe(true);
     expect(out.cancellable).toBe(true);
+    expect(out.hoursUntilStart).toBeCloseTo(6, 6);
   });
 
-  it("exactly 5h before start: free (inclusive boundary)", () => {
-    const out = evaluateCancellation(future(5), NOW);
-    expect(out.status).toBe("free");
-    expect(out.free).toBe(true);
-    expect(out.cancellable).toBe(true);
-    expect(out.hoursUntilStart).toBeCloseTo(5, 6);
-  });
-
-  it("<5h before start: too_late AND not cancellable (blocked)", () => {
-    const out = evaluateCancellation(future(4.99), NOW);
+  it("<6h before start: too_late AND not cancellable (blocked)", () => {
+    const out = evaluateCancellation(future(5.99), NOW);
     expect(out.status).toBe("too_late");
     expect(out.free).toBe(false);
     expect(out.cancellable).toBe(false);

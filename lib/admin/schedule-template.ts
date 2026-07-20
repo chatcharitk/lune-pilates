@@ -38,6 +38,8 @@ export interface TemplateSlot {
   time: string;
   type: ClassType;
   typeMeta: ClassTypeMeta;
+  /** Optional custom class name; null → show the type label. */
+  name: string | null;
   durationMin: number;
   capacity: number;
   instructorId: string | null;
@@ -49,6 +51,8 @@ export interface TemplateBaselineSlot extends BaselineSlot {
   /** The class_templates.id this slot came from, or null when sourced from the fallback. */
   templateId: string | null;
   instructorId: string | null;
+  /** Optional custom class name copied onto generated instances; null for baseline. */
+  name: string | null;
 }
 
 const byDowThenTime = (a: { dayOfWeek: number; time: string }, b: { dayOfWeek: number; time: string }) =>
@@ -76,6 +80,7 @@ export async function getScheduleTemplate(): Promise<TemplateSlot[]> {
       dayOfWeek: classTemplates.dayOfWeek,
       time: classTemplates.time,
       type: classTemplates.type,
+      name: classTemplates.name,
       durationMin: classTemplates.durationMin,
       capacity: classTemplates.capacity,
       instructorId: classTemplates.instructorId,
@@ -94,6 +99,7 @@ export async function getScheduleTemplate(): Promise<TemplateSlot[]> {
     time: r.time,
     type: r.type,
     typeMeta: metaFor(r.type),
+    name: r.name,
     durationMin: r.durationMin,
     capacity: effectiveCapacity(r.capacity, r.type),
     instructorId: r.instructorId,
@@ -129,6 +135,7 @@ export async function getTemplateSlotsByDow(): Promise<Map<number, TemplateBasel
       dayOfWeek: classTemplates.dayOfWeek,
       time: classTemplates.time,
       type: classTemplates.type,
+      name: classTemplates.name,
       durationMin: classTemplates.durationMin,
       capacity: classTemplates.capacity,
       instructorId: classTemplates.instructorId,
@@ -149,6 +156,7 @@ export async function getTemplateSlotsByDow(): Promise<Map<number, TemplateBasel
       capacity: effectiveCapacity(r.capacity, r.type),
       templateId: r.id,
       instructorId: r.instructorId,
+      name: r.name,
     };
     const list = map.get(r.dayOfWeek) ?? [];
     list.push(slot);
@@ -171,6 +179,7 @@ function mockTemplateSlot(slot: BaselineSlot, i: number): TemplateSlot {
     time: slot.time,
     type: slot.type,
     typeMeta: metaFor(slot.type),
+    name: null,
     durationMin: slot.durationMin,
     capacity: slot.capacity,
     instructorId: null,
@@ -182,7 +191,7 @@ function mockTemplateSlot(slot: BaselineSlot, i: number): TemplateSlot {
 function groupBaselineFallback(): Map<number, TemplateBaselineSlot[]> {
   const map = new Map<number, TemplateBaselineSlot[]>();
   for (const s of BASELINE_SLOTS) {
-    const slot: TemplateBaselineSlot = { ...s, templateId: null, instructorId: null };
+    const slot: TemplateBaselineSlot = { ...s, templateId: null, instructorId: null, name: null };
     const list = map.get(s.dayOfWeek) ?? [];
     list.push(slot);
     map.set(s.dayOfWeek, list);

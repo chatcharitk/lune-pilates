@@ -27,12 +27,12 @@ import { CAPACITY, type ClassType } from "@/lib/domain/types";
 import type { Bilingual, StrKey } from "@/lib/i18n";
 import { addDays, formatStudioDate, studioParts, studioStartOfDay } from "@/lib/time";
 
-const TYPES: ClassType[] = ["group", "private", "duo", "trio", "rental"];
+const TYPES: ClassType[] = ["group", "private", "duo", "trio"]; // rental hidden 2026-07-20
 const TIME_OPTIONS = [
   "07:00", "07:30", "08:00", "09:00", "09:30", "10:00", "11:00", "12:00",
   "13:00", "16:00", "17:00", "17:30", "18:00", "18:30", "19:00",
 ];
-const DURATIONS = [50, 60, 90];
+const DURATIONS = [30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90];
 
 // The three known instructors (mirrors admin-data.jsx AINSTR). Static so this
 // client view never imports server-only query code.
@@ -227,7 +227,7 @@ export function ScheduleView({
                     <button
                       type="button"
                       onClick={() => setRosterId(c.id)}
-                      aria-label={`${tt(c.typeMeta.label)} ${c.time} · ${t("roster")}`}
+                      aria-label={`${c.name || tt(c.typeMeta.label)} ${c.time} · ${t("roster")}`}
                       className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl px-2 py-1 text-left transition-colors hover:bg-surface md:gap-3 md:px-3"
                     >
                       <div className="w-11 shrink-0 md:w-12">
@@ -242,7 +242,7 @@ export function ScheduleView({
                               cancelled ? "text-muted line-through" : "text-ink"
                             }`}
                           >
-                            {tt(c.typeMeta.label)}
+                            {c.name || tt(c.typeMeta.label)}
                           </span>
                           {cancelled && (
                             <span className="shrink-0 rounded-full bg-rose/20 px-2 py-0.5 font-body text-[10px] font-bold text-[#a56a52]">
@@ -336,6 +336,7 @@ function ClassEditor({
   const c = state.cls;
 
   const [type, setType] = useState<ClassType>(c?.type ?? "group");
+  const [name, setName] = useState<string>(c?.name ?? "");
   const [time, setTime] = useState<string>(c?.time ?? "07:00");
   const [durationMin, setDurationMin] = useState<number>(c?.durationMin ?? 60);
   const [instructorId, setInstructorId] = useState<string | null>(c?.instructorId ?? null);
@@ -355,8 +356,8 @@ function ClassEditor({
     setErrorKey(null);
     startTransition(async () => {
       const res = isNew
-        ? await createClass({ date: dayDate, time, type, durationMin, capacity, instructorId })
-        : await updateClass({ id: c!.id, time, type, durationMin, capacity, instructorId });
+        ? await createClass({ date: dayDate, time, type, durationMin, capacity, instructorId, name: name.trim() || null })
+        : await updateClass({ id: c!.id, time, type, durationMin, capacity, instructorId, name: name.trim() || null });
       if (res.ok) onSaved();
       else setErrorKey(FAILURE_STR[res.code] ?? "err_generic");
     });
@@ -437,6 +438,17 @@ function ClassEditor({
             );
           })}
         </div>
+      </Field>
+
+      <Field label={`${t("class_name_label")} (${t("instructor_optional")})`}>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder={t("class_name_ph")}
+          maxLength={60}
+          className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink placeholder:text-muted"
+        />
       </Field>
 
       <div className="grid grid-cols-2 gap-3.5">

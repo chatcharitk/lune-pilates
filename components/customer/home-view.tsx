@@ -196,7 +196,7 @@ export function HomeView({ viewer, overview, next, hasOffer, week }: HomeViewPro
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- static studio asset in /public */}
               <img
-                src={studioImage(next.classInstanceId)}
+                src={studioImage(next.type)}
                 alt=""
                 className="absolute inset-0 h-full w-full object-cover"
                 onError={(e) => {
@@ -293,7 +293,7 @@ function ThisWeekCard({ cls, dateLabel }: { cls: BookableClass; dateLabel: strin
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- static studio asset in /public */}
         <img
-          src={studioImage(cls.id)}
+          src={studioImage(cls.type)}
           alt=""
           className="absolute inset-0 h-full w-full object-cover"
           onError={(e) => {
@@ -312,7 +312,7 @@ function ThisWeekCard({ cls, dateLabel }: { cls: BookableClass; dateLabel: strin
           style={{ background: TYPE_DOT[cls.type] }}
           aria-hidden="true"
         />
-        <span className="truncate font-body text-[12.5px] text-ink-soft">{tt(cls.typeMeta.short)}</span>
+        <span className="truncate font-body text-[12.5px] text-ink-soft">{cls.name || tt(cls.typeMeta.short)}</span>
       </div>
       <p className={`font-body text-[11.5px] font-semibold ${low ? "text-rose" : "text-sage-deep"}`}>
         {cls.seatsLeft} {cls.seatsLeft === 1 ? t("spot_left") : t("spots_left")}

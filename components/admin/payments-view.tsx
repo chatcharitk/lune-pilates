@@ -234,11 +234,14 @@ function PaymentsTable({
               key={p.id}
               role="row"
               tabIndex={0}
-              onClick={() => onOpen(p)}
+              // A slip awaiting a decision opens the approve/reject drawer directly
+              // (so it's one tap on a phone); any other row opens the read-only detail.
+              onClick={() => (p.status === "awaiting_review" ? onReview(p) : onOpen(p))}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  onOpen(p);
+                  if (p.status === "awaiting_review") onReview(p);
+                  else onOpen(p);
                 }
               }}
               aria-label={`${p.customer.name} · ${thb(p.amount)}`}

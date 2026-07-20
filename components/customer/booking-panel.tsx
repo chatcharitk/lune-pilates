@@ -220,7 +220,7 @@ export function BookingPanel({
 
           <div className="mt-5 rounded-lune-sm border border-line bg-surface px-4 py-3.5 text-left">
             <div className="font-head text-[17px] font-semibold text-ink">
-              {tt(detail.typeMeta.label)}
+              {detail.name || tt(detail.typeMeta.label)}
             </div>
             <div className="mt-1 font-body text-[13px] text-ink-soft">
               {dateStr} · {timeRange}
@@ -268,7 +268,7 @@ export function BookingPanel({
 
           <div className="mt-5 rounded-lune-sm border border-line bg-surface px-4 py-3.5 text-left">
             <div className="font-head text-[17px] font-semibold text-ink">
-              {tt(detail.typeMeta.label)}
+              {detail.name || tt(detail.typeMeta.label)}
             </div>
             <div className="mt-1 font-body text-[13px] text-ink-soft">
               {dateStr} · {timeRange}

@@ -26,8 +26,8 @@ import type { TemplateSlot } from "@/lib/admin/schedule-template";
 import { CAPACITY, type ClassType } from "@/lib/domain/types";
 import type { Bilingual, StrKey } from "@/lib/i18n";
 
-const TYPES: ClassType[] = ["group", "private", "duo", "trio", "rental"];
-const DURATIONS = [50, 60, 90];
+const TYPES: ClassType[] = ["group", "private", "duo", "trio"]; // rental hidden 2026-07-20
+const DURATIONS = [30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90];
 
 // ISO weekday (1=Mon … 7=Sun) → full-name i18n key (reuses the availability editor's
 // day_mon..day_sun keys).
@@ -202,7 +202,7 @@ function DaySection({
               <Dot type={s.type} size={8} />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-body text-[13.5px] font-semibold text-ink">
-                  {tt(s.typeMeta.label)}
+                  {s.name || tt(s.typeMeta.label)}
                 </p>
                 <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 font-body text-[11.5px] text-muted tabular-nums">
                   <span>
@@ -265,6 +265,7 @@ function SlotFormDrawer({
 
   const [dayOfWeek, setDayOfWeek] = useState<number>(1);
   const [type, setType] = useState<ClassType>("group");
+  const [name, setName] = useState<string>("");
   const [time, setTime] = useState<string>("07:00");
   const [durationMin, setDurationMin] = useState<number>(60);
   const [capacity, setCapacity] = useState<number>(CAPACITY.group);
@@ -276,6 +277,7 @@ function SlotFormDrawer({
     if (!state) return;
     setDayOfWeek(state.dayOfWeek);
     setType(slot?.type ?? "group");
+    setName(slot?.name ?? "");
     setTime(slot?.time ?? "07:00");
     setDurationMin(slot?.durationMin ?? 60);
     setCapacity(slot?.capacity ?? CAPACITY.group);
@@ -295,8 +297,8 @@ function SlotFormDrawer({
     startTransition(async () => {
       const cap = Math.min(capacity, maxCap);
       const res = isEdit
-        ? await updateTemplateSlot({ id: slot!.id, time, type, durationMin, capacity: cap, instructorId })
-        : await createTemplateSlot({ dayOfWeek, time, type, durationMin, capacity: cap, instructorId });
+        ? await updateTemplateSlot({ id: slot!.id, time, type, durationMin, capacity: cap, instructorId, name: name.trim() || null })
+        : await createTemplateSlot({ dayOfWeek, time, type, durationMin, capacity: cap, instructorId, name: name.trim() || null });
       if (res.ok) {
         onSaved(isEdit ? "toast_template_updated" : "toast_template_added");
         router.refresh();
@@ -378,6 +380,17 @@ function SlotFormDrawer({
             );
           })}
         </div>
+      </Field>
+
+      <Field label={`${t("class_name_label")} (${t("instructor_optional")})`}>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder={t("class_name_ph")}
+          maxLength={60}
+          className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3 font-body text-sm text-ink placeholder:text-muted"
+        />
       </Field>
 
       <div className="grid grid-cols-2 gap-3.5">

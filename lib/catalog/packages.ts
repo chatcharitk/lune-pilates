@@ -112,8 +112,8 @@ const GROUP_ITEMS: CatalogItem[] = [
     tag: "popular", label: hoursLabel(10), sublabel: VALIDITY_LABEL.two_months,
   },
   {
-    id: "p15", category: "group", hours: 15, price: 7500, perHour: 500, validity: "three_months",
-    tag: "best_value", label: hoursLabel(15), sublabel: VALIDITY_LABEL.three_months,
+    id: "p15", category: "group", hours: 20, price: 10000, perHour: 500, validity: "three_months",
+    tag: "best_value", label: hoursLabel(20), sublabel: VALIDITY_LABEL.three_months,
   },
 ];
 
@@ -193,7 +193,10 @@ const ITEM_BY_ID: ReadonlyMap<string, CatalogItem> = new Map(
  * canonical structure (read-only by contract — do not mutate).
  */
 export function listPackageCatalog(): CatalogCategory[] {
-  return CATALOG;
+  // Studio rental is hidden from the buy + POS UIs for now (2026-07-20, "not yet in
+  // use"). The "rental" catalog items still resolve via getCatalogItem for any legacy
+  // charge, so nothing already purchased breaks.
+  return CATALOG.filter((c) => c.id !== "rental");
 }
 
 /**

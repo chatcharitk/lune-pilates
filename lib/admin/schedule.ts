@@ -46,6 +46,8 @@ export interface AdminScheduleClass {
   durationMin: number;
   type: ClassType;
   typeMeta: ClassTypeMeta;
+  /** Optional custom class name; null → show the type label. */
+  name: string | null;
   instructorId: string | null;
   instructor: InstructorMeta | null;
   capacity: number;
@@ -140,6 +142,7 @@ function shape(row: {
   startsAt: Date;
   durationMin: number;
   type: ClassType;
+  name: string | null;
   capacity: number;
   status: ClassStatus;
   instructorId: string | null;
@@ -155,6 +158,7 @@ function shape(row: {
     durationMin: row.durationMin,
     type: row.type,
     typeMeta: metaFor(row.type),
+    name: row.name,
     instructorId: row.instructorId,
     instructor: instructorMetaFor(
       row.instructorId,
@@ -240,6 +244,7 @@ export async function getWeekSchedule(
       startsAt: classInstances.startsAt,
       durationMin: classInstances.durationMin,
       type: classInstances.type,
+      name: classInstances.name,
       capacity: classInstances.capacity,
       status: classInstances.status,
       instructorId: classInstances.instructorId,
@@ -307,6 +312,7 @@ function mockWeekSchedule(weekStart: Date): AdminWeekSchedule {
         durationMin: slot.durationMin,
         type: "group",
         typeMeta: metaFor("group"),
+        name: null,
         instructorId: null,
         instructor: null,
         capacity: slot.capacity,
@@ -326,6 +332,7 @@ function mockWeekSchedule(weekStart: Date): AdminWeekSchedule {
       durationMin: a.type === "group" ? 60 : 50,
       type: a.type,
       typeMeta: metaFor(a.type),
+      name: null,
       instructorId: a.instr,
       instructor: instructorMetaFor(a.instr),
       capacity: effectiveCapacity(99, a.type),
@@ -338,7 +345,7 @@ function mockWeekSchedule(weekStart: Date): AdminWeekSchedule {
   // getTemplateSlotsByDow's no-DB return), so the mock screen's diff is unchanged.
   const templateByDow = new Map<number, TemplateBaselineSlot[]>();
   for (const s of BASELINE_SLOTS) {
-    const slot: TemplateBaselineSlot = { ...s, templateId: null, instructorId: null };
+    const slot: TemplateBaselineSlot = { ...s, templateId: null, instructorId: null, name: null };
     const list = templateByDow.get(s.dayOfWeek) ?? [];
     list.push(slot);
     templateByDow.set(s.dayOfWeek, list);

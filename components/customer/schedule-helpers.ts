@@ -115,7 +115,7 @@ export function windowHoursLabel(hours: number, t: (k: StrKey) => string): strin
 }
 
 /** Order class types appear as filter chips (matches the prototype). */
-export const FILTER_TYPES: ClassType[] = ["group", "private", "duo", "trio", "rental"];
+export const FILTER_TYPES: ClassType[] = ["group", "private", "duo", "trio"]; // rental hidden 2026-07-20
 
 // ───────── week / month chrome (dynamic — anchored to the real current day) ─────────
 // The bookable strip is 7 consecutive days starting today, with real weekday

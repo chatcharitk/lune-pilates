@@ -77,14 +77,14 @@ describe("toAdminBooking (pure)", () => {
     expect(b.cancellation!.freeCancelHours).toBe(5);
   });
 
-  it("is FREE exactly at the 5h boundary (inclusive)", () => {
-    // starts exactly 5h after now, window = 5 → hoursUntilStart === freeCancelHours.
+  it("is FREE exactly at the 6h boundary (inclusive)", () => {
+    // starts exactly 6h after now → hoursUntilStart === the fixed free window (6h).
     const b = toAdminBooking(
-      bookingRow({ startsAt: new Date(now.getTime() + 5 * 3_600_000) }),
+      bookingRow({ startsAt: new Date(now.getTime() + 6 * 3_600_000) }),
       now,
     );
     expect(b.cancellation!.free).toBe(true);
-    expect(b.cancellation!.hoursUntilStart).toBeCloseTo(5, 6);
+    expect(b.cancellation!.hoursUntilStart).toBeCloseTo(6, 6);
     expect(b.cancellation!.refundCredits).toBe(1);
   });
 

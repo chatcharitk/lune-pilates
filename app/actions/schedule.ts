@@ -60,6 +60,8 @@ const createInput = z.object({
   durationMin: z.number().int().min(30).max(180),
   capacity: z.number().int().min(1).max(3),
   instructorId: z.string().nullable().optional(),
+  // Optional custom class name; blank → null (the type label is shown).
+  name: z.string().trim().max(60).nullable().optional(),
 });
 export type CreateClassInput = z.infer<typeof createInput>;
 
@@ -103,6 +105,7 @@ export async function createClass(raw: CreateClassInput): Promise<CreateClassRes
       startsAt,
       durationMin: input.durationMin,
       type: input.type,
+      name: input.name?.trim() || null,
       capacity: effectiveCapacity(input.capacity, input.type),
       instructorId,
       status: "published",
@@ -129,6 +132,8 @@ const updateInput = z.object({
   durationMin: z.number().int().min(30).max(180),
   capacity: z.number().int().min(1).max(3),
   instructorId: z.string().nullable().optional(),
+  // Optional custom class name; blank → null (the type label is shown).
+  name: z.string().trim().max(60).nullable().optional(),
 });
 export type UpdateClassInput = z.infer<typeof updateInput>;
 
@@ -181,6 +186,7 @@ export async function updateClass(raw: UpdateClassInput): Promise<UpdateClassRes
       startsAt,
       durationMin: input.durationMin,
       type: input.type,
+      name: input.name?.trim() || null,
       capacity: cap,
       instructorId,
       // A published class stays visible to members; only its drop-in window moves.
@@ -415,6 +421,7 @@ export async function generateWeekFromBaseline(raw: WeekInput): Promise<Generate
         startsAt,
         durationMin: slot.durationMin,
         type: slot.type,
+        name: slot.name ?? null,
         capacity: slot.capacity,
         instructorId: slot.instructorId ?? null,
         // Born published (live immediately) — invariant 4 stamps per instance.
@@ -545,6 +552,7 @@ const createTemplateInput = z.object({
   durationMin: z.number().int().positive().max(180),
   capacity: z.number().int().min(1),
   instructorId: z.string().min(1).nullable().optional(),
+  name: z.string().trim().max(60).nullable().optional(),
 });
 export type CreateTemplateSlotInput = z.infer<typeof createTemplateInput>;
 
@@ -583,6 +591,7 @@ export async function createTemplateSlot(
       dayOfWeek: input.dayOfWeek,
       time: input.time,
       type: input.type,
+      name: input.name?.trim() || null,
       durationMin: input.durationMin,
       capacity: effectiveCapacity(input.capacity, input.type),
       instructorId,
@@ -601,6 +610,7 @@ const updateTemplateInput = z.object({
   durationMin: z.number().int().positive().max(180),
   capacity: z.number().int().min(1),
   instructorId: z.string().min(1).nullable().optional(),
+  name: z.string().trim().max(60).nullable().optional(),
 });
 export type UpdateTemplateSlotInput = z.infer<typeof updateTemplateInput>;
 
@@ -636,6 +646,7 @@ export async function updateTemplateSlot(
     .set({
       time: input.time,
       type: input.type,
+      name: input.name?.trim() || null,
       durationMin: input.durationMin,
       capacity: effectiveCapacity(input.capacity, input.type),
       instructorId,

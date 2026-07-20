@@ -11,16 +11,22 @@
 
 import { useEffect, useRef, useState } from "react";
 
-const LOGO_SRC = "/brand/logo-full.png";
+const LOGO_SRC = {
+  full: "/brand/logo-full.png", // wide "LUNE PILATES STUDIO" lockup — admin
+  mark: "/brand/logo-mark.png", // tall "E"-with-sparkle mark — customer app
+} as const;
 
 export function BrandLogo({
   imgHeight,
+  variant = "full",
   onDark = false,
   className,
   fallback,
 }: {
   /** Rendered logo height in px (width scales with the asset's aspect ratio). */
   imgHeight: number;
+  /** Which asset: the wide lockup ("full") or the compact mark ("mark"). */
+  variant?: "full" | "mark";
   /** Render in cream for dark backgrounds (admin sidebar). */
   onDark?: boolean;
   className?: string;
@@ -42,7 +48,7 @@ export function BrandLogo({
     // eslint-disable-next-line @next/next/no-img-element -- static brand asset in /public
     <img
       ref={ref}
-      src={LOGO_SRC}
+      src={LOGO_SRC[variant]}
       alt="LUNE Pilates Studio"
       style={{
         height: imgHeight,
