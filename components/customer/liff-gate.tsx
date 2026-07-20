@@ -15,6 +15,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useCustomerLang } from "./customer-context";
 import { establishLineSession, linkLineByPhone } from "@/app/actions/line-auth";
+import { BrandLogo } from "@/components/brand";
 import type { StrKey } from "@/lib/i18n";
 
 type GateState = "loading" | "open_in_line" | "phone" | "error";
@@ -85,9 +86,15 @@ export function LiffGate({ liffId }: { liffId: string }) {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center bg-cream px-6 py-10">
       <div className="w-full max-w-[360px] text-center">
-        <span className="font-brand text-4xl font-semibold tracking-[0.18em] text-taupe-deep">
-          LUN<span className="lune-spark">E</span>
-        </span>
+        <BrandLogo
+          imgHeight={72}
+          className="mx-auto"
+          fallback={
+            <span className="font-brand text-4xl font-semibold tracking-[0.18em] text-taupe-deep">
+              LUN<span className="lune-spark">E</span>
+            </span>
+          }
+        />
 
         {state === "loading" && (
           <p className="mt-8 font-body text-sm text-muted">{t("liff_loading")}</p>

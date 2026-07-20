@@ -8,6 +8,7 @@
 
 import { usePathname } from "next/navigation";
 import { useCustomerLang } from "./customer-context";
+import { BrandLogo } from "@/components/brand";
 import type { Lang } from "@/lib/i18n";
 
 // Route prefixes that render their own focused flow with a back button (no global
@@ -21,12 +22,17 @@ function isHidden(pathname: string): boolean {
   return false;
 }
 
-/** The LUNE wordmark with the 4-point sparkle on the "E" (lune-spark utility). */
+/** The LUNE logo (real asset via BrandLogo; falls back to the sparkle wordmark). */
 export function BrandLockup() {
   return (
-    <span className="font-brand text-[26px] font-semibold leading-none tracking-[0.18em] text-taupe-deep">
-      LUN<span className="lune-spark">E</span>
-    </span>
+    <BrandLogo
+      imgHeight={30}
+      fallback={
+        <span className="font-brand text-[26px] font-semibold leading-none tracking-[0.18em] text-taupe-deep">
+          LUN<span className="lune-spark">E</span>
+        </span>
+      }
+    />
   );
 }
 

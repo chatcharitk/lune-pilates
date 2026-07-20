@@ -11,6 +11,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminLang } from "./admin-context";
 import { Dot, Drawer } from "./ui";
+import { BrandLogo } from "@/components/brand";
 import { TemplateEditor } from "./template-editor";
 import { ClassRosterDrawer } from "./class-roster-drawer";
 import {
@@ -624,9 +625,14 @@ function EmptyWeek({ onGenerate, pending }: { onGenerate: () => void; pending: b
   const { t } = useAdminLang();
   return (
     <div className="flex min-h-[44vh] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-line-strong bg-surface-2 p-10 text-center">
-      <span className="font-brand text-3xl font-semibold text-taupe-deep">
-        LUN<span className="lune-spark">E</span>
-      </span>
+      <BrandLogo
+        imgHeight={52}
+        fallback={
+          <span className="font-brand text-3xl font-semibold text-taupe-deep">
+            LUN<span className="lune-spark">E</span>
+          </span>
+        }
+      />
       <p className="font-head text-lg font-semibold text-ink">{t("empty_week_title")}</p>
       <p className="max-w-sm font-body text-sm text-muted">{t("empty_week_sub")}</p>
       <button
