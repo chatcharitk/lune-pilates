@@ -31,6 +31,7 @@ import {
 } from "./schedule-helpers";
 import { Bell, Clock, Sparkle } from "./icons";
 import { formatStudioDate } from "@/lib/time";
+import { studioImage } from "@/lib/studio-images";
 
 export interface HomeViewProps {
   /** Viewer identity (display only — server-resolved). */
@@ -186,13 +187,23 @@ export function HomeView({ viewer, overview, next, hasOffer, week }: HomeViewPro
             href="/bookings"
             className="flex items-center gap-0 overflow-hidden rounded-lune border border-line bg-surface-2 shadow-soft transition-transform active:scale-[0.99]"
           >
-            {/* studio-image thumbnail placeholder — a tasteful taupe panel until an
-                asset is wired in (lune-home.jsx uses a studio-equipment image). */}
+            {/* studio-photo thumbnail over a taupe gradient (gradient shows if the
+                image is missing). */}
             <span
               aria-hidden="true"
-              className="h-[82px] w-[80px] shrink-0"
+              className="relative h-[82px] w-[80px] shrink-0 overflow-hidden"
               style={{ background: "linear-gradient(150deg, var(--color-cream-2), var(--color-taupe))" }}
-            />
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element -- static studio asset in /public */}
+              <img
+                src={studioImage(next.classInstanceId)}
+                alt=""
+                className="absolute inset-0 h-full w-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            </span>
             <div className="min-w-0 flex-1 px-4 py-3">
               <div className="mb-1.5 flex items-center gap-1.5">
                 <span
@@ -272,8 +283,25 @@ function ThisWeekCard({ cls, dateLabel }: { cls: BookableClass; dateLabel: strin
   return (
     <Link
       href={`/schedule/${cls.id}`}
-      className="block w-[144px] rounded-lune-sm border border-line bg-surface-2 px-3.5 py-3 shadow-soft transition-transform active:scale-[0.98]"
+      className="block w-[144px] overflow-hidden rounded-lune-sm border border-line bg-surface-2 shadow-soft transition-transform active:scale-[0.98]"
     >
+      {/* studio-photo band over a taupe gradient (gradient shows if missing) */}
+      <span
+        aria-hidden="true"
+        className="relative block h-[76px] w-full"
+        style={{ background: "linear-gradient(150deg, var(--color-cream-2), var(--color-taupe))" }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- static studio asset in /public */}
+        <img
+          src={studioImage(cls.id)}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+          }}
+        />
+      </span>
+      <div className="px-3.5 py-3">
       <p className="mb-2 font-body text-xs font-semibold uppercase tracking-[0.04em] text-taupe-deep">
         {dateLabel}
       </p>
@@ -289,6 +317,7 @@ function ThisWeekCard({ cls, dateLabel }: { cls: BookableClass; dateLabel: strin
       <p className={`font-body text-[11.5px] font-semibold ${low ? "text-rose" : "text-sage-deep"}`}>
         {cls.seatsLeft} {cls.seatsLeft === 1 ? t("spot_left") : t("spots_left")}
       </p>
+      </div>
     </Link>
   );
 }

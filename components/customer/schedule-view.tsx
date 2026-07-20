@@ -9,6 +9,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { BookableClass } from "@/lib/schedule/queries";
 import type { ClassType } from "@/lib/domain/types";
+import { studioImage } from "@/lib/studio-images";
 import { makeT, type Bilingual, type Lang } from "@/lib/i18n";
 import { useCustomerLang } from "./customer-context";
 import {
@@ -191,6 +192,23 @@ function SessionRow({ c, lang }: { c: BookableClass; lang: Lang }) {
         c.full ? "opacity-90" : ""
       }`}
     >
+      {/* studio-photo thumbnail over a taupe gradient (gradient shows if missing) */}
+      <span
+        aria-hidden="true"
+        className="relative w-[52px] shrink-0 self-center overflow-hidden rounded-xl"
+        style={{ aspectRatio: "1 / 1", background: "linear-gradient(150deg, var(--color-cream-2), var(--color-taupe))" }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- static studio asset in /public */}
+        <img
+          src={studioImage(c.id)}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+          }}
+        />
+      </span>
+
       {/* time */}
       <div className="flex w-[52px] shrink-0 flex-col justify-center border-r border-line pr-3">
         <span className="font-head text-base font-semibold leading-none text-ink">{start}</span>

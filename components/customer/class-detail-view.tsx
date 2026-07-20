@@ -13,6 +13,7 @@
 
 import Link from "next/link";
 import type { ClassDetail } from "@/lib/schedule/queries";
+import { studioImage } from "@/lib/studio-images";
 import { useCustomerLang } from "./customer-context";
 import { classDateLabel, endTime, hhmm, TYPE_DOT } from "./schedule-helpers";
 import {
@@ -45,8 +46,20 @@ export function ClassDetailView({ detail, cost, balanceBefore, usesPositions }: 
 
   return (
     <div className="flex min-h-dvh flex-col bg-cream">
-      {/* hero */}
+      {/* hero — studio photo over the gradient (gradient shows if the image 404s) */}
       <div className="relative h-[168px] shrink-0 bg-gradient-to-b from-taupe/40 via-taupe/20 to-cream">
+        {/* eslint-disable-next-line @next/next/no-img-element -- static studio asset in /public */}
+        <img
+          src={studioImage(detail.id)}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 h-full w-full object-cover"
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+          }}
+        />
+        {/* legibility scrim under the back button */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/15 to-transparent" />
         <div className="absolute inset-x-4 top-5 flex justify-between">
           <Link
             href="/schedule"
