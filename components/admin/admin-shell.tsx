@@ -9,6 +9,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { AdminLangProvider, useAdminLang } from "./admin-context";
+import { BrandLogo } from "@/components/brand";
 import type { AdminRole } from "@/lib/auth/admin";
 import type { Lang, StrKey } from "@/lib/i18n";
 
@@ -138,11 +139,17 @@ function Brand({ light }: { light?: boolean }) {
   const { t } = useAdminLang();
   return (
     <div className="flex items-center gap-2.5">
-      <span
-        className={`font-brand text-2xl font-semibold tracking-[0.18em] ${light ? "text-cream" : "text-taupe-deep"}`}
-      >
-        LUN<span className="lune-spark">E</span>
-      </span>
+      <BrandLogo
+        imgHeight={28}
+        onDark={light}
+        fallback={
+          <span
+            className={`font-brand text-2xl font-semibold tracking-[0.18em] ${light ? "text-cream" : "text-taupe-deep"}`}
+          >
+            LUN<span className="lune-spark">E</span>
+          </span>
+        }
+      />
       <span
         className={`border-l pl-2.5 font-body text-[9px] font-semibold uppercase tracking-[0.2em] ${
           light ? "border-cream/20 text-cream/50" : "border-line text-muted"
