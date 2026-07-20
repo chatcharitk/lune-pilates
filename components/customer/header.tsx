@@ -27,7 +27,7 @@ export function BrandLockup() {
   return (
     <BrandLogo
       imgHeight={34}
-      variant="mark"
+      variant="full"
       fallback={
         <span className="font-brand text-[26px] font-semibold leading-none tracking-[0.18em] text-taupe-deep">
           LUN<span className="lune-spark">E</span>
