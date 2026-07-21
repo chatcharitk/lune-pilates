@@ -78,6 +78,41 @@ export const packages = pgTable(
   ],
 );
 
+// ───────────────────────── catalog items (EDITABLE purchasable catalog) ─────────────────────────
+// The studio owner's purchasable package catalog. Mirrors the class_templates
+// pattern: the DB is authoritative once populated, and the hardcoded SEED_CATALOG
+// (lib/catalog/packages.ts) is only the seed + the empty-table fallback.
+//
+// `id` is a STABLE SLUG (e.g. "p10", "pv8"), not a uuid: it is already the value
+// stored in `packages.type` and `charges.package_id`, so it must never change and
+// items are NEVER hard-deleted — only archived (active=false) — or historical
+// charges and unspent credits would stop resolving.
+//
+// `per_hour` and `sublabel` are deliberately NOT stored: both are derived
+// (per_hour = price / hours; sublabel = the validity label). Money is integer THB.
+export const catalogItems = pgTable(
+  "catalog_items",
+  {
+    id: text("id").primaryKey(),
+    // Immutable after creation: it decides which credit bucket a booking debits,
+    // so changing it would corrupt existing balances (enforced in the action).
+    category: packageCategory("category").notNull(),
+    hours: integer("hours").notNull(),
+    price: integer("price").notNull(), // THB, integer (no minor units / floats)
+    validity: text("validity").notNull(), // single_visit | one_month | two_months | three_months
+    tag: text("tag"), // popular | best_value | null
+    labelEn: text("label_en").notNull(),
+    labelTh: text("label_th").notNull(),
+    active: boolean("active").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check("catalog_item_hours_positive", sql`${t.hours} > 0`),
+    check("catalog_item_price_nonneg", sql`${t.price} >= 0`),
+  ],
+);
+
 // ───────────────────────── charges (purchase intent) ─────────────────────────
 // Server-side binding of a PromptPay charge → exactly what it pays for. Written at
 // createCheckout time from the catalog item + session user (never the client), and
@@ -99,6 +134,21 @@ export const charges = pgTable("charges", {
     .references(() => users.id),
   // THB amount the charge was opened for — from the catalog, integer (no floats).
   amount: integer("amount").notNull(),
+  // ── PURCHASED-TERMS SNAPSHOT (hours / validity / category) ──
+  // The catalog is now OWNER-EDITABLE at runtime (catalog_items), so re-resolving the
+  // item LIVE at approval time would let an edit made while a charge sits in
+  // `awaiting_review` retroactively change what an already-paid charge grants (edit
+  // p10 10h→20h and the front desk credits 20h for a ฿5,500 payment; 10h→5h
+  // shortchanges the customer). These columns freeze the terms the customer actually
+  // paid against, written at charge-creation time; crediting reads them, not the
+  // live item. `amount` already froze the price — this completes the snapshot.
+  //
+  // NULLABLE by design: charges created BEFORE this column existed have no snapshot,
+  // and the credit paths fall back to the live catalog item exactly as they did
+  // before (see lib/catalog/chargeTerms.ts). New rows always write all three.
+  hours: integer("hours"),
+  validity: text("validity"),
+  category: packageCategory("category"),
   // Opaque reference tying charge → user + item + instant (audit / provider match).
   reference: text("reference").notNull(),
   // How the sale was tendered: "promptpay" (QR, the default — customer self-serve

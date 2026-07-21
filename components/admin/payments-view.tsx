@@ -17,8 +17,11 @@
 //
 // All money/owner decisions are the server's (CLAUDE.md §8): this view sends only a
 // customerId + a catalog packageId + the tender method, and renders whatever the
-// action returns. It imports ONLY the POS action fns + erased types + the catalog +
-// the AdminCustomer type + thb — never lib/db/*.
+// action returns. It imports ONLY the POS action fns + erased TYPES + the
+// AdminCustomer type + thb — never lib/db/*. The purchasable catalog is now
+// DB-backed and owner-editable (lib/catalog/packages.ts reads catalog_items), so it
+// can no longer be imported here: the server page (app/admin/payments/page.tsx)
+// fetches it with `listPackageCatalog()` and passes it down as a prop.
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -38,11 +41,7 @@ import {
   getSlip,
   type SlipImage,
 } from "@/app/actions/admin-payments";
-import {
-  listPackageCatalog,
-  type CatalogItem,
-  type CatalogCategory,
-} from "@/lib/catalog/packages";
+import type { CatalogItem, CatalogCategory } from "@/lib/catalog/packages";
 import type { AdminCustomer } from "@/lib/admin/members";
 import type {
   PaymentRow,
@@ -89,9 +88,12 @@ const STATUS_BADGE: Record<PaymentStatus, { tone: BadgeTone; key: StrKey }> = {
 export function PaymentsView({
   overview,
   customers,
+  catalog,
 }: {
   overview: PaymentsOverview;
   customers: AdminCustomer[];
+  /** The purchasable catalog, fetched server-side (owner-editable, DB-backed). */
+  catalog: CatalogCategory[];
 }) {
   const { t } = useAdminLang();
   const [posOpen, setPosOpen] = useState(false);
@@ -162,7 +164,12 @@ export function PaymentsView({
       )}
 
       {/* POS flow drawer */}
-      <PosDrawer open={posOpen} onClose={() => setPosOpen(false)} customers={customers} />
+      <PosDrawer
+        open={posOpen}
+        onClose={() => setPosOpen(false)}
+        customers={customers}
+        catalog={catalog}
+      />
 
       {/* slip verification drawer */}
       <SlipReviewDrawer row={reviewRow} onClose={() => setReviewRow(null)} />
@@ -518,10 +525,13 @@ function PosDrawer({
   open,
   onClose,
   customers,
+  catalog,
 }: {
   open: boolean;
   onClose: () => void;
   customers: AdminCustomer[];
+  /** The purchasable catalog, passed down from the server page. */
+  catalog: CatalogCategory[];
 }) {
   const { t } = useAdminLang();
   const router = useRouter();
@@ -541,8 +551,6 @@ function PosDrawer({
   // response / double-tap can't double-charge (the server keys the cash credit on
   // it). Minted lazily on the first charge and cleared when a new sale starts.
   const [idemKey, setIdemKey] = useState<string | null>(null);
-
-  const catalog = useMemo(() => listPackageCatalog(), []);
 
   function reset() {
     setStep("package");

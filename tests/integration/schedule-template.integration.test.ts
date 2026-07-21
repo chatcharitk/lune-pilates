@@ -266,7 +266,11 @@ describe.skipIf(!HAS_DB)("schedule template (integration · requires DATABASE_UR
         publicVisibleAt: classInstances.publicVisibleAt,
       })
       .from(classInstances)
-      .where(eq(classInstances.startsAt, startsAt))
+      // Match on OUR template, not just the timestamp: an earlier spec in this file
+      // leaves its own active Wednesday slot at TEST_TIME_A (a duo), so two instances
+      // legitimately share this starts_at. Selecting by time alone picked either one
+      // at random and made the type assertion below nondeterministic.
+      .where(and(eq(classInstances.startsAt, startsAt), eq(classInstances.templateId, created.id)))
       .limit(1);
     expect(inst).toBeTruthy();
     expect(inst!.status).toBe("published");

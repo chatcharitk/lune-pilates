@@ -28,6 +28,7 @@ import { creditLedger, packages } from "@/lib/db/schema";
 import { loadPoolOwner } from "@/lib/credits/selectPackage";
 import { ownerForPool, type CreditOwner } from "@/lib/credits/creditPackage";
 import { packageLabelFor } from "@/lib/admin/payments";
+import { loadCatalogMap } from "@/lib/catalog/packages";
 import { getCustomerLedger as readCustomerLedger, type CustomerLedgerEntry } from "@/lib/admin/members";
 import { emit } from "@/lib/events/bus";
 import type { Bilingual } from "@/lib/i18n";
@@ -147,6 +148,9 @@ export async function getAdjustablePackages(
   if (!ctx) return { ok: false, code: "UNKNOWN_CUSTOMER" };
   const owner = ownerForPool(ctx);
 
+  // ONE catalog read for the whole list, threaded into the pure label helper.
+  const catalog = await loadCatalogMap();
+
   const db = getDb();
   const rows = await db
     .select({
@@ -165,7 +169,7 @@ export async function getAdjustablePackages(
     packages: rows.map((r) => ({
       id: r.id,
       category: r.category,
-      label: packageLabelFor(r.type),
+      label: packageLabelFor(r.type, catalog),
       hoursLeft: r.hoursLeft,
       expiresAt: r.expiresAt.toISOString(),
     })),

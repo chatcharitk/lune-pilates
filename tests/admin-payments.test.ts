@@ -8,6 +8,7 @@
 //   - the period bounds are a clean [month start, next month start).
 
 import { studioParts } from "@/lib/time";
+import { loadCatalogMap } from "@/lib/catalog/packages";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   getPaymentsOverview,
@@ -108,11 +109,17 @@ describe("normalisers (pure, fail safe)", () => {
 });
 
 describe("packageLabelFor", () => {
-  it("resolves a real catalog item's bilingual label", () => {
-    expect(packageLabelFor("p10")).toEqual({ en: "10 hours", th: "10 ชั่วโมง" });
+  // Pure by construction: the caller loads the catalog ONCE and passes the map in.
+  it("resolves a real catalog item's bilingual label", async () => {
+    const catalog = await loadCatalogMap();
+    expect(packageLabelFor("p10", catalog)).toEqual({ en: "10 hours", th: "10 ชั่วโมง" });
   });
-  it("falls back to the raw id when the catalog has drifted", () => {
-    expect(packageLabelFor("ghost")).toEqual({ en: "ghost", th: "ghost" });
+  it("falls back to the raw id when the catalog has drifted", async () => {
+    const catalog = await loadCatalogMap();
+    expect(packageLabelFor("ghost", catalog)).toEqual({ en: "ghost", th: "ghost" });
+  });
+  it("never throws on an empty catalog (fails safe to the raw id)", () => {
+    expect(packageLabelFor("p10", new Map())).toEqual({ en: "p10", th: "p10" });
   });
 });
 

@@ -28,7 +28,7 @@
 import { and, desc, eq, gte, lt } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { charges, paymentSlips, users } from "@/lib/db/schema";
-import { getCatalogItem } from "@/lib/catalog/packages";
+import { loadCatalogMap, type CatalogItem } from "@/lib/catalog/packages";
 import type { Bilingual } from "@/lib/i18n";
 import { PERIOD, periodBounds } from "@/lib/admin/period";
 import { formatStudioDate, studioInstant, studioParts, studioStartOfDay } from "@/lib/time";
@@ -113,9 +113,17 @@ export interface PaymentsOverview {
  * A charge's display package label. Resolves the bilingual catalog label by the
  * stored `packageId`; falls back to the raw id (never throws) when the catalog has
  * drifted, so a stale charge still renders a row.
+ *
+ * PURE by construction: the caller loads the catalog ONCE (`loadCatalogMap()`) and
+ * passes it in, rather than this helper awaiting a read per row (an N+1 over the
+ * charge list). The map includes ARCHIVED items, so a charge for a since-retired
+ * package still renders its real label instead of the raw slug.
  */
-export function packageLabelFor(packageId: string): Bilingual {
-  return getCatalogItem(packageId)?.label ?? { en: packageId, th: packageId };
+export function packageLabelFor(
+  packageId: string,
+  catalog: ReadonlyMap<string, CatalogItem>,
+): Bilingual {
+  return catalog.get(packageId)?.label ?? { en: packageId, th: packageId };
 }
 
 /**
@@ -212,8 +220,12 @@ export function whenDisplay(when: Date, now: Date = new Date()): string {
  * authoritative.
  */
 export async function listPayments(now: Date = new Date()): Promise<PaymentRow[]> {
+  // The catalog is loaded ONCE per query and threaded into the pure label helper,
+  // so labelling N charges costs one read, not N (see packageLabelFor).
+  const catalog = await loadCatalogMap();
+
   if (mockDataMode()) {
-    return mockListPayments(now);
+    return mockListPayments(now, catalog);
   }
 
   const db = getDb();
@@ -238,7 +250,7 @@ export async function listPayments(now: Date = new Date()): Promise<PaymentRow[]
   return rows.map((r) => ({
     id: r.chargeId,
     customer: { userId: r.userId, name: r.name },
-    packageLabel: packageLabelFor(r.packageId),
+    packageLabel: packageLabelFor(r.packageId, catalog),
     packageId: r.packageId,
     amount: r.amount,
     method: normaliseMethod(r.method),
@@ -259,9 +271,10 @@ export async function listPayments(now: Date = new Date()): Promise<PaymentRow[]
  */
 export async function getPaymentsStats(now: Date = new Date()): Promise<PaymentsStats> {
   const { start, end } = periodBounds(now);
+  const catalog = await loadCatalogMap();
 
   if (mockDataMode()) {
-    const rows = mockListPayments(now).filter((r) => inPeriod(r.when, start, end));
+    const rows = mockListPayments(now, catalog).filter((r) => inPeriod(r.when, start, end));
     return summarisePayments(rows, MOCK_NEW_MEMBERS);
   }
 
@@ -295,7 +308,7 @@ export async function getPaymentsStats(now: Date = new Date()): Promise<Payments
   const rows: PaymentRow[] = chargeRows.map((r) => ({
     id: r.chargeId,
     customer: { userId: r.userId, name: r.name },
-    packageLabel: packageLabelFor(r.packageId),
+    packageLabel: packageLabelFor(r.packageId, catalog),
     packageId: r.packageId,
     amount: r.amount,
     method: normaliseMethod(r.method),
@@ -374,13 +387,13 @@ function mockWhen(p: MockPayment, now: Date): Date {
   return studioInstant(year, month0, day - p.daysAgo, p.hour, p.minute);
 }
 
-function mockListPayments(now: Date): PaymentRow[] {
+function mockListPayments(now: Date, catalog: ReadonlyMap<string, CatalogItem>): PaymentRow[] {
   return MOCK_PAYMENTS.map((p) => {
     const when = mockWhen(p, now);
     return {
       id: p.id,
       customer: { userId: p.userId, name: p.name },
-      packageLabel: packageLabelFor(p.packageId),
+      packageLabel: packageLabelFor(p.packageId, catalog),
       packageId: p.packageId,
       amount: p.amount,
       method: p.method,

@@ -22,6 +22,7 @@ import { and, desc, eq, gte, lt } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { charges, paymentSlips, users } from "@/lib/db/schema";
 import type { Bilingual } from "@/lib/i18n";
+import { loadCatalogMap } from "@/lib/catalog/packages";
 import type { PeriodBounds } from "@/lib/admin/period";
 import { mockDataMode } from "@/lib/mock-mode";
 import {
@@ -111,6 +112,8 @@ export async function listSales(range: PeriodBounds, now: Date = new Date()): Pr
     return await mockListSales(range, now);
   }
 
+  // ONE catalog read for the whole export, threaded into the pure label helper.
+  const catalog = await loadCatalogMap();
   const db = getDb();
   const rows = await db
     .select({
@@ -136,7 +139,7 @@ export async function listSales(range: PeriodBounds, now: Date = new Date()): Pr
     whenDisplay: whenDisplay(r.createdAt, now),
     customerName: r.name,
     customerId: r.userId,
-    packageLabel: packageLabelFor(r.packageId),
+    packageLabel: packageLabelFor(r.packageId, catalog),
     packageId: r.packageId,
     method: normaliseMethod(r.method),
     amount: r.amount,

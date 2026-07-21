@@ -35,7 +35,7 @@ vi.mock("@/lib/auth/session", () => ({
 
 import { getDb, closeDb } from "@/lib/db/client";
 import { charges, creditLedger, packages, paymentSlips, users } from "@/lib/db/schema";
-import { getCatalogItem } from "@/lib/catalog/packages";
+import { getCatalogItem, type CatalogItem } from "@/lib/catalog/packages";
 import { uploadPaymentSlip } from "@/app/actions/purchase";
 import { approveSlip, rejectSlip, getSlip } from "@/app/actions/admin-payments";
 
@@ -47,7 +47,8 @@ const PNG_DATA_URL =
 
 describe.skipIf(!HAS_DB)("slip verification (integration · requires DATABASE_URL)", () => {
   const tag = `slip_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-  const item = getCatalogItem("p10")!; // 10h group pack
+  // DB-backed catalog: resolved async in beforeAll (see drizzle/0001_catalog_items.sql).
+  let item: CatalogItem; // 10h group pack
   let userId: string;
 
   const packagesForCharge = (chargeId: string) =>
@@ -80,6 +81,7 @@ describe.skipIf(!HAS_DB)("slip verification (integration · requires DATABASE_UR
   beforeAll(async () => {
     delete process.env.ADMIN_AUTH; // POS/admin auth gate resolves the mock admin
     process.env.STORAGE_MODE = "mock";
+    item = (await getCatalogItem("p10"))!;
     const db = getDb();
     const [u] = await db
       .insert(users)

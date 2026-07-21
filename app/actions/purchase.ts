@@ -35,6 +35,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/client";
 import { charges, paymentSlips } from "@/lib/db/schema";
 import { getCatalogItem, type CatalogItem } from "@/lib/catalog/packages";
+import { termsSnapshotFor } from "@/lib/catalog/chargeTerms";
 import { getPaymentProvider } from "@/lib/payments";
 import { validateSlipDataUrl } from "@/lib/payments/slip";
 import { getSlipStorage } from "@/lib/storage";
@@ -94,7 +95,7 @@ export async function createCheckout(raw: CreateCheckoutInput): Promise<CreateCh
     return { ok: false, code: "INVALID_INPUT" };
   }
 
-  const item = getCatalogItem(parsed.data.packageId);
+  const item = await getCatalogItem(parsed.data.packageId);
   if (!item) {
     return { ok: false, code: "UNKNOWN_PACKAGE" };
   }
@@ -127,6 +128,12 @@ export async function createCheckout(raw: CreateCheckoutInput): Promise<CreateCh
         userId: viewer.id,
         amount: item.price,
         reference: charge.reference,
+        // Freeze the PURCHASED TERMS alongside the price. The catalog is
+        // owner-editable at runtime, and this charge may sit in awaiting_review for
+        // days — approveSlip credits from this snapshot so an edit to the item can
+        // never retroactively change what an already-paid charge grants
+        // (lib/catalog/chargeTerms.ts).
+        ...termsSnapshotFor(item),
       });
   }
 

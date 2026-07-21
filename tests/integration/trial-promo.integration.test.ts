@@ -36,14 +36,15 @@ vi.mock("next/cache", () => ({ revalidatePath: () => {}, revalidateTag: () => {}
 import { getDb, closeDb } from "@/lib/db/client";
 import { charges, creditLedger, packages, users } from "@/lib/db/schema";
 import { creditPackage } from "@/lib/credits/creditPackage";
-import { getCatalogItem } from "@/lib/catalog/packages";
+import { getCatalogItem, type CatalogItem } from "@/lib/catalog/packages";
 
 const HAS_DB = !!process.env.DATABASE_URL;
 
 describe.skipIf(!HAS_DB)("first-purchase 1+1 trial promo (integration · requires DATABASE_URL)", () => {
   const run = `promo_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
-  const drop = getCatalogItem("drop")!; // ฿650 · 1h group drop-in — THE promo item
-  const p10 = getCatalogItem("p10")!; // 10h group pack — a non-promo control
+  // DB-backed catalog: resolved async in beforeAll (see drizzle/0001_catalog_items.sql).
+  let drop: CatalogItem; // ฿650 · 1h group drop-in — THE promo item (id "drop")
+  let p10: CatalogItem; // 10h group pack — a non-promo control
 
   // Two throwaway GUESTS (owner = user_id satisfies the single-owner XOR): one walks
   // the drop-in promo journey (tests 1/2/4), one buys p10 first (test 3).
@@ -94,6 +95,8 @@ describe.skipIf(!HAS_DB)("first-purchase 1+1 trial promo (integration · require
   };
 
   beforeAll(async () => {
+    drop = (await getCatalogItem("drop"))!;
+    p10 = (await getCatalogItem("p10"))!;
     const db = getDb();
     const [a] = await db
       .insert(users)

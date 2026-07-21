@@ -18,7 +18,7 @@
 import { and, desc, eq, isNull, type SQL } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { charges, households, packages, users } from "@/lib/db/schema";
-import { getCatalogItem } from "@/lib/catalog/packages";
+import { loadCatalogMap, type CatalogItem } from "@/lib/catalog/packages";
 import type { UserTier } from "@/lib/domain/types";
 import { getCurrentUser, type SessionUser } from "@/lib/auth/session";
 import { getCreditOverview } from "@/lib/credits/selectPackage";
@@ -108,9 +108,10 @@ function poolPackagesWhere(viewer: SessionUser): SQL {
  * MOCK_SESSION_USER and the mock session; housemates + purchase history mirror the
  * prototype ProfileScreen sample so the screen renders fully without a database.
  */
-function mockProfileOverview(): ProfileOverview {
+async function mockProfileOverview(): Promise<ProfileOverview> {
   const session = getMockSession();
   const viewerName = session.name.en;
+  const catalog = await loadCatalogMap();
   return {
     identity: {
       userId: "00000000-0000-4000-8000-000000000001",
@@ -132,15 +133,21 @@ function mockProfileOverview(): ProfileOverview {
     ],
     // The prototype's two sample purchases (p10, p5), most-recent first.
     purchaseHistory: [
-      buildMockPurchase("h1", "p10", 5500, "2026-05-18T10:00:00+07:00"),
-      buildMockPurchase("h2", "p5", 2950, "2026-05-02T10:00:00+07:00"),
+      buildMockPurchase("h1", "p10", 5500, "2026-05-18T10:00:00+07:00", catalog),
+      buildMockPurchase("h2", "p5", 2950, "2026-05-02T10:00:00+07:00", catalog),
     ],
   };
 }
 
 /** Build one mock purchase row from a catalog id, resolving its label/hours from the catalog. */
-function buildMockPurchase(id: string, itemId: string, price: number, iso: string): PurchaseHistoryItem {
-  const item = getCatalogItem(itemId);
+function buildMockPurchase(
+  id: string,
+  itemId: string,
+  price: number,
+  iso: string,
+  catalog: ReadonlyMap<string, CatalogItem>,
+): PurchaseHistoryItem {
+  const item = catalog.get(itemId);
   return {
     id,
     itemId,
@@ -166,7 +173,7 @@ function buildMockPurchase(id: string, itemId: string, price: number, iso: strin
  */
 export async function getProfileOverview(now: Date = new Date()): Promise<ProfileOverview> {
   if (mockDataMode()) {
-    return mockProfileOverview();
+    return await mockProfileOverview();
   }
 
   const viewer = await getCurrentUser();
@@ -219,6 +226,10 @@ async function loadHousemates(viewer: SessionUser): Promise<Housemate[]> {
 /** The pool's package purchases, newest-first (capped). `pricePaid` comes from the
  *  charge that credited the package, or null when no charge backs it. */
 async function loadPurchaseHistory(viewer: SessionUser): Promise<PurchaseHistoryItem[]> {
+  // ONE catalog read for the whole history, threaded into the pure row shaper —
+  // never a lookup per row. The map includes ARCHIVED items so a package bought
+  // from a since-retired catalog item still shows its real label and hours.
+  const catalog = await loadCatalogMap();
   const db = getDb();
   const rows = await db
     .select({
@@ -237,7 +248,7 @@ async function loadPurchaseHistory(viewer: SessionUser): Promise<PurchaseHistory
     .limit(PURCHASE_HISTORY_LIMIT);
 
   return rows.map((r) => {
-    const item = getCatalogItem(r.itemId);
+    const item = catalog.get(r.itemId);
     return {
       id: r.id,
       itemId: r.itemId,

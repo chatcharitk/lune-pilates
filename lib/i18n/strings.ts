@@ -1066,6 +1066,94 @@ export const STR = {
     en: "Couldn’t adjust hours. Please try again.",
     th: "ปรับชั่วโมงไม่สำเร็จ กรุณาลองใหม่",
   },
+
+  // ───────── admin · package catalog management (owner-only CRUD) ─────────
+  admin_packages: { en: "Packages", th: "แพ็กเกจ" },
+  cat_title: { en: "Packages", th: "แพ็กเกจ" },
+  cat_subtitle: { en: "What customers can buy", th: "แพ็กเกจที่ลูกค้าซื้อได้" },
+  cat_add: { en: "Add package", th: "เพิ่มแพ็กเกจ" },
+  cat_edit: { en: "Edit package", th: "แก้ไขแพ็กเกจ" },
+  cat_active: { en: "On sale", th: "เปิดขาย" },
+  cat_archived: { en: "Archived", th: "เก็บถาวร" },
+  cat_show_archived: { en: "Show archived", th: "แสดงที่เก็บถาวร" },
+  cat_archive: { en: "Archive", th: "เก็บถาวร" },
+  cat_restore: { en: "Put back on sale", th: "นำกลับมาขาย" },
+  cat_id: { en: "Package ID", th: "รหัสแพ็กเกจ" },
+  cat_id_hint: {
+    en: "Permanent — used by every past purchase. Cannot be changed later.",
+    th: "ถาวร — ใช้อ้างอิงการซื้อทั้งหมดที่ผ่านมา แก้ไขภายหลังไม่ได้",
+  },
+  cat_category: { en: "Credit type", th: "ประเภทเครดิต" },
+  cat_category_hint: {
+    en: "Decides which credit balance this tops up. Cannot be changed later.",
+    th: "กำหนดว่าจะเติมเครดิตประเภทใด แก้ไขภายหลังไม่ได้",
+  },
+  cat_hours: { en: "Hours granted", th: "ชั่วโมงที่ได้รับ" },
+  cat_price: { en: "Price (THB)", th: "ราคา (บาท)" },
+  cat_per_hour: { en: "Per hour", th: "ต่อชั่วโมง" },
+  cat_validity: { en: "Validity", th: "อายุการใช้งาน" },
+  cat_tag: { en: "Badge (optional)", th: "ป้ายกำกับ (ไม่บังคับ)" },
+  cat_tag_none: { en: "No badge", th: "ไม่มีป้าย" },
+  cat_tag_popular: { en: "Popular", th: "ยอดนิยม" },
+  cat_tag_best_value: { en: "Best value", th: "คุ้มที่สุด" },
+  cat_label_en: { en: "Name (English)", th: "ชื่อ (อังกฤษ)" },
+  cat_label_th: { en: "Name (Thai)", th: "ชื่อ (ไทย)" },
+  ph_cat_id: { en: "e.g. p20", th: "เช่น p20" },
+  ph_cat_label_en: { en: "e.g. 20 hours", th: "เช่น 20 hours" },
+  ph_cat_label_th: { en: "e.g. 20 ชั่วโมง", th: "เช่น 20 ชั่วโมง" },
+  cat_archive_confirm: {
+    en: "Archived packages stop being sold, but past purchases keep working.",
+    th: "แพ็กเกจที่เก็บถาวรจะหยุดขาย แต่การซื้อที่ผ่านมายังใช้งานได้ตามปกติ",
+  },
+  cat_promo_warning: {
+    en: "This package powers the 1+1 free-trial offer. Archiving it turns the offer off.",
+    th: "แพ็กเกจนี้ผูกกับโปรโมชั่นทดลอง 1 แถม 1 หากเก็บถาวรโปรโมชั่นจะปิดลง",
+  },
+  toast_cat_created: { en: "Package added", th: "เพิ่มแพ็กเกจแล้ว" },
+  toast_cat_updated: { en: "Package updated", th: "อัปเดตแพ็กเกจแล้ว" },
+  toast_cat_archived: { en: "Package archived", th: "เก็บแพ็กเกจถาวรแล้ว" },
+  toast_cat_restored: { en: "Package back on sale", th: "นำแพ็กเกจกลับมาขายแล้ว" },
+  err_cat_id_taken: {
+    en: "That package ID is already used. Pick another.",
+    th: "รหัสแพ็กเกจนี้ถูกใช้แล้ว กรุณาเลือกรหัสอื่น",
+  },
+  err_cat_id_invalid: {
+    en: "Use lowercase letters, numbers and hyphens only (e.g. p20).",
+    th: "ใช้ได้เฉพาะตัวอักษรพิมพ์เล็ก ตัวเลข และขีดกลาง (เช่น p20)",
+  },
+  err_cat_labels_required: {
+    en: "Both the English and Thai names are required.",
+    th: "ต้องกรอกชื่อทั้งภาษาอังกฤษและภาษาไทย",
+  },
+  err_cat_numbers: {
+    en: "Hours must be a whole number above zero, and price a whole number.",
+    th: "ชั่วโมงต้องเป็นจำนวนเต็มมากกว่าศูนย์ และราคาต้องเป็นจำนวนเต็ม",
+  },
+  err_cat_category_immutable: {
+    en: "The credit type can’t be changed after a package is created.",
+    th: "เปลี่ยนประเภทเครดิตหลังสร้างแพ็กเกจแล้วไม่ได้",
+  },
+  err_cat_unknown: {
+    en: "That package no longer exists.",
+    th: "ไม่พบแพ็กเกจนี้แล้ว",
+  },
+  // Demo/mock-data mode: the edit validated but there is no database behind it, so
+  // nothing was written. Distinct from an error — the owner must not think it saved.
+  err_cat_mock_no_db: {
+    en: "Demo mode — this change wasn’t saved.",
+    th: "โหมดตัวอย่าง — การเปลี่ยนแปลงนี้ไม่ได้ถูกบันทึก",
+  },
+  err_cat_save: {
+    en: "Couldn’t save the package. Please try again.",
+    th: "บันทึกแพ็กเกจไม่สำเร็จ กรุณาลองใหม่",
+  },
+  err_cat_forbidden: {
+    en: "Only the studio owner can manage packages.",
+    th: "เฉพาะเจ้าของสตูดิโอเท่านั้นที่จัดการแพ็กเกจได้",
+  },
+  cat_empty: { en: "No packages yet.", th: "ยังไม่มีแพ็กเกจ" },
+  cat_move_up: { en: "Move up", th: "เลื่อนขึ้น" },
+  cat_move_down: { en: "Move down", th: "เลื่อนลง" },
 } as const;
 
 export type StrKey = keyof typeof STR;

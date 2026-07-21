@@ -1,4 +1,5 @@
 import { getPaymentsOverview } from "@/lib/admin/payments";
+import { listPackageCatalog } from "@/lib/catalog/packages";
 import { listCustomers } from "@/lib/admin/members";
 import { requireOwner } from "@/lib/auth/admin";
 import { PaymentsView } from "@/components/admin/payments-view";
@@ -18,6 +19,13 @@ export default async function AdminPaymentsPage() {
   if (!(await requireOwner())) {
     return <AdminForbidden />;
   }
-  const [overview, customers] = await Promise.all([getPaymentsOverview(), listCustomers()]);
-  return <PaymentsView overview={overview} customers={customers} />;
+  // The purchasable catalog is DB-backed and owner-editable (catalog_items), so it
+  // is fetched HERE on the server and passed to the client view — the client can no
+  // longer import it (it would pull lib/db into the browser bundle).
+  const [overview, customers, catalog] = await Promise.all([
+    getPaymentsOverview(),
+    listCustomers(),
+    listPackageCatalog(),
+  ]);
+  return <PaymentsView overview={overview} customers={customers} catalog={catalog} />;
 }

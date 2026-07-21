@@ -1,17 +1,30 @@
-// The canonical, server-side purchasable catalog — the single source of truth
-// for what a customer can buy, how many hours it grants, and what it costs.
+// The canonical, server-side purchasable catalog — the single source of truth for
+// what a customer can buy, how many hours it grants, and what it costs.
 //
-// Mirrors lune-pilates/project/lune-data.jsx (PACKAGE_CATS / PACKAGES) and the
-// spec §1 pricing. Prices and hours live ONLY here; the checkout flow looks them
-// up server-side and NEVER trusts a client-supplied price, hour count, or owner
+// The catalog is now EDITABLE by the studio owner: items live in the `catalog_items`
+// table (admin CRUD via app/actions/admin-catalog.ts). This mirrors the schedule
+// template exactly (lib/admin/schedule-template.ts): SEED_CATALOG below is ONLY the
+// seed source and the empty-table FALLBACK — when the table has rows, the DB is
+// authoritative. Numbers in SEED_CATALOG stay verbatim from lune-pilates/project/
+// lune-data.jsx (PACKAGE_CATS / PACKAGES) and the spec §1 pricing.
+//
+// CATEGORY-LEVEL copy (label / note) stays a hardcoded constant — only ITEMS are
+// editable. Prices and hours are read server-side and NEVER trusted from a client
 // (CLAUDE.md §8 — recompute money server-side).
+//
+// Derived, never stored: `perHour` (price / hours) and `sublabel` (the validity
+// label). Storing them would let them drift from price/hours.
 //
 // Bilingual labels follow the prototype's content-object pattern (CLAUDE.md §6):
 // catalog copy is content, carried as `{ en, th }` objects the UI renders with
-// `tt(...)`, exactly as queries.ts carries TYPE_META labels. Money is integer THB.
+// `tt(...)`. Money is integer THB.
 
+import { asc, eq } from "drizzle-orm";
 import type { Bilingual } from "@/lib/i18n";
 import type { PackageCategory } from "@/lib/domain/types";
+import { getDb } from "@/lib/db/client";
+import { catalogItems } from "@/lib/db/schema";
+import { mockDataMode } from "@/lib/mock-mode";
 
 /**
  * How long a purchased package stays usable. Maps to a concrete `expires_at` via
@@ -20,8 +33,17 @@ import type { PackageCategory } from "@/lib/domain/types";
  */
 export type Validity = "single_visit" | "one_month" | "two_months" | "three_months";
 
+export const VALIDITIES: readonly Validity[] = [
+  "single_visit",
+  "one_month",
+  "two_months",
+  "three_months",
+] as const;
+
 /** Promotional badge a catalog item can carry. */
 export type CatalogTag = "popular" | "best_value";
+
+export const CATALOG_TAGS: readonly CatalogTag[] = ["popular", "best_value"] as const;
 
 /**
  * One purchasable item. `category` is the package balance bucket it credits
@@ -36,13 +58,13 @@ export interface CatalogItem {
   hours: number;
   /** Price in Thai Baht, integer (no minor units / floats). */
   price: number;
-  /** Convenience per-hour rate in THB for display; derived, never authoritative. */
+  /** Convenience per-hour rate in THB for display; DERIVED, never authoritative. */
   perHour: number;
   validity: Validity;
   tag?: CatalogTag;
   /** Bilingual display name (e.g. "10 hours", "1:1 · 8-hour pack"). */
   label: Bilingual;
-  /** Bilingual one-line descriptor under the label (validity / plan). */
+  /** Bilingual one-line descriptor under the label; DERIVED from `validity`. */
   sublabel: Bilingual;
 }
 
@@ -54,9 +76,18 @@ export interface CatalogCategory {
   items: CatalogItem[];
 }
 
+/**
+ * The admin read model: EVERY item including archived ones, carrying the editable
+ * fields plus `active`/`sortOrder` so the management screen can render the list.
+ */
+export interface AdminCatalogItem extends CatalogItem {
+  active: boolean;
+  sortOrder: number;
+}
+
 // ───────────────────────── bilingual label fragments ─────────────────────────
 // Mirrors lune-data.jsx STR validity / format / plan labels. Kept local so the
-// catalog is self-describing; the UI may also key these in strings.ts if needed.
+// catalog is self-describing.
 
 const VALIDITY_LABEL: Record<Validity, Bilingual> = {
   single_visit: { en: "Single visit", th: "ครั้งเดียว" },
@@ -64,6 +95,11 @@ const VALIDITY_LABEL: Record<Validity, Bilingual> = {
   two_months: { en: "Valid 2 months", th: "ใช้ได้ 2 เดือน" },
   three_months: { en: "Valid 3 months", th: "ใช้ได้ 3 เดือน" },
 };
+
+/** The bilingual sublabel for a validity — the ONE place the mapping lives. */
+export function sublabelForValidity(validity: Validity): Bilingual {
+  return VALIDITY_LABEL[validity];
+}
 
 const FMT_LABEL = {
   solo: { en: "1:1", th: "1:1" },
@@ -93,117 +129,253 @@ function fmtPlanLabel(fmt: Fmt, plan: Plan): Bilingual {
   return { en: `${f.en} · ${p.en}`, th: `${f.th} · ${p.th}` };
 }
 
-// ───────────────────────── the catalog (canonical numbers) ─────────────────────────
+/** Derived per-hour display rate. The ONE place the derivation lives. */
+export function perHourFor(price: number, hours: number): number {
+  return Math.round(price / hours);
+}
+
+// ───────────────────────── the seed / fallback catalog ─────────────────────────
 // Numbers copied verbatim from lune-data.jsx PACKAGE_CATS. Group = sharable hour
 // credits; Private & Semi = format packs (1:1 / Duo / Trio); Rental = per-hour
-// apparatus. perHour is derived (price / hours) and kept for display parity.
+// apparatus.
+//
+// This constant is the SEED (scripts/seed-catalog.ts upserts it into catalog_items)
+// and the FALLBACK used when there is no DATABASE_URL or the table is empty —
+// exactly the role BASELINE_SLOTS plays for the schedule template. Once the table
+// has rows, the DB wins and edits here have no effect on a live studio.
 
-const GROUP_ITEMS: CatalogItem[] = [
-  {
-    id: "drop", category: "group", hours: 1, price: 650, perHour: 650, validity: "single_visit",
-    label: hoursLabel(1), sublabel: VALIDITY_LABEL.single_visit,
-  },
-  {
-    id: "p5", category: "group", hours: 5, price: 2950, perHour: 590, validity: "one_month",
-    label: hoursLabel(5), sublabel: VALIDITY_LABEL.one_month,
-  },
-  {
-    id: "p10", category: "group", hours: 10, price: 5500, perHour: 550, validity: "two_months",
-    tag: "popular", label: hoursLabel(10), sublabel: VALIDITY_LABEL.two_months,
-  },
-  {
-    id: "p15", category: "group", hours: 20, price: 10000, perHour: 500, validity: "three_months",
-    tag: "best_value", label: hoursLabel(20), sublabel: VALIDITY_LABEL.three_months,
-  },
-];
+/** The stored shape of a seed item: no derived `perHour` / `sublabel`. */
+export interface CatalogSeedItem {
+  id: string;
+  category: PackageCategory;
+  hours: number;
+  price: number;
+  validity: Validity;
+  tag?: CatalogTag;
+  label: Bilingual;
+  /** Display order WITHIN the category (ascending). */
+  sortOrder: number;
+}
 
-const PRIVATE_ITEMS: CatalogItem[] = [
-  {
-    id: "pv-drop", category: "private", hours: 1, price: 1700, perHour: 1700, validity: "single_visit",
-    label: fmtPlanLabel("solo", "drop"), sublabel: VALIDITY_LABEL.single_visit,
-  },
-  {
-    id: "pv8", category: "private", hours: 8, price: 12000, perHour: 1500, validity: "two_months",
-    tag: "best_value", label: fmtPlanLabel("solo", "pack8"), sublabel: VALIDITY_LABEL.two_months,
-  },
-  {
-    id: "duo-drop", category: "private", hours: 1, price: 2000, perHour: 2000, validity: "single_visit",
-    label: fmtPlanLabel("duo", "drop"), sublabel: VALIDITY_LABEL.single_visit,
-  },
-  {
-    id: "duo8", category: "private", hours: 8, price: 14400, perHour: 1800, validity: "two_months",
-    label: fmtPlanLabel("duo", "pack8"), sublabel: VALIDITY_LABEL.two_months,
-  },
-  {
-    id: "trio-drop", category: "private", hours: 1, price: 2200, perHour: 2200, validity: "single_visit",
-    label: fmtPlanLabel("trio", "drop"), sublabel: VALIDITY_LABEL.single_visit,
-  },
-  {
-    id: "trio8", category: "private", hours: 8, price: 16000, perHour: 2000, validity: "two_months",
-    label: fmtPlanLabel("trio", "pack8"), sublabel: VALIDITY_LABEL.two_months,
-  },
-];
+export const SEED_CATALOG: readonly CatalogSeedItem[] = [
+  // group
+  { id: "drop", category: "group", hours: 1, price: 650, validity: "single_visit", label: hoursLabel(1), sortOrder: 0 },
+  { id: "p5", category: "group", hours: 5, price: 2950, validity: "one_month", label: hoursLabel(5), sortOrder: 10 },
+  { id: "p10", category: "group", hours: 10, price: 5500, validity: "two_months", tag: "popular", label: hoursLabel(10), sortOrder: 20 },
+  { id: "p15", category: "group", hours: 20, price: 10000, validity: "three_months", tag: "best_value", label: hoursLabel(20), sortOrder: 30 },
+  // private & semi
+  { id: "pv-drop", category: "private", hours: 1, price: 1700, validity: "single_visit", label: fmtPlanLabel("solo", "drop"), sortOrder: 0 },
+  { id: "pv8", category: "private", hours: 8, price: 12000, validity: "two_months", tag: "best_value", label: fmtPlanLabel("solo", "pack8"), sortOrder: 10 },
+  { id: "duo-drop", category: "private", hours: 1, price: 2000, validity: "single_visit", label: fmtPlanLabel("duo", "drop"), sortOrder: 20 },
+  { id: "duo8", category: "private", hours: 8, price: 14400, validity: "two_months", label: fmtPlanLabel("duo", "pack8"), sortOrder: 30 },
+  { id: "trio-drop", category: "private", hours: 1, price: 2200, validity: "single_visit", label: fmtPlanLabel("trio", "drop"), sortOrder: 40 },
+  { id: "trio8", category: "private", hours: 8, price: 16000, validity: "two_months", label: fmtPlanLabel("trio", "pack8"), sortOrder: 50 },
+  // studio rental
+  { id: "r-solo", category: "rental", hours: 1, price: 600, validity: "single_visit", label: fmtPlanLabel("solo", "rental"), sortOrder: 0 },
+  { id: "r-duo", category: "rental", hours: 1, price: 800, validity: "single_visit", label: fmtPlanLabel("duo", "rental"), sortOrder: 10 },
+  { id: "r-trio", category: "rental", hours: 1, price: 1000, validity: "single_visit", label: fmtPlanLabel("trio", "rental"), sortOrder: 20 },
+] as const;
 
-const RENTAL_ITEMS: CatalogItem[] = [
-  {
-    id: "r-solo", category: "rental", hours: 1, price: 600, perHour: 600, validity: "single_visit",
-    label: fmtPlanLabel("solo", "rental"), sublabel: VALIDITY_LABEL.single_visit,
-  },
-  {
-    id: "r-duo", category: "rental", hours: 1, price: 800, perHour: 800, validity: "single_visit",
-    label: fmtPlanLabel("duo", "rental"), sublabel: VALIDITY_LABEL.single_visit,
-  },
-  {
-    id: "r-trio", category: "rental", hours: 1, price: 1000, perHour: 1000, validity: "single_visit",
-    label: fmtPlanLabel("trio", "rental"), sublabel: VALIDITY_LABEL.single_visit,
-  },
-];
-
-const CATALOG: CatalogCategory[] = [
-  {
-    id: "group",
+/**
+ * Category-level display copy (the prototype's PACKAGE_CATS tabs). NOT editable by
+ * the owner — only the items inside a category are.
+ */
+export const CATEGORY_META: Record<PackageCategory, { label: Bilingual; note: Bilingual }> = {
+  group: {
     label: { en: "Group Class", th: "คลาสกลุ่ม" },
     note: { en: "Hour credits · sharable for members", th: "เครดิตชั่วโมง · สมาชิกแบ่งปันได้" },
-    items: GROUP_ITEMS,
   },
-  {
-    id: "private",
+  private: {
     label: { en: "Private & Semi", th: "ส่วนตัว & กลุ่มเล็ก" },
     note: {
       en: "Choose your instructor · 8-hr packs valid 2 months",
       th: "เลือกผู้สอน · แพ็ก 8 ชม. ใช้ได้ 2 เดือน",
     },
-    items: PRIVATE_ITEMS,
   },
-  {
-    id: "rental",
+  rental: {
     label: { en: "Studio Rental", th: "เช่าสตูดิโอ" },
     note: { en: "Full apparatus · per hour", th: "อุปกรณ์ครบชุด · ต่อชั่วโมง" },
-    items: RENTAL_ITEMS,
   },
-];
+};
 
-/** Flat id → item index for O(1) server-side price/hour lookups. */
-const ITEM_BY_ID: ReadonlyMap<string, CatalogItem> = new Map(
-  CATALOG.flatMap((c) => c.items).map((item) => [item.id, item]),
-);
+/** Display order of the categories (the tab order). */
+const CATEGORY_ORDER: readonly PackageCategory[] = ["group", "private", "rental"] as const;
 
 /**
- * The full catalog, grouped by category for the buy-credits UI. Returns the
- * canonical structure (read-only by contract — do not mutate).
+ * Studio rental is hidden from the buy + POS UIs for now (2026-07-20, "not yet in
+ * use"). Rental items still resolve via `getCatalogItem` for any legacy charge or
+ * unspent credit, so nothing already purchased breaks.
  */
-export function listPackageCatalog(): CatalogCategory[] {
-  // Studio rental is hidden from the buy + POS UIs for now (2026-07-20, "not yet in
-  // use"). The "rental" catalog items still resolve via getCatalogItem for any legacy
-  // charge, so nothing already purchased breaks.
-  return CATALOG.filter((c) => c.id !== "rental");
+const HIDDEN_CATEGORIES: readonly PackageCategory[] = ["rental"] as const;
+
+// ───────────────────────── row → contract shaping ─────────────────────────
+
+/** Hydrate a seed/stored record into the full contract by deriving perHour + sublabel. */
+function toCatalogItem(seed: CatalogSeedItem): CatalogItem {
+  return {
+    id: seed.id,
+    category: seed.category,
+    hours: seed.hours,
+    price: seed.price,
+    perHour: perHourFor(seed.price, seed.hours),
+    validity: seed.validity,
+    ...(seed.tag ? { tag: seed.tag } : {}),
+    label: seed.label,
+    sublabel: sublabelForValidity(seed.validity),
+  };
+}
+
+/** Narrow a free-text stored validity, failing safe to a 1-month window. */
+function asValidity(v: string): Validity {
+  return (VALIDITIES as readonly string[]).includes(v) ? (v as Validity) : "one_month";
+}
+
+/** Narrow a free-text stored tag; anything unknown becomes no badge. */
+function asTag(v: string | null): CatalogTag | undefined {
+  return v !== null && (CATALOG_TAGS as readonly string[]).includes(v) ? (v as CatalogTag) : undefined;
+}
+
+interface CatalogRow {
+  id: string;
+  category: PackageCategory;
+  hours: number;
+  price: number;
+  validity: string;
+  tag: string | null;
+  labelEn: string;
+  labelTh: string;
+  active: boolean;
+  sortOrder: number;
+}
+
+function rowToAdminItem(r: CatalogRow): AdminCatalogItem {
+  const seed: CatalogSeedItem = {
+    id: r.id,
+    category: r.category,
+    hours: r.hours,
+    price: r.price,
+    validity: asValidity(r.validity),
+    ...(asTag(r.tag) ? { tag: asTag(r.tag)! } : {}),
+    label: { en: r.labelEn, th: r.labelTh },
+    sortOrder: r.sortOrder,
+  };
+  return { ...toCatalogItem(seed), active: r.active, sortOrder: r.sortOrder };
+}
+
+/** The seed catalog as admin items (all active), the fallback shape. */
+function seedAdminItems(): AdminCatalogItem[] {
+  return SEED_CATALOG.map((s) => ({ ...toCatalogItem(s), active: true, sortOrder: s.sortOrder }));
+}
+
+// ───────────────────────── public reads ─────────────────────────
+
+const SELECT_COLUMNS = {
+  id: catalogItems.id,
+  category: catalogItems.category,
+  hours: catalogItems.hours,
+  price: catalogItems.price,
+  validity: catalogItems.validity,
+  tag: catalogItems.tag,
+  labelEn: catalogItems.labelEn,
+  labelTh: catalogItems.labelTh,
+  active: catalogItems.active,
+  sortOrder: catalogItems.sortOrder,
+};
+
+/**
+ * EVERY catalog item — including ARCHIVED (active=false) ones — as the admin read
+ * model, ordered by category then sortOrder.
+ *
+ * FALLBACK: when the table is EMPTY (before seeding) or there is no DATABASE_URL,
+ * falls back to SEED_CATALOG so the app behaves exactly as it did before the table
+ * existed. Once the table has rows, the DB is authoritative.
+ */
+export async function listAllCatalogItems(): Promise<AdminCatalogItem[]> {
+  if (mockDataMode()) return seedAdminItems();
+
+  const db = getDb();
+  const rows = await db
+    .select(SELECT_COLUMNS)
+    .from(catalogItems)
+    .orderBy(asc(catalogItems.category), asc(catalogItems.sortOrder), asc(catalogItems.id));
+
+  if (rows.length === 0) return seedAdminItems();
+  return rows.map(rowToAdminItem);
+}
+
+/**
+ * A `Map<id, CatalogItem>` over the WHOLE catalog (archived included), loaded once.
+ *
+ * This exists so PURE shaping helpers stay pure and synchronous: a query function
+ * loads the map ONCE at the top and passes it into the helper, instead of every
+ * helper awaiting its own read (an N+1 per row). See lib/admin/payments.ts
+ * `packageLabelFor` and lib/admin/analytics.ts `categoryForPackageId`.
+ */
+export async function loadCatalogMap(): Promise<Map<string, CatalogItem>> {
+  const items = await listAllCatalogItems();
+  return new Map(items.map((i) => [i.id, i as CatalogItem]));
 }
 
 /**
  * Look up a single catalog item by id, or `undefined` if no such item exists.
  * This is the ONLY trusted source of an item's price/hours for checkout — the
  * server resolves the item here and ignores any price the client may have sent.
+ *
+ * Resolves ARCHIVED items too, deliberately: historical charges (charges.package_id)
+ * and unspent credits (packages.type) reference ids that may since have been
+ * archived, and they must keep resolving to their label/hours/category forever.
+ * Gating what is PURCHASABLE is `listPackageCatalog`'s job, not this one's.
  */
-export function getCatalogItem(id: string): CatalogItem | undefined {
-  return ITEM_BY_ID.get(id);
+export async function getCatalogItem(id: string): Promise<CatalogItem | undefined> {
+  if (!id) return undefined;
+
+  if (mockDataMode()) {
+    const seed = SEED_CATALOG.find((s) => s.id === id);
+    return seed ? toCatalogItem(seed) : undefined;
+  }
+
+  const db = getDb();
+  const rows = await db.select(SELECT_COLUMNS).from(catalogItems).where(eq(catalogItems.id, id)).limit(1);
+  const row = rows[0];
+  if (row) return rowToAdminItem(row);
+
+  // Empty-table fallback: before the seed has run, resolve from the constant.
+  const anyRow = await db.select({ id: catalogItems.id }).from(catalogItems).limit(1);
+  if (anyRow.length > 0) return undefined; // table is populated → genuinely unknown id
+
+  const seed = SEED_CATALOG.find((s) => s.id === id);
+  return seed ? toCatalogItem(seed) : undefined;
+}
+
+/**
+ * The PURCHASABLE catalog, grouped by category for the buy-credits + POS UIs.
+ * Only ACTIVE items, ordered by sortOrder; hidden categories (rental) are omitted.
+ * Empty categories are dropped so the UI never renders a blank tab.
+ */
+export async function listPackageCatalog(): Promise<CatalogCategory[]> {
+  const all = await listAllCatalogItems();
+
+  const groups: CatalogCategory[] = [];
+  for (const id of CATEGORY_ORDER) {
+    if (HIDDEN_CATEGORIES.includes(id)) continue;
+    const items = all
+      .filter((i) => i.active && i.category === id)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map(
+        (i): CatalogItem => ({
+          id: i.id,
+          category: i.category,
+          hours: i.hours,
+          price: i.price,
+          perHour: i.perHour,
+          validity: i.validity,
+          ...(i.tag ? { tag: i.tag } : {}),
+          label: i.label,
+          sublabel: i.sublabel,
+        }),
+      );
+    if (items.length === 0) continue;
+    groups.push({ id, label: CATEGORY_META[id].label, note: CATEGORY_META[id].note, items });
+  }
+  return groups;
 }

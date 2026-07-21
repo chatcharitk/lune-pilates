@@ -40,7 +40,7 @@ import {
 import type { Bilingual } from "@/lib/i18n";
 import type { ClassType, PackageCategory } from "@/lib/domain/types";
 import { effectiveCapacity } from "@/lib/domain/types";
-import { getCatalogItem } from "@/lib/catalog/packages";
+import { loadCatalogMap, type CatalogItem } from "@/lib/catalog/packages";
 import { instructorMetaFor } from "@/lib/schedule/queries";
 import {
   dayBounds,
@@ -205,9 +205,19 @@ export function monthLabelFor(now: Date): Bilingual {
   return { en, th };
 }
 
-/** Map a stored catalog packageId → its revenue-mix category, failing safe to group. */
-export function categoryForPackageId(packageId: string): PackageCategory {
-  return getCatalogItem(packageId)?.category ?? "group";
+/**
+ * Map a stored catalog packageId → its revenue-mix category, failing safe to group.
+ *
+ * PURE by construction: the caller loads the catalog ONCE (`loadCatalogMap()`) at the
+ * top of its query and passes it in, rather than this helper awaiting a read per row
+ * (an N+1 over the revenue-mix rows). The map includes ARCHIVED items, so a charge
+ * for a since-retired package still lands in the right revenue bucket.
+ */
+export function categoryForPackageId(
+  packageId: string,
+  catalog: ReadonlyMap<string, CatalogItem>,
+): PackageCategory {
+  return catalog.get(packageId)?.category ?? "group";
 }
 
 /** Avatar initial from a bilingual name (first letter of the last EN token). */
@@ -405,14 +415,16 @@ async function buildSalesSection(now: Date): Promise<SalesSection> {
   const byDay = new Map<string, number>(sparkRows.map((r) => [r.day, r.total]));
   const dailyRevenue = denseDailyRevenue(byDay, now);
 
-  // Mix by category (group | private | rental).
+  // Mix by category (group | private | rental). The catalog is loaded ONCE here and
+  // passed into the pure helper — never once per row (N+1).
+  const catalog = await loadCatalogMap();
   const catTotals = new Map<PackageCategory, number>([
     ["group", 0],
     ["private", 0],
     ["rental", 0],
   ]);
   for (const r of mixRows) {
-    const cat = categoryForPackageId(r.packageId);
+    const cat = categoryForPackageId(r.packageId, catalog);
     catTotals.set(cat, (catTotals.get(cat) ?? 0) + r.total);
   }
   const { mix: revenueMix, total: revenueTotalMix } = withMixPct(

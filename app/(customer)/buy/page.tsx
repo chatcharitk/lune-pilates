@@ -19,7 +19,7 @@ import { BuyView } from "@/components/customer/buy-view";
 export const dynamic = "force-dynamic";
 
 export default async function BuyCreditsPage() {
-  const catalog = listPackageCatalog();
+  const catalog = await listPackageCatalog();
   const viewer = await getCurrentUser();
   // Recap reads the real summed household pool + nearest expiry (invariant 2);
   // member/household status gates the sharing perk.

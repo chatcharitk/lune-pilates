@@ -12,6 +12,7 @@
 //     priorPeriodBounds, pctDelta) are correct.
 
 import { studioParts } from "@/lib/time";
+import { loadCatalogMap } from "@/lib/catalog/packages";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   buildAlert,
@@ -154,11 +155,21 @@ describe("buildHouseUsage (pure)", () => {
 });
 
 describe("categoryForPackageId", () => {
-  it("maps a real catalog item to its category, fails safe to group", () => {
-    expect(categoryForPackageId("p10")).toBe("group");
-    expect(categoryForPackageId("pv8")).toBe("private");
-    expect(categoryForPackageId("r-solo")).toBe("rental");
-    expect(categoryForPackageId("ghost")).toBe("group");
+  // The catalog is now DB-backed and owner-editable; the helper stayed PURE and
+  // takes a preloaded map (loaded once per query, never per row). With no
+  // DATABASE_URL this resolves the SEED_CATALOG fallback.
+  it("maps a real catalog item to its category, fails safe to group", async () => {
+    const catalog = await loadCatalogMap();
+    expect(categoryForPackageId("p10", catalog)).toBe("group");
+    expect(categoryForPackageId("pv8", catalog)).toBe("private");
+    expect(categoryForPackageId("r-solo", catalog)).toBe("rental");
+    expect(categoryForPackageId("ghost", catalog)).toBe("group");
+  });
+
+  it("still resolves an ARCHIVED item's category (historical charges must bucket right)", async () => {
+    // An empty map is the pathological "catalog drifted entirely" case — the
+    // helper must never throw, only fail safe.
+    expect(categoryForPackageId("p10", new Map())).toBe("group");
   });
 });
 

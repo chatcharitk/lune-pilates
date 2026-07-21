@@ -28,6 +28,7 @@ import { z } from "zod";
 import { getDb } from "@/lib/db/client";
 import { charges, paymentSlips } from "@/lib/db/schema";
 import { getCatalogItem } from "@/lib/catalog/packages";
+import { itemForCredit } from "@/lib/catalog/chargeTerms";
 import { getSlipStorage } from "@/lib/storage";
 import { loadPoolOwner } from "@/lib/credits/selectPackage";
 import { creditPackage, ownerForPool, type CreditOwner } from "@/lib/credits/creditPackage";
@@ -127,10 +128,19 @@ export async function approveSlip(raw: ApproveSlipInput): Promise<ApproveSlipRes
   }
 
   // Resolve the item from the STORED packageId — never the client's (§8).
-  const item = getCatalogItem(intent.packageId);
-  if (!item) {
+  //
+  // THE LIVE ITEM IS THE LABEL, NOT THE TERMS. A slip can sit in awaiting_review for
+  // days, and the catalog is owner-editable at runtime — so the hours, validity and
+  // category actually granted come from the charge's own purchased-terms snapshot,
+  // frozen at checkout (lib/catalog/chargeTerms.ts). Without this, editing p10 from
+  // 10h to 20h while a slip was pending would credit 20 hours for a ฿5,500 payment.
+  // Charges created before the snapshot columns existed have nulls and fall back to
+  // the live item — the pre-existing behaviour, since their terms aren't recorded.
+  const live = await getCatalogItem(intent.packageId);
+  if (!live) {
     return { ok: false, code: "UNKNOWN_PACKAGE" };
   }
+  const item = itemForCredit(live, intent);
 
   // Resolve the recipient's pool from the charge's bound customer, from the DB
   // (member→household, guest→own — invariants 2 & 3).

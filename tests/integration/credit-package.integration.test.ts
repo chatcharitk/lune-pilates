@@ -36,7 +36,7 @@ vi.mock("next/cache", () => ({
 import { getDb, closeDb } from "@/lib/db/client";
 import { charges, creditLedger, packages, users } from "@/lib/db/schema";
 import { creditPackage } from "@/lib/credits/creditPackage";
-import { getCatalogItem } from "@/lib/catalog/packages";
+import { getCatalogItem, type CatalogItem } from "@/lib/catalog/packages";
 import { posSellPackage } from "@/app/actions/admin-pos";
 
 const HAS_DB = !!process.env.DATABASE_URL;
@@ -47,7 +47,10 @@ describe.skipIf(!HAS_DB)("credit grant at-most-once (integration · requires DAT
   // "delete everything referencing this user". Guest ⇒ owner = user_id (XOR), which
   // satisfies the schema's single-owner check and the owner_user_id FK.
   const tag = `it_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-  const item = getCatalogItem("p10")!; // 10h group pack — the canonical catalog item
+  // The catalog is now DB-backed (catalog_items); resolving an item is async, so it
+  // is loaded in beforeAll rather than at describe-body time. Requires the table to
+  // exist — apply drizzle/0001_catalog_items.sql before running the integration suite.
+  let item: CatalogItem;
   let userId: string;
 
   const ownerOf = () => ({ ownerHouseholdId: null, ownerUserId: userId });
@@ -66,6 +69,7 @@ describe.skipIf(!HAS_DB)("credit grant at-most-once (integration · requires DAT
 
   beforeAll(async () => {
     delete process.env.ADMIN_AUTH; // ensure the POS auth gate resolves the mock admin
+    item = (await getCatalogItem("p10"))!; // 10h group pack — the canonical catalog item
     const db = getDb();
     const [u] = await db
       .insert(users)

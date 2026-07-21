@@ -39,7 +39,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getDb } from "@/lib/db/client";
 import { charges } from "@/lib/db/schema";
-import { getCatalogItem } from "@/lib/catalog/packages";
+import { getCatalogItem, type CatalogItem } from "@/lib/catalog/packages";
+import { itemForCredit, termsSnapshotFor } from "@/lib/catalog/chargeTerms";
 import { getPaymentProvider } from "@/lib/payments";
 import { loadPoolOwner } from "@/lib/credits/selectPackage";
 import { creditPackage, ownerForPool, type CreditOwner } from "@/lib/credits/creditPackage";
@@ -152,7 +153,7 @@ export async function posSellPackage(raw: PosSellPackageInput): Promise<PosSellP
   const now = new Date();
 
   // Resolve the item server-side — the ONLY trusted source of price/hours (§8).
-  const item = getCatalogItem(packageId);
+  const item = await getCatalogItem(packageId);
   if (!item) {
     return { ok: false, code: "UNKNOWN_PACKAGE" };
   }
@@ -204,7 +205,7 @@ export async function posSellPackage(raw: PosSellPackageInput): Promise<PosSellP
  */
 async function sellForCash(params: {
   customerId: string;
-  item: NonNullable<ReturnType<typeof getCatalogItem>>;
+  item: CatalogItem;
   owner: CreditOwner;
   idempotencyKey: string;
   now: Date;
@@ -234,11 +235,30 @@ async function sellForCash(params: {
       reference,
       method: "cash",
       status: "pending",
+      // Freeze the purchased terms with the price (lib/catalog/chargeTerms.ts). The
+      // cash path credits in the same breath so the window is tiny, but the snapshot
+      // is what the receipt and any later reconciliation read back.
+      ...termsSnapshotFor(item),
     })
     .onConflictDoNothing();
 
   // Credit immediately — cash is tendered at the desk, so it is paid on sale.
-  const outcome = await creditPackage({ chargeId, item, owner, actorUserId: customerId, now });
+  // A retried sale (same idempotency key) reuses the ALREADY-STORED snapshot, so a
+  // catalog edit between the first attempt and the retry can't change the grant.
+  const [stored] = await db
+    .select({ hours: charges.hours, validity: charges.validity, category: charges.category })
+    .from(charges)
+    .where(eq(charges.chargeId, chargeId))
+    .limit(1);
+  const granted = stored ? itemForCredit(item, stored) : item;
+
+  const outcome = await creditPackage({
+    chargeId,
+    item: granted,
+    owner,
+    actorUserId: customerId,
+    now,
+  });
 
   await emitPurchased({ outcome, customerId, owner });
 
@@ -264,7 +284,7 @@ async function sellForCash(params: {
  */
 async function sellForPromptPay(params: {
   customerId: string;
-  item: NonNullable<ReturnType<typeof getCatalogItem>>;
+  item: CatalogItem;
   now: Date;
 }): Promise<PosSellPackageResult> {
   const { customerId, item, now } = params;
@@ -286,6 +306,9 @@ async function sellForPromptPay(params: {
     reference: charge.reference,
     method: "promptpay",
     status: "pending",
+    // Freeze the purchased terms with the price — posConfirmPayment credits from
+    // this snapshot, not from the (editable) live catalog item.
+    ...termsSnapshotFor(item),
   });
 
   return {
@@ -381,11 +404,17 @@ export async function posConfirmPayment(
     return { ok: false, code: "UNKNOWN_CHARGE" };
   }
 
-  // Resolve the item from the STORED packageId — never the client's (§8).
-  const item = getCatalogItem(intent.packageId);
-  if (!item) {
+  // Resolve the item from the STORED packageId — never the client's (§8). The live
+  // item supplies the LABEL and the catalog id; the HOURS / VALIDITY / CATEGORY that
+  // are actually granted come from the charge's own purchased-terms snapshot, so a
+  // catalog edit between opening the QR and confirming it cannot change what this
+  // already-paid charge is worth (lib/catalog/chargeTerms.ts). Pre-snapshot charges
+  // (null columns) fall back to the live item, as before.
+  const live = await getCatalogItem(intent.packageId);
+  if (!live) {
     return { ok: false, code: "UNKNOWN_PACKAGE" };
   }
+  const item = itemForCredit(live, intent);
 
   // Resolve the recipient's pool from the charge's bound customer, from the DB.
   const owner = await resolveOwnerFor(intent.userId);

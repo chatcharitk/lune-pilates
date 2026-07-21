@@ -7,12 +7,12 @@
 // Coverage:
 //   1. FREE cancel refunds the EXACT booked cost (a 2-credit Private → a +2 ledger row,
 //      never a hardcoded 1); the cached balance returns to its starting value.
-//   2. CANCEL WITHIN 5h is BLOCKED entirely (TOO_LATE_TO_CANCEL): no ledger change, the
+//   2. CANCEL WITHIN 6h is BLOCKED entirely (TOO_LATE_TO_CANCEL): no ledger change, the
 //      booking stays live (CLAUDE.md §5 inv 7, fixed window decided 2026-06-28).
 //   3. ADMIN RESCHEDULE net-zero on a same-cost type: refund(old) + debit(new) sum to 0,
 //      the pool balance is unchanged, and it is ONE atomic move (old cancelled, new
 //      live, exactly one +cost and one −cost ledger row for the move).
-//   3b. ADMIN RESCHEDULE overrides the 5h rule: a booking 2h out (well inside the window)
+//   3b. ADMIN RESCHEDULE overrides the 6h rule: a booking 2h out (well inside the window)
 //      can still be moved by the owner-only admin path (skipWindowCheck).
 //   4. WAITLIST confirm-race: two offered heads confirm the same single freed seat →
 //      exactly one books, the other gets OFFER_LOST (CLAUDE.md §5 inv 6).
@@ -203,7 +203,7 @@ describe.skipIf(!HAS_DB)(
     it("FREE cancel of a 2-credit Private refunds EXACTLY 2 (a +2 ledger row, not 1)", async () => {
       const POOL = 5;
       const { members, packageId } = await makeHousehold("free-cancel", 1, "private", POOL);
-      // 48h ahead ⇒ booked ≥5h ⇒ free window = 5h; cancelling now (≈48h out) is free.
+      // 48h ahead ⇒ booked ≥6h ⇒ free window = 6h; cancelling now (≈48h out) is free.
       const classId = await makeClass("private", 1, 48);
 
       enqueueSession(members[0]!);
@@ -230,20 +230,20 @@ describe.skipIf(!HAS_DB)(
       expect(await liveBookingsFor(classId)).toHaveLength(0);
     });
 
-    // ───────────── 2. CANCEL within 5h is BLOCKED entirely ─────────────
+    // ───────────── 2. CANCEL within 6h is BLOCKED entirely ─────────────
 
-    it("CANCEL within 5h is BLOCKED (TOO_LATE_TO_CANCEL): no ledger change, booking stays live", async () => {
+    it("CANCEL within 6h is BLOCKED (TOO_LATE_TO_CANCEL): no ledger change, booking stays live", async () => {
       const POOL = 5;
       const { members, packageId } = await makeHousehold("late-cancel", 1, "private", POOL);
-      // 0.5h ahead ⇒ well inside the fixed 5h window ⇒ a customer self-cancel is
-      // BLOCKED entirely (CLAUDE.md §5 inv 7, decided 2026-06-28).
+      // 0.5h ahead ⇒ well inside the fixed 6h window ⇒ a customer self-cancel is
+      // BLOCKED entirely (CLAUDE.md §5 inv 7, window widened 5h → 6h 2026-07-20).
       const classId = await makeClass("private", 1, 0.5);
 
       enqueueSession(members[0]!);
       const booked = await bookClass({ classInstanceId: classId });
       expect(booked.ok).toBe(true);
       if (!booked.ok) return;
-      expect(booked.freeCancelHours).toBe(5); // fixed window stamp
+      expect(booked.freeCancelHours).toBe(6); // fixed window stamp
       expect(await hoursLeftOf(packageId)).toBe(POOL - PRIVATE_COST);
 
       enqueueSession(members[0]!);
@@ -300,12 +300,12 @@ describe.skipIf(!HAS_DB)(
       expect(newLive[0]!.id).toBe(res.newBookingId);
     });
 
-    // ───────────── 3b. ADMIN RESCHEDULE overrides the 5h rule ─────────────
+    // ───────────── 3b. ADMIN RESCHEDULE overrides the 6h rule ─────────────
 
-    it("ADMIN RESCHEDULE overrides the 5h rule: a booking 2h out can still be moved", async () => {
+    it("ADMIN RESCHEDULE overrides the 6h rule: a booking 2h out can still be moved", async () => {
       const POOL = 5;
       const { members, packageId } = await makeHousehold("resched-late", 1, "private", POOL);
-      // 2h out ⇒ well inside the 5h window ⇒ a CUSTOMER could not move it, but the
+      // 2h out ⇒ well inside the 6h window ⇒ a CUSTOMER could not move it, but the
       // owner-only admin path bypasses the window (skipWindowCheck).
       const oldClass = await makeClass("private", 1, 2);
       const newClass = await makeClass("private", 1, 72);
@@ -320,7 +320,7 @@ describe.skipIf(!HAS_DB)(
         bookingId: booked.bookingId,
         newClassInstanceId: newClass,
       });
-      // The admin move succeeds despite being inside the 5h window.
+      // The admin move succeeds despite being inside the 6h window.
       expect(res.ok).toBe(true);
       if (!res.ok) return;
 
