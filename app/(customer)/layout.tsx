@@ -2,6 +2,7 @@ import { CustomerLangProvider } from "@/components/customer/customer-context";
 import { BottomNav } from "@/components/customer/bottom-nav";
 import { Header } from "@/components/customer/header";
 import { LiffGate } from "@/components/customer/liff-gate";
+import { StandaloneNav } from "@/components/customer/standalone-nav";
 import { resolveActiveCustomerUid } from "@/lib/auth/session";
 
 // Customer surface shell (LINE LIFF, mobile). Wraps every customer screen in the
@@ -29,6 +30,9 @@ export default async function CustomerLayout({ children }: { children: React.Rea
 
   return (
     <CustomerLangProvider>
+      {/* iOS home-screen PWA: keep internal navigations inside the standalone
+          window (no-op everywhere except an iOS home-screen install). */}
+      <StandaloneNav />
       <div className="mx-auto flex min-h-dvh max-w-[440px] flex-col bg-cream">
         {/* Shared brand header + EN/TH toggle on the in-nav tab screens; hidden on
             the pushed booking/checkout flows (Header decides via the pathname). */}
