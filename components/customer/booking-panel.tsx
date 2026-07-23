@@ -15,6 +15,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ClassDetail, PositionAvailability } from "@/lib/schedule/queries";
 import type { ReformerPosition } from "@/lib/domain/types";
+import { isCustomerBookable } from "@/lib/domain/types";
 import { bookClass, type BookActionFailureCode } from "@/app/actions/booking";
 import {
   joinWaitlist,
@@ -22,8 +23,8 @@ import {
 } from "@/app/actions/waitlist";
 import { makeT, type Lang } from "@/lib/i18n";
 import type { StrKey } from "@/lib/i18n/strings";
-import { POSITION_KEY, windowHoursLabel } from "./schedule-helpers";
-import { ArrowRight, Bell, Check, Info } from "./icons";
+import { classDateLabel, POSITION_KEY, windowHoursLabel } from "./schedule-helpers";
+import { ArrowRight, Bell, Check, Info, Clock } from "./icons";
 
 interface BookingPanelProps {
   lang: Lang;
@@ -63,6 +64,13 @@ function errorKey(code: BookActionFailureCode): StrKey {
       return "err_full";
     case "INVALID_POSITION":
       return "err_invalid_position";
+    case "ADMIN_ONLY":
+      // The CTA is replaced for front-desk-only types, but map it defensively.
+      return "err_admin_only";
+    case "RENTAL_WINDOW_CLOSED":
+      return "err_rental_window_closed";
+    case "ROOM_CONFLICT":
+      return "err_room_conflict";
     case "ALREADY_BOOKED":
       return "err_already_booked";
     case "CLASS_NOT_FOUND":
@@ -148,6 +156,14 @@ export function BookingPanel({
 
   const full = detail.full;
   const seatsLeft = detail.seatsLeft;
+
+  // Front-desk-only types (private/duo/trio) are never self-bookable — the Book CTA
+  // (and any waitlist) is replaced with a "contact front desk" notice. Single source
+  // of truth: CUSTOMER_BOOKABLE_TYPES (lib/domain/types).
+  const adminOnly = !isCustomerBookable(detail.type);
+  // A rental whose monthly booking window hasn't opened yet: the server sends the ISO
+  // instant it opens, so the CTA is a disabled "not open yet" state showing that date.
+  const rentalLocked = detail.rentalOpensAt !== null;
 
   async function submit() {
     setPhase("submitting");
@@ -310,6 +326,61 @@ export function BookingPanel({
             {t("done")}
           </button>
         </div>
+      </div>
+    );
+  }
+
+  // ───────── front-desk-only (private / duo / trio) — no self-book, no waitlist ─────────
+  if (adminOnly) {
+    return (
+      <div className="px-[18px] pb-10 pt-2">
+        <div className="flex items-start gap-3.5 rounded-lune-sm border border-line bg-surface-2 px-4 py-4 shadow-soft">
+          <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-cream-2 text-taupe-deep">
+            <Info size={18} />
+          </span>
+          <div className="min-w-0">
+            <div className="font-head text-[17px] font-semibold text-ink">
+              {t("book_admin_only")}
+            </div>
+            <p className="m-0 mt-1 font-body text-[13.5px] leading-[1.5] text-ink-soft">
+              {t("book_admin_only_hint")}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ───────── rental with a not-yet-open booking window — locked CTA + open date ─────────
+  if (rentalLocked && detail.rentalOpensAt) {
+    const opensLabel = tt(classDateLabel(detail.rentalOpensAt));
+    return (
+      <div className="px-[18px] pb-10 pt-2">
+        <div className="flex items-center gap-3.5 rounded-lune-sm border border-line bg-surface-2 px-4 py-3.5 shadow-soft">
+          <div className="shrink-0">
+            <div className="font-body text-[11px] tracking-[0.02em] text-muted">{t("costs")}</div>
+            <div className="font-head text-[20px] font-semibold leading-[1.1] text-ink">
+              {cost}{" "}
+              <span className="font-body text-[13px] font-medium text-taupe">
+                {cost === 1 ? t("hour") : t("hours")}
+              </span>
+            </div>
+          </div>
+          <div className="flex-1">
+            <button
+              type="button"
+              disabled
+              aria-disabled="true"
+              className="flex h-12 w-full cursor-not-allowed items-center justify-center gap-2.5 rounded-lune-sm border-[1.5px] border-line bg-cream-2 font-body text-base font-semibold text-muted"
+            >
+              <Clock size={18} />
+              {t("rental_locked")}
+            </button>
+          </div>
+        </div>
+        <p className="mt-2.5 text-center font-body text-[12.5px] text-ink-soft">
+          {t("rental_opens_on").replace("{date}", opensLabel)}
+        </p>
       </div>
     );
   }

@@ -28,7 +28,6 @@ import type {
   CatalogCategory,
   CatalogItem,
   CatalogTag,
-  Validity,
 } from "@/lib/catalog/packages";
 import type { PackageCategory } from "@/lib/domain/types";
 import { useRouter } from "next/navigation";
@@ -62,13 +61,8 @@ const SLIP_ACCEPT = "image/png,image/jpeg,image/webp";
 const SLIP_MAX_BYTES = 5 * 1024 * 1024;
 const SLIP_ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp"];
 
-// Validity enum → the keyed UI label used in the card meta and sheet receipt.
-const VALIDITY_KEY: Record<Validity, StrKey> = {
-  single_visit: "single_visit",
-  one_month: "one_month",
-  two_months: "two_months",
-  three_months: "three_months",
-};
+// Validity copy comes from the server-derived `sublabel` on the item (structured
+// validity, 2026-07-23) — no client-side enum → label mapping.
 
 // Promo tag enum → the keyed UI label on the card pill.
 const TAG_KEY: Record<CatalogTag, StrKey> = {
@@ -874,7 +868,7 @@ function PromptPayStep({
       {/* receipt: package line + amount */}
       {item && (
         <div className="mt-4 overflow-hidden rounded-lune-sm border border-line">
-          <ReceiptLine label={tt(item.label)} value={`${t("valid_for")} ${t(VALIDITY_KEY[item.validity])}`} />
+          <ReceiptLine label={tt(item.label)} value={tt(item.sublabel)} />
           <ReceiptLine label={t("amount")} value={thb(checkout.amount)} last />
         </div>
       )}

@@ -83,7 +83,7 @@ describe("born-published schedule actions (no-DB) — schedule.published emissio
 
   it("generateWeekFromBaseline with 0 created emits NO event", async () => {
     const res = await generateWeekFromBaseline({ weekStart: "2026-06-15" });
-    expect(res).toEqual({ ok: true, created: 0 }); // no-DB path creates nothing
+    expect(res).toEqual({ ok: true, created: 0, skippedConflicts: 0 }); // no-DB path creates nothing
     expect(seen.length).toBe(0);
   });
 

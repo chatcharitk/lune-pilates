@@ -11,9 +11,10 @@ import { z } from "zod";
 import { getDb } from "@/lib/db/client";
 import { bookings, classInstances, creditLedger, packages } from "@/lib/db/schema";
 import type { ReformerPosition } from "@/lib/domain/types";
-import { effectiveCapacity, FREE_CANCEL_HOURS } from "@/lib/domain/types";
+import { effectiveCapacity, FREE_CANCEL_HOURS, isCustomerBookable } from "@/lib/domain/types";
 import { positionsForCapacity } from "@/lib/schedule/queries";
 import { isBookableForViewer } from "@/lib/schedule/visibility";
+import { hasRoomConflict, isRentalBookingOpen } from "@/lib/schedule/rental";
 import { creditCostForClassType } from "./cost";
 import { packageDebitBlock } from "./guards";
 
@@ -26,12 +27,27 @@ export const bookInput = z.object({
   viewerTier: z.enum(["member", "guest"]),
   packageId: z.string().uuid(),
   position: z.enum(["left", "middle", "right"]).optional(),
+  // Set ONLY by the front-desk paths (adminBookForCustomer / adminReschedule). The
+  // front desk operates the schedule, so it may book ADMIN-ONLY types (private/duo/
+  // trio) and may book a rental before its customer release window opens. The
+  // customer flow never sets this, so it stays bound by both gates. ROOM_CONFLICT
+  // (physical room exclusivity) is enforced for admin AND customer alike.
+  bookedByAdmin: z.boolean().optional(),
 });
 export type BookInput = z.infer<typeof bookInput>;
 
 export type BookFailureCode =
   | "NOT_BOOKABLE"
   | "NOT_VISIBLE"
+  // Private/Duo/Trio are front-desk-only — a customer self-book never reaches the
+  // debit for them. Defense in depth: even if a caller forgets the pre-check, the
+  // transaction fails closed here (CUSTOMER_BOOKABLE_TYPES is the single source).
+  | "ADMIN_ONLY"
+  // Room exclusivity for rentals: a rental slot may not overlap any other active
+  // class instance (re-checked under the lock — a class could be scheduled onto the
+  // rental's time after it was booked). See lib/schedule/rental.ts.
+  | "ROOM_CONFLICT"
+  | "RENTAL_WINDOW_CLOSED"
   | "CLASS_FULL"
   | "ALREADY_BOOKED"
   | "POSITION_TAKEN"
@@ -101,6 +117,33 @@ export async function bookClassWithDebit(
 
     if (!cls || cls.status !== "published" || cls.startsAt.getTime() <= now.getTime()) {
       return { ok: false, code: "NOT_BOOKABLE" } as const;
+    }
+
+    // Front-desk-only types (private/duo/trio) can NEVER be self-booked by a customer.
+    // Defense in depth under the lock: the customer action pre-checks this before ever
+    // reaching the transaction, but the rule is single-sourced here too so a caller
+    // that forgets still fails closed. The admin path sets bookedByAdmin to book them.
+    if (!input.bookedByAdmin && !isCustomerBookable(cls.type)) {
+      return { ok: false, code: "ADMIN_ONLY" } as const;
+    }
+
+    // Rental release window (customer only): a rental is bookable by customers only
+    // from 00:00 Bangkok on the first day of the month BEFORE its start month
+    // (lib/schedule/rental.ts). The front desk (bookedByAdmin) bypasses it.
+    if (!input.bookedByAdmin && cls.type === "rental" && !isRentalBookingOpen(cls.startsAt, now)) {
+      return { ok: false, code: "RENTAL_WINDOW_CLOSED" } as const;
+    }
+
+    // Room exclusivity for rentals (everyone, incl. admin): a rental may not share
+    // its time with any other ACTIVE class. Re-checked under the lock because a class
+    // could have been scheduled onto the rental's slot after it was booked. The
+    // class row is already FOR UPDATE-locked, and the conflicting rows are read
+    // inside this same transaction, so the check is race-safe.
+    if (cls.type === "rental") {
+      const conflict = await hasRoomConflict(tx, cls.startsAt, cls.durationMin, cls.type, {
+        excludeId: cls.id,
+      });
+      if (conflict) return { ok: false, code: "ROOM_CONFLICT" } as const;
     }
 
     // Tiered visibility under the lock (CLAUDE.md §5 inv 4). The read models gate

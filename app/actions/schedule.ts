@@ -29,6 +29,7 @@ import { cancelBooking } from "@/lib/credits/debit";
 import type { ClassType } from "@/lib/domain/types";
 import { CAPACITY, effectiveCapacity } from "@/lib/domain/types";
 import { computePublicVisibleAt } from "@/lib/schedule/visibility";
+import { hasRoomConflict, rentalRoomOverlap } from "@/lib/schedule/rental";
 import { startOfWeekMonday, startsAtFor } from "@/lib/schedule/baseline";
 import { addDays, studioDayFromYmd, studioIsoDow } from "@/lib/time";
 import { getTemplateSlotsByDow } from "@/lib/admin/schedule-template";
@@ -65,7 +66,13 @@ const createInput = z.object({
 });
 export type CreateClassInput = z.infer<typeof createInput>;
 
-export type CreateClassFailureCode = "UNAUTHORIZED" | "INVALID_INPUT" | "INVALID_INSTRUCTOR";
+export type CreateClassFailureCode =
+  | "UNAUTHORIZED"
+  | "INVALID_INPUT"
+  | "INVALID_INSTRUCTOR"
+  // Room exclusivity: a rental slot overlaps an active class, or a class was placed
+  // over an active rental (lib/schedule/rental.ts). Rental-scoped only.
+  | "ROOM_CONFLICT";
 export type CreateClassResult =
   | { ok: true; id: string }
   | { ok: false; code: CreateClassFailureCode };
@@ -98,6 +105,13 @@ export async function createClass(raw: CreateClassInput): Promise<CreateClassRes
   if (instructorId === INVALID) return { ok: false, code: "INVALID_INSTRUCTOR" };
 
   const startsAt = startsAtFor(localDay(input.date), input.time);
+
+  // Room exclusivity (rental-scoped): reject a rental that overlaps any active class,
+  // and a non-rental placed over an active rental. The studio has one room.
+  if (await hasRoomConflict(db, startsAt, input.durationMin, input.type)) {
+    return { ok: false, code: "ROOM_CONFLICT" };
+  }
+
   const now = new Date();
   const [row] = await db
     .insert(classInstances)
@@ -142,7 +156,10 @@ export type UpdateClassFailureCode =
   | "INVALID_INPUT"
   | "NOT_FOUND"
   | "INVALID_INSTRUCTOR"
-  | "CAPACITY_BELOW_BOOKED";
+  | "CAPACITY_BELOW_BOOKED"
+  // Room exclusivity: the edited time/type/duration would land a rental over an
+  // active class, or a class over an active rental (lib/schedule/rental.ts).
+  | "ROOM_CONFLICT";
 export type UpdateClassResult = { ok: true } | { ok: false; code: UpdateClassFailureCode };
 
 /**
@@ -179,6 +196,13 @@ export async function updateClass(raw: UpdateClassInput): Promise<UpdateClassRes
 
   // Keep the calendar day; apply the new time-of-day to it.
   const startsAt = startsAtFor(existing.startsAt, input.time);
+
+  // Room exclusivity (rental-scoped): reject an edit that lands a rental over an
+  // active class, or a class over an active rental — excluding this row itself. The
+  // studio has one room; mirrors createClass / generateWeekFromBaseline / the booking tx.
+  if (await hasRoomConflict(db, startsAt, input.durationMin, input.type, { excludeId: input.id })) {
+    return { ok: false, code: "ROOM_CONFLICT" };
+  }
 
   await db
     .update(classInstances)
@@ -361,7 +385,7 @@ function weekStartOf(raw: string): Date {
 }
 
 export type GenerateResult =
-  | { ok: true; created: number }
+  | { ok: true; created: number; skippedConflicts: number }
   | { ok: false; code: "UNAUTHORIZED" | "INVALID_INPUT" };
 
 /**
@@ -388,7 +412,7 @@ export async function generateWeekFromBaseline(raw: WeekInput): Promise<Generate
   if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
   const weekStart = weekStartOf(parsed.data.weekStart);
 
-  if (mockDataMode()) return { ok: true, created: 0 };
+  if (mockDataMode()) return { ok: true, created: 0, skippedConflicts: 0 };
 
   const db = getDb();
   const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 3_600_000);
@@ -411,11 +435,29 @@ export async function generateWeekFromBaseline(raw: WeekInput): Promise<Generate
 
   const now = new Date();
   const toInsert: (typeof classInstances.$inferInsert)[] = [];
+  // Accepted candidates so far, for the in-memory rental room-conflict check between
+  // slots being generated in THIS batch (the DB check below only sees persisted rows).
+  const accepted: { startsAt: Date; durationMin: number; type: ClassType }[] = [];
+  let skippedConflicts = 0;
   for (let i = 0; i < 7; i++) {
     const date = addDays(weekStart, i);
     for (const slot of slotsByDow.get(isoDow(date)) ?? []) {
       const startsAt = startsAtFor(date, slot.time);
       if (present.has(`${startsAt.getTime()}|${slot.type}`)) continue;
+
+      // Room exclusivity (rental-scoped): SKIP a slot that would overlap an active
+      // rental (or, if it IS a rental, any active class) — never error the whole
+      // generation, but count the skip so the caller can report it (no silent
+      // truncation, CLAUDE.md house rule). Check persisted rows AND this batch.
+      const candidate = { startsAt, durationMin: slot.durationMin, type: slot.type };
+      const dbConflict = await hasRoomConflict(db, startsAt, slot.durationMin, slot.type);
+      const batchConflict = accepted.some((a) => rentalRoomOverlap(a, candidate));
+      if (dbConflict || batchConflict) {
+        skippedConflicts++;
+        continue;
+      }
+      accepted.push(candidate);
+
       toInsert.push({
         templateId: slot.templateId ?? null,
         startsAt,
@@ -440,7 +482,7 @@ export async function generateWeekFromBaseline(raw: WeekInput): Promise<Generate
     await emit({ type: "schedule.published", weekStart: weekStart.toISOString() });
   }
   revalidatePath("/admin/schedule");
-  return { ok: true, created: toInsert.length };
+  return { ok: true, created: toInsert.length, skippedConflicts };
 }
 
 // ───────────────────────── publish ─────────────────────────

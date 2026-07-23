@@ -236,7 +236,7 @@ export async function creditPackage(params: {
           : 0;
       const hoursGranted = item.hours + bonusHours;
 
-      const expiresAt = expiryFromValidity(item.validity, now);
+      const expiresAt = expiryFromValidity(item.validity.amount, item.validity.unit, now);
 
       // hoursTotal == hoursLeft on a fresh purchase (incl. the promo bonus); the
       // ledger rows below are the source of truth and reconcile to this cached

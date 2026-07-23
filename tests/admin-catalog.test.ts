@@ -29,6 +29,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   archiveCatalogItem,
   createCatalogItem,
+  deleteCatalogItem,
   listCatalogForAdmin,
   reorderCatalog,
   restoreCatalogItem,
@@ -61,7 +62,8 @@ const VALID_CREATE: CreateCatalogItemInput = {
   category: "group",
   hours: 20,
   price: 11000,
-  validity: "three_months",
+  validityAmount: 3,
+  validityUnit: "month",
   labelEn: "20 hours",
   labelTh: "20 ชั่วโมง",
 };
@@ -70,7 +72,8 @@ const VALID_UPDATE: UpdateCatalogItemInput = {
   id: "p10",
   hours: 10,
   price: 5900,
-  validity: "two_months",
+  validityAmount: 2,
+  validityUnit: "month",
   tag: "popular",
   labelEn: "10 hours",
   labelTh: "10 ชั่วโมง",
@@ -90,6 +93,7 @@ describe("owner-only gate (line 1 of every action)", () => {
     expect(await archiveCatalogItem("p10")).toEqual({ ok: false, code: "UNAUTHORIZED" });
     expect(await restoreCatalogItem("p10")).toEqual({ ok: false, code: "UNAUTHORIZED" });
     expect(await reorderCatalog({ ids: ["p10"] })).toEqual({ ok: false, code: "UNAUTHORIZED" });
+    expect(await deleteCatalogItem("p10")).toEqual({ ok: false, code: "UNAUTHORIZED" });
   });
 
   it("gates BEFORE input parsing: a garbage payload from a non-owner reads UNAUTHORIZED", async () => {
@@ -97,6 +101,8 @@ describe("owner-only gate (line 1 of every action)", () => {
     // schema validity to an unauthorised caller.
     const res = await createCatalogItem({ ...VALID_CREATE, id: "!!!", hours: -1 });
     expect(res).toEqual({ ok: false, code: "UNAUTHORIZED" });
+    // deleteCatalogItem gates the same way (UNAUTHORIZED before INVALID_INPUT).
+    expect(await deleteCatalogItem("")).toEqual({ ok: false, code: "UNAUTHORIZED" });
   });
 });
 
@@ -211,9 +217,23 @@ describe("both labels are required and non-empty (CLAUDE.md §6)", () => {
     });
   });
 
-  it("derives the sublabel from validity (never client-supplied)", () => {
-    expect(sublabelForValidity("two_months")).toEqual({ en: "Valid 2 months", th: "ใช้ได้ 2 เดือน" });
-    expect(sublabelForValidity("single_visit")).toEqual({ en: "Single visit", th: "ครั้งเดียว" });
+  it("derives the sublabel from structured validity (never client-supplied)", () => {
+    expect(sublabelForValidity({ amount: 2, unit: "month" })).toEqual({
+      en: "Valid 2 months",
+      th: "ใช้ได้ 2 เดือน",
+    });
+    expect(sublabelForValidity({ amount: 1, unit: "month" })).toEqual({
+      en: "Valid 1 month",
+      th: "ใช้ได้ 1 เดือน",
+    });
+    expect(sublabelForValidity({ amount: 45, unit: "day" })).toEqual({
+      en: "Valid 45 days",
+      th: "ใช้ได้ 45 วัน",
+    });
+    expect(sublabelForValidity({ amount: 1, unit: "day" })).toEqual({
+      en: "Valid 1 day",
+      th: "ใช้ได้ 1 วัน",
+    });
   });
 });
 
@@ -287,12 +307,6 @@ describe("archive is a SOFT retire — never a hard delete", () => {
     expect(await restoreCatalogItem("p10")).toEqual({ ok: false, code: "MOCK_NO_DB" });
   });
 
-  it("exposes NO delete/destroy action at all (archive is the only retire path)", async () => {
-    const mod: Record<string, unknown> = await import("@/app/actions/admin-catalog");
-    const destructive = Object.keys(mod).filter((k) => /delete|destroy|remove|purge/i.test(k));
-    expect(destructive).toEqual([]);
-  });
-
   it("rejects archiving an unknown id", async () => {
     expect(await archiveCatalogItem("ghost")).toEqual({ ok: false, code: "UNKNOWN_ITEM" });
   });
@@ -306,6 +320,24 @@ describe("archive is a SOFT retire — never a hard delete", () => {
     // "drop" (lib/credits/creditPackage.ts). Archiving it is allowed; the UI warns
     // (cat_promo_warning). Pinned here so a future refactor notices the link.
     expect(await archiveCatalogItem("drop")).toEqual({ ok: false, code: "MOCK_NO_DB" });
+  });
+});
+
+// ───────────────────────── delete (hard-delete if unused, else archive) ─────────────────────────
+
+describe("deleteCatalogItem — gates without a database", () => {
+  it("a known item reaches the write (MOCK_NO_DB in mock mode)", async () => {
+    // The unused-vs-referenced decision needs the DB; the DB-backed proof lives in
+    // tests/integration/catalog-crud.integration.test.ts. Here we only pin the gates.
+    expect(await deleteCatalogItem("p10")).toEqual({ ok: false, code: "MOCK_NO_DB" });
+  });
+
+  it("an unknown id is UNKNOWN_ITEM (in any mode)", async () => {
+    expect(await deleteCatalogItem("ghost")).toEqual({ ok: false, code: "UNKNOWN_ITEM" });
+  });
+
+  it("a blank id is INVALID_INPUT (after the owner gate)", async () => {
+    expect(await deleteCatalogItem("")).toEqual({ ok: false, code: "INVALID_INPUT" });
   });
 });
 

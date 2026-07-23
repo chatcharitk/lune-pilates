@@ -27,18 +27,73 @@ import { catalogItems } from "@/lib/db/schema";
 import { mockDataMode } from "@/lib/mock-mode";
 
 /**
- * How long a purchased package stays usable. Maps to a concrete `expires_at` via
- * `expiryFromValidity` (the single place validity → months lives). `single_visit`
- * (drop-in) is given a 1-month window to use the single credit.
+ * How long a purchased package stays usable, as a STRUCTURED amount + unit (decided
+ * 2026-07-23, supersedes the fixed single_visit|one_month|two_months|three_months
+ * enum). The owner picks any positive whole `amount` of `day`s or `month`s; maps to a
+ * concrete `expires_at` via `expiryFromValidity` (the single place validity → expiry
+ * lives). A drop-in is now simply `{ amount: 1, unit: "month" }`.
  */
-export type Validity = "single_visit" | "one_month" | "two_months" | "three_months";
+export type ValidityUnit = "day" | "month";
+export interface Validity {
+  amount: number;
+  unit: ValidityUnit;
+}
 
-export const VALIDITIES: readonly Validity[] = [
-  "single_visit",
-  "one_month",
-  "two_months",
-  "three_months",
-] as const;
+export const VALIDITY_UNITS: readonly ValidityUnit[] = ["day", "month"] as const;
+
+/**
+ * Legacy free-text validity → structured pair (for rows written before the
+ * amount/unit columns existed). The four old enum values map to their month/day
+ * equivalents; a synthesized "N_unit" token round-trips; anything else fails safe to
+ * 1 month (a drop-in still needs a window to use its credit).
+ */
+export function parseLegacyValidity(text: string): Validity {
+  switch (text) {
+    case "single_visit":
+    case "one_month":
+      return { amount: 1, unit: "month" };
+    case "two_months":
+      return { amount: 2, unit: "month" };
+    case "three_months":
+      return { amount: 3, unit: "month" };
+  }
+  // Synthesized "N_day" / "N_month" token (what new writes stamp on the DEAD legacy
+  // column — see legacyValidityText). Parse it back so a legacy read still works.
+  const m = /^(\d+)_(day|month)$/.exec(text);
+  if (m) {
+    const amount = Number.parseInt(m[1]!, 10);
+    if (Number.isInteger(amount) && amount > 0) return { amount, unit: m[2] as ValidityUnit };
+  }
+  return { amount: 1, unit: "month" };
+}
+
+/**
+ * The value written to the DEAD `validity` text column so its legacy NOT NULL
+ * constraint is satisfied. The old enum tokens are preserved where they still match
+ * (audit-friendliness); everything else becomes a "N_unit" token that
+ * `parseLegacyValidity` round-trips. New rows always carry the structured columns, so
+ * this text is never actually read back for them.
+ */
+export function legacyValidityText(v: Validity): string {
+  if (v.unit === "month") {
+    if (v.amount === 1) return "one_month";
+    if (v.amount === 2) return "two_months";
+    if (v.amount === 3) return "three_months";
+  }
+  return `${v.amount}_${v.unit}`;
+}
+
+/** Resolve a stored catalog/charge row's validity: structured columns win, legacy text is the fallback. */
+export function validityFromRow(
+  amount: number | null,
+  unit: string | null,
+  legacyText: string | null,
+): Validity {
+  if (amount !== null && amount > 0 && (unit === "day" || unit === "month")) {
+    return { amount, unit };
+  }
+  return parseLegacyValidity(legacyText ?? "");
+}
 
 /** Promotional badge a catalog item can carry. */
 export type CatalogTag = "popular" | "best_value";
@@ -89,16 +144,22 @@ export interface AdminCatalogItem extends CatalogItem {
 // Mirrors lune-data.jsx STR validity / format / plan labels. Kept local so the
 // catalog is self-describing.
 
-const VALIDITY_LABEL: Record<Validity, Bilingual> = {
-  single_visit: { en: "Single visit", th: "ครั้งเดียว" },
-  one_month: { en: "Valid 1 month", th: "ใช้ได้ 1 เดือน" },
-  two_months: { en: "Valid 2 months", th: "ใช้ได้ 2 เดือน" },
-  three_months: { en: "Valid 3 months", th: "ใช้ได้ 3 เดือน" },
-};
-
-/** The bilingual sublabel for a validity — the ONE place the mapping lives. */
+/**
+ * The bilingual sublabel for a structured validity — the ONE place the mapping lives.
+ * "Valid X days/months" / "ใช้ได้ X วัน/เดือน", with X=1 handled (Thai has no plural,
+ * English drops the trailing "s"). Thai uses วัน (day) / เดือน (month) with no count
+ * word when amount is 1, matching the prototype's phrasing.
+ */
 export function sublabelForValidity(validity: Validity): Bilingual {
-  return VALIDITY_LABEL[validity];
+  const { amount, unit } = validity;
+  if (unit === "day") {
+    return amount === 1
+      ? { en: "Valid 1 day", th: "ใช้ได้ 1 วัน" }
+      : { en: `Valid ${amount} days`, th: `ใช้ได้ ${amount} วัน` };
+  }
+  return amount === 1
+    ? { en: "Valid 1 month", th: "ใช้ได้ 1 เดือน" }
+    : { en: `Valid ${amount} months`, th: `ใช้ได้ ${amount} เดือน` };
 }
 
 const FMT_LABEL = {
@@ -157,23 +218,30 @@ export interface CatalogSeedItem {
   sortOrder: number;
 }
 
+// Structured-validity shorthands, so the seed rows below stay readable. The old enum
+// mapping is preserved exactly: single_visit / one_month → 1 month; two_months → 2
+// months; three_months → 3 months (so effective expiries are byte-for-byte unchanged).
+const V1M: Validity = { amount: 1, unit: "month" };
+const V2M: Validity = { amount: 2, unit: "month" };
+const V3M: Validity = { amount: 3, unit: "month" };
+
 export const SEED_CATALOG: readonly CatalogSeedItem[] = [
   // group
-  { id: "drop", category: "group", hours: 1, price: 650, validity: "single_visit", label: hoursLabel(1), sortOrder: 0 },
-  { id: "p5", category: "group", hours: 5, price: 2950, validity: "one_month", label: hoursLabel(5), sortOrder: 10 },
-  { id: "p10", category: "group", hours: 10, price: 5500, validity: "two_months", tag: "popular", label: hoursLabel(10), sortOrder: 20 },
-  { id: "p15", category: "group", hours: 20, price: 10000, validity: "three_months", tag: "best_value", label: hoursLabel(20), sortOrder: 30 },
+  { id: "drop", category: "group", hours: 1, price: 650, validity: V1M, label: hoursLabel(1), sortOrder: 0 },
+  { id: "p5", category: "group", hours: 5, price: 2950, validity: V1M, label: hoursLabel(5), sortOrder: 10 },
+  { id: "p10", category: "group", hours: 10, price: 5500, validity: V2M, tag: "popular", label: hoursLabel(10), sortOrder: 20 },
+  { id: "p15", category: "group", hours: 20, price: 10000, validity: V3M, tag: "best_value", label: hoursLabel(20), sortOrder: 30 },
   // private & semi
-  { id: "pv-drop", category: "private", hours: 1, price: 1700, validity: "single_visit", label: fmtPlanLabel("solo", "drop"), sortOrder: 0 },
-  { id: "pv8", category: "private", hours: 8, price: 12000, validity: "two_months", tag: "best_value", label: fmtPlanLabel("solo", "pack8"), sortOrder: 10 },
-  { id: "duo-drop", category: "private", hours: 1, price: 2000, validity: "single_visit", label: fmtPlanLabel("duo", "drop"), sortOrder: 20 },
-  { id: "duo8", category: "private", hours: 8, price: 14400, validity: "two_months", label: fmtPlanLabel("duo", "pack8"), sortOrder: 30 },
-  { id: "trio-drop", category: "private", hours: 1, price: 2200, validity: "single_visit", label: fmtPlanLabel("trio", "drop"), sortOrder: 40 },
-  { id: "trio8", category: "private", hours: 8, price: 16000, validity: "two_months", label: fmtPlanLabel("trio", "pack8"), sortOrder: 50 },
+  { id: "pv-drop", category: "private", hours: 1, price: 1700, validity: V1M, label: fmtPlanLabel("solo", "drop"), sortOrder: 0 },
+  { id: "pv8", category: "private", hours: 8, price: 12000, validity: V2M, tag: "best_value", label: fmtPlanLabel("solo", "pack8"), sortOrder: 10 },
+  { id: "duo-drop", category: "private", hours: 1, price: 2000, validity: V1M, label: fmtPlanLabel("duo", "drop"), sortOrder: 20 },
+  { id: "duo8", category: "private", hours: 8, price: 14400, validity: V2M, label: fmtPlanLabel("duo", "pack8"), sortOrder: 30 },
+  { id: "trio-drop", category: "private", hours: 1, price: 2200, validity: V1M, label: fmtPlanLabel("trio", "drop"), sortOrder: 40 },
+  { id: "trio8", category: "private", hours: 8, price: 16000, validity: V2M, label: fmtPlanLabel("trio", "pack8"), sortOrder: 50 },
   // studio rental
-  { id: "r-solo", category: "rental", hours: 1, price: 600, validity: "single_visit", label: fmtPlanLabel("solo", "rental"), sortOrder: 0 },
-  { id: "r-duo", category: "rental", hours: 1, price: 800, validity: "single_visit", label: fmtPlanLabel("duo", "rental"), sortOrder: 10 },
-  { id: "r-trio", category: "rental", hours: 1, price: 1000, validity: "single_visit", label: fmtPlanLabel("trio", "rental"), sortOrder: 20 },
+  { id: "r-solo", category: "rental", hours: 1, price: 600, validity: V1M, label: fmtPlanLabel("solo", "rental"), sortOrder: 0 },
+  { id: "r-duo", category: "rental", hours: 1, price: 800, validity: V1M, label: fmtPlanLabel("duo", "rental"), sortOrder: 10 },
+  { id: "r-trio", category: "rental", hours: 1, price: 1000, validity: V1M, label: fmtPlanLabel("trio", "rental"), sortOrder: 20 },
 ] as const;
 
 /**
@@ -202,11 +270,11 @@ export const CATEGORY_META: Record<PackageCategory, { label: Bilingual; note: Bi
 const CATEGORY_ORDER: readonly PackageCategory[] = ["group", "private", "rental"] as const;
 
 /**
- * Studio rental is hidden from the buy + POS UIs for now (2026-07-20, "not yet in
- * use"). Rental items still resolve via `getCatalogItem` for any legacy charge or
- * unspent credit, so nothing already purchased breaks.
+ * Categories hidden from the buy + POS UIs. Studio rental was un-hidden 2026-07-23
+ * (monthly-release model went live — lib/schedule/rental.ts), so this is now empty.
+ * Kept as the single knob for hiding a category without touching the loop below.
  */
-const HIDDEN_CATEGORIES: readonly PackageCategory[] = ["rental"] as const;
+const HIDDEN_CATEGORIES: readonly PackageCategory[] = [] as const;
 
 // ───────────────────────── row → contract shaping ─────────────────────────
 
@@ -225,11 +293,6 @@ function toCatalogItem(seed: CatalogSeedItem): CatalogItem {
   };
 }
 
-/** Narrow a free-text stored validity, failing safe to a 1-month window. */
-function asValidity(v: string): Validity {
-  return (VALIDITIES as readonly string[]).includes(v) ? (v as Validity) : "one_month";
-}
-
 /** Narrow a free-text stored tag; anything unknown becomes no badge. */
 function asTag(v: string | null): CatalogTag | undefined {
   return v !== null && (CATALOG_TAGS as readonly string[]).includes(v) ? (v as CatalogTag) : undefined;
@@ -240,7 +303,11 @@ interface CatalogRow {
   category: PackageCategory;
   hours: number;
   price: number;
+  /** Legacy free-text validity (DEAD; only the fallback for pre-migration rows). */
   validity: string;
+  /** Structured validity columns (2026-07-23); null on pre-migration rows. */
+  validityAmount: number | null;
+  validityUnit: string | null;
   tag: string | null;
   labelEn: string;
   labelTh: string;
@@ -254,7 +321,7 @@ function rowToAdminItem(r: CatalogRow): AdminCatalogItem {
     category: r.category,
     hours: r.hours,
     price: r.price,
-    validity: asValidity(r.validity),
+    validity: validityFromRow(r.validityAmount, r.validityUnit, r.validity),
     ...(asTag(r.tag) ? { tag: asTag(r.tag)! } : {}),
     label: { en: r.labelEn, th: r.labelTh },
     sortOrder: r.sortOrder,
@@ -275,6 +342,8 @@ const SELECT_COLUMNS = {
   hours: catalogItems.hours,
   price: catalogItems.price,
   validity: catalogItems.validity,
+  validityAmount: catalogItems.validityAmount,
+  validityUnit: catalogItems.validityUnit,
   tag: catalogItems.tag,
   labelEn: catalogItems.labelEn,
   labelTh: catalogItems.labelTh,

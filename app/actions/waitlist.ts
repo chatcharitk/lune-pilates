@@ -21,7 +21,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/client";
 import { bookings, classInstances, waitlist } from "@/lib/db/schema";
 import type { ClassType } from "@/lib/domain/types";
-import { effectiveCapacity } from "@/lib/domain/types";
+import { effectiveCapacity, isCustomerBookable } from "@/lib/domain/types";
 import { bookClassWithDebit, type BookFailureCode } from "@/lib/credits/debit";
 import { selectUsablePackage } from "@/lib/credits/selectPackage";
 import { creditCostForClassType } from "@/lib/credits/cost";
@@ -47,6 +47,9 @@ export type JoinWaitlistFailureCode =
   // The class is still inside its members-only window for this (guest) viewer —
   // not yet publicly bookable, so it can't be waitlisted either (CLAUDE.md §5 inv 4).
   | "NOT_VISIBLE"
+  // Private/Duo/Trio are front-desk-only — a customer must not queue for a class
+  // they can't self-book (CUSTOMER_BOOKABLE_TYPES). Mirrors the booking ADMIN_ONLY.
+  | "ADMIN_ONLY"
   | "NOT_FULL"
   | "ALREADY_BOOKED"
   | "ALREADY_WAITLISTED";
@@ -96,6 +99,13 @@ export async function joinWaitlist(raw: JoinWaitlistInput): Promise<JoinWaitlist
       .limit(1);
     if (!cls) {
       return { ok: false, code: "CLASS_NOT_FOUND" } as const;
+    }
+
+    // Front-desk-only types are never self-bookable, so they are never waitlistable
+    // by a customer either — bail before the full/dupe checks (single source:
+    // CUSTOMER_BOOKABLE_TYPES). Rentals stay waitlistable when full.
+    if (!isCustomerBookable(cls.type as ClassType)) {
+      return { ok: false, code: "ADMIN_ONLY" } as const;
     }
 
     // Tiered visibility under the lock (CLAUDE.md §5 inv 4). Like the booking

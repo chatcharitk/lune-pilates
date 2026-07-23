@@ -364,6 +364,8 @@ export async function adminBookForCustomer(
       viewerTier: "member",
       packageId,
       position: input.position,
+      // Front desk may book ADMIN-ONLY types and rentals before their release window.
+      bookedByAdmin: true,
     },
     now,
   );

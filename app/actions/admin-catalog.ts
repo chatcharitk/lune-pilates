@@ -39,8 +39,9 @@ import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getDb } from "@/lib/db/client";
-import { catalogItems } from "@/lib/db/schema";
+import { catalogItems, charges, packages } from "@/lib/db/schema";
 import {
+  legacyValidityText,
   listAllCatalogItems,
   perHourFor,
   sublabelForValidity,
@@ -57,7 +58,9 @@ import { mockDataMode } from "@/lib/mock-mode";
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 const CATEGORY = z.enum(["group", "private", "rental"]);
-const VALIDITY = z.enum(["single_visit", "one_month", "two_months", "three_months"]);
+// Structured validity (2026-07-23): a positive whole amount of days or months.
+const VALIDITY_AMOUNT = z.number().int().positive().max(60);
+const VALIDITY_UNIT = z.enum(["day", "month"]);
 const TAG = z.enum(["popular", "best_value"]);
 
 /** Whole credits, strictly positive — matches the catalog_item_hours_positive CHECK. */
@@ -72,7 +75,8 @@ const createInput = z.object({
   category: CATEGORY,
   hours: hoursField,
   price: priceField,
-  validity: VALIDITY,
+  validityAmount: VALIDITY_AMOUNT,
+  validityUnit: VALIDITY_UNIT,
   tag: TAG.nullable().optional(),
   labelEn: labelField,
   labelTh: labelField,
@@ -88,7 +92,8 @@ const updateInput = z.object({
   category: CATEGORY.optional(),
   hours: hoursField,
   price: priceField,
-  validity: VALIDITY,
+  validityAmount: VALIDITY_AMOUNT,
+  validityUnit: VALIDITY_UNIT,
   tag: TAG.nullable().optional(),
   labelEn: labelField,
   labelTh: labelField,
@@ -212,7 +217,11 @@ export async function createCatalogItem(
         category: input.category,
         hours: input.hours,
         price: input.price,
-        validity: input.validity,
+        // Legacy text stamped for the NOT NULL constraint (dead — reads use the
+        // structured pair). The structured columns are the real source.
+        validity: legacyValidityText({ amount: input.validityAmount, unit: input.validityUnit }),
+        validityAmount: input.validityAmount,
+        validityUnit: input.validityUnit,
         tag: input.tag ?? null,
         labelEn: input.labelEn,
         labelTh: input.labelTh,
@@ -290,7 +299,9 @@ export async function updateCatalogItem(
     .set({
       hours: input.hours,
       price: input.price,
-      validity: input.validity,
+      validity: legacyValidityText({ amount: input.validityAmount, unit: input.validityUnit }),
+      validityAmount: input.validityAmount,
+      validityUnit: input.validityUnit,
       tag: input.tag ?? null,
       labelEn: input.labelEn,
       labelTh: input.labelTh,
@@ -348,6 +359,85 @@ async function setActive(rawId: string, active: boolean): Promise<ArchiveCatalog
 
   revalidateCatalog();
   return { ok: true, id, active };
+}
+
+// ───────────────────────── delete (hard-delete if unused, else archive) ─────────────────────────
+
+export type DeleteCatalogItemFailureCode =
+  | "UNAUTHORIZED"
+  | "INVALID_INPUT"
+  | "UNKNOWN_ITEM"
+  | MockNoDbCode;
+
+export type DeleteCatalogItemResult =
+  | { ok: true; deleted: boolean; archived: boolean }
+  | { ok: false; code: DeleteCatalogItemFailureCode };
+
+/**
+ * Delete a catalog item — but ONLY when it is truly unused. If ANY charge references
+ * it (`charges.package_id = id`) or ANY sold credit is bucketed under it
+ * (`packages.type = id`), a hard delete would orphan financial history and unspent
+ * balances, so we ARCHIVE instead (active=false, exactly like archiveCatalogItem) and
+ * report `archived: true`. Only when there are NO references at all do we hard-delete
+ * the row and report `deleted: true`.
+ *
+ * Owner-only, gate BEFORE parse (UNAUTHORIZED wins over INVALID_INPUT — matches every
+ * other action here and tests/admin-auth.test.ts).
+ */
+export async function deleteCatalogItem(rawId: string): Promise<DeleteCatalogItemResult> {
+  if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
+
+  const parsed = idInput.safeParse({ id: rawId });
+  if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
+  const { id } = parsed.data;
+
+  // Mock-data dev mode: report against the seed catalog. An unknown id is UNKNOWN_ITEM
+  // in any mode; a real delete/archive has nowhere to persist → MOCK_NO_DB.
+  if (mockDataMode()) {
+    const exists = (await listAllCatalogItems()).some((i) => i.id === id);
+    return exists ? { ok: false, code: "MOCK_NO_DB" } : { ok: false, code: "UNKNOWN_ITEM" };
+  }
+
+  const db = getDb();
+
+  // Reference checks + the delete/archive run in ONE interactive transaction so a
+  // checkout writing a `charges` row between the check and the delete can't leave a
+  // charge pointing at a hard-deleted id (which would then fail UNKNOWN_PACKAGE in
+  // credits). The reads and the write share the same tx snapshot.
+  const outcome = await db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select({ id: catalogItems.id })
+      .from(catalogItems)
+      .where(eq(catalogItems.id, id))
+      .limit(1);
+    if (!existing) return { ok: false as const, code: "UNKNOWN_ITEM" as const };
+
+    // Any charge OR any sold-credit package referencing this id makes it UNSAFE to hard
+    // delete (historical rows must keep resolving via getCatalogItem forever).
+    const [chargeRef] = await tx
+      .select({ id: charges.id })
+      .from(charges)
+      .where(eq(charges.packageId, id))
+      .limit(1);
+    const [packageRef] = await tx
+      .select({ id: packages.id })
+      .from(packages)
+      .where(eq(packages.type, id))
+      .limit(1);
+
+    if (chargeRef || packageRef) {
+      // Referenced → archive instead of deleting, so nothing sold breaks.
+      await tx.update(catalogItems).set({ active: false }).where(eq(catalogItems.id, id));
+      return { ok: true as const, deleted: false as const, archived: true as const };
+    }
+
+    // Unused → safe to hard-delete the row entirely.
+    await tx.delete(catalogItems).where(eq(catalogItems.id, id));
+    return { ok: true as const, deleted: true as const, archived: false as const };
+  });
+
+  if (outcome.ok) revalidateCatalog();
+  return outcome;
 }
 
 // ───────────────────────── reorder ─────────────────────────
@@ -411,7 +501,8 @@ function synthesizeItem(
     category: "group" | "private" | "rental";
     hours: number;
     price: number;
-    validity: Validity;
+    validityAmount: number;
+    validityUnit: Validity["unit"];
     tag?: CatalogTag | null;
     labelEn: string;
     labelTh: string;
@@ -419,16 +510,17 @@ function synthesizeItem(
   active: boolean,
   sortOrder: number,
 ): AdminCatalogItem {
+  const validity: Validity = { amount: input.validityAmount, unit: input.validityUnit };
   return {
     id: input.id,
     category: input.category,
     hours: input.hours,
     price: input.price,
     perHour: perHourFor(input.price, input.hours),
-    validity: input.validity,
+    validity,
     ...(input.tag ? { tag: input.tag } : {}),
     label: { en: input.labelEn, th: input.labelTh },
-    sublabel: sublabelForValidity(input.validity),
+    sublabel: sublabelForValidity(validity),
     active,
     sortOrder,
   };

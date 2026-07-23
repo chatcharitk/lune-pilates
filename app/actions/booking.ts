@@ -22,7 +22,8 @@ import { creditCostForClassType } from "@/lib/credits/cost";
 import { evaluateCancellation } from "@/lib/credits/policy";
 import { bookings, classInstances } from "@/lib/db/schema";
 import type { ClassType } from "@/lib/domain/types";
-import { CAPACITY } from "@/lib/domain/types";
+import { CAPACITY, isCustomerBookable } from "@/lib/domain/types";
+import { isRentalBookingOpen } from "@/lib/schedule/rental";
 import { positionsForCapacity } from "@/lib/schedule/queries";
 import { emit } from "@/lib/events/bus";
 import { registerNotificationHandlers } from "@/lib/events/notifications";
@@ -71,6 +72,19 @@ export async function bookClass(raw: BookClassInput): Promise<BookResult> {
   const cls = await loadClassMeta(input.classInstanceId);
   if (!cls) {
     return { ok: false, code: "CLASS_NOT_FOUND" };
+  }
+
+  // Front-desk-only types (private/duo/trio) can never be self-booked — bail BEFORE
+  // selecting a package or touching the ledger (CUSTOMER_BOOKABLE_TYPES is the single
+  // source; the atomic debit re-checks it under the lock as defense in depth).
+  if (!isCustomerBookable(cls.type)) {
+    return { ok: false, code: "ADMIN_ONLY" };
+  }
+
+  // Rental release window: a customer may book a rental only once its monthly window
+  // has opened (lib/schedule/rental.ts). Bail before debiting; the debit re-checks it.
+  if (cls.type === "rental" && !isRentalBookingOpen(cls.startsAt, now)) {
+    return { ok: false, code: "RENTAL_WINDOW_CLOSED" };
   }
 
   // Reject an illegal reformer position early — never trust the client to send a
@@ -239,12 +253,17 @@ export async function cancelBookingAction(raw: CancelBookingInput): Promise<Canc
 interface ClassMeta {
   type: ClassType;
   capacity: number;
+  startsAt: Date;
 }
 
 async function loadClassMeta(classInstanceId: string): Promise<ClassMeta | null> {
   const db = getDb();
   const [row] = await db
-    .select({ type: classInstances.type, capacity: classInstances.capacity })
+    .select({
+      type: classInstances.type,
+      capacity: classInstances.capacity,
+      startsAt: classInstances.startsAt,
+    })
     .from(classInstances)
     .where(eq(classInstances.id, classInstanceId))
     .limit(1);

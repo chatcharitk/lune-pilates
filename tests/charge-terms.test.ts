@@ -23,14 +23,20 @@ const LIVE_EDITED: CatalogItem = {
   hours: 20,
   price: 5500,
   perHour: 275,
-  validity: "three_months",
+  validity: { amount: 3, unit: "month" },
   tag: "popular",
   label: { en: "20 hours", th: "20 ชั่วโมง" },
   sublabel: { en: "Valid 3 months", th: "ใช้ได้ 3 เดือน" },
 };
 
-/** What the customer actually paid for before that edit. */
-const PAID = { hours: 10, validity: "two_months", category: "group" as const };
+/** What the customer actually paid for before that edit (structured snapshot). */
+const PAID = {
+  hours: 10,
+  validity: "two_months",
+  validityAmount: 2,
+  validityUnit: "month",
+  category: "group" as const,
+};
 
 describe("itemForCredit — a complete snapshot wins over the live item", () => {
   it("grants the PAID hours, not today's", () => {
@@ -38,7 +44,7 @@ describe("itemForCredit — a complete snapshot wins over the live item", () => 
   });
 
   it("uses the PAID validity, so the expiry matches what was sold", () => {
-    expect(itemForCredit(LIVE_EDITED, PAID).validity).toBe("two_months");
+    expect(itemForCredit(LIVE_EDITED, PAID).validity).toEqual({ amount: 2, unit: "month" });
   });
 
   it("uses the PAID category, so the credit lands in the bucket that was bought", () => {
@@ -53,32 +59,60 @@ describe("itemForCredit — a complete snapshot wins over the live item", () => 
     expect(out.price).toBe(5500);
   });
 
-  it("narrows an unrecognised stored validity to the safe 1-month window", () => {
-    const out = itemForCredit(LIVE_EDITED, { ...PAID, validity: "forever" });
-    expect(out.validity).toBe("one_month");
+  it("supports a custom DAY validity snapshot", () => {
+    const out = itemForCredit(LIVE_EDITED, {
+      hours: 5,
+      validity: "45_day",
+      validityAmount: 45,
+      validityUnit: "day",
+      category: "group",
+    });
+    expect(out.validity).toEqual({ amount: 45, unit: "day" });
   });
 
   it("honours a zero-price / comped snapshot without treating 0 hours as missing", () => {
     // hours is validated > 0 at the catalog boundary, but the null-check must be a
     // null-check, not a falsiness check — pinned so a refactor can't regress it.
-    const out = itemForCredit(LIVE_EDITED, { hours: 1, validity: "single_visit", category: "group" });
+    const out = itemForCredit(LIVE_EDITED, {
+      hours: 1,
+      validity: "one_month",
+      validityAmount: 1,
+      validityUnit: "month",
+      category: "group",
+    });
     expect(out.hours).toBe(1);
-    expect(out.validity).toBe("single_visit");
+    expect(out.validity).toEqual({ amount: 1, unit: "month" });
+  });
+
+  it("falls back to the legacy validity TEXT when the structured columns are null (old snapshot)", () => {
+    const out = itemForCredit(LIVE_EDITED, {
+      hours: 10,
+      validity: "two_months",
+      validityAmount: null,
+      validityUnit: null,
+      category: "group",
+    });
+    expect(out.validity).toEqual({ amount: 2, unit: "month" });
   });
 });
 
 describe("itemForCredit — legacy and partial snapshots fall back", () => {
   it("all-null (a pre-migration charge) credits from the live item, exactly as before", () => {
-    const out = itemForCredit(LIVE_EDITED, { hours: null, validity: null, category: null });
+    const out = itemForCredit(LIVE_EDITED, {
+      hours: null,
+      validity: null,
+      validityAmount: null,
+      validityUnit: null,
+      category: null,
+    });
     expect(out).toEqual(LIVE_EDITED);
   });
 
   it("a half-written snapshot is legacy, NOT a mix of paid and live terms", () => {
     for (const partial of [
-      { hours: 10, validity: null, category: null },
-      { hours: null, validity: "two_months", category: null },
-      { hours: 10, validity: "two_months", category: null },
-      { hours: 10, validity: null, category: "group" as const },
+      { hours: 10, validity: null, validityAmount: null, validityUnit: null, category: null },
+      { hours: null, validity: "two_months", validityAmount: 2, validityUnit: "month", category: null },
+      { hours: 10, validity: null, validityAmount: null, validityUnit: null, category: "group" as const },
     ]) {
       const out = itemForCredit(LIVE_EDITED, partial);
       expect(out).toEqual(LIVE_EDITED); // whole live item, never a stitched hybrid
@@ -87,15 +121,32 @@ describe("itemForCredit — legacy and partial snapshots fall back", () => {
 });
 
 describe("termsSnapshotFor — what every charge-creation site writes", () => {
-  it("captures exactly the three terms that decide the grant", () => {
+  it("captures the structured validity plus the legacy text and the other terms", () => {
     expect(termsSnapshotFor(LIVE_EDITED)).toEqual({
       hours: 20,
       validity: "three_months",
+      validityAmount: 3,
+      validityUnit: "month",
       category: "group",
     });
   });
 
   it("round-trips: crediting from a fresh snapshot equals crediting from the item", () => {
     expect(itemForCredit(LIVE_EDITED, termsSnapshotFor(LIVE_EDITED))).toEqual(LIVE_EDITED);
+  });
+
+  it("round-trips a custom DAY validity too", () => {
+    const dayItem: CatalogItem = { ...LIVE_EDITED, validity: { amount: 10, unit: "day" } };
+    expect(termsSnapshotFor(dayItem)).toEqual({
+      hours: 20,
+      validity: "10_day",
+      validityAmount: 10,
+      validityUnit: "day",
+      category: "group",
+    });
+    expect(itemForCredit(dayItem, termsSnapshotFor(dayItem)).validity).toEqual({
+      amount: 10,
+      unit: "day",
+    });
   });
 });

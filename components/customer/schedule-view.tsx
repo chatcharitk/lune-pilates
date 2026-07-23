@@ -7,6 +7,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { BookableClass } from "@/lib/schedule/queries";
 import type { ClassType } from "@/lib/domain/types";
 import { studioImage } from "@/lib/studio-images";
@@ -24,22 +25,37 @@ import {
   type PartOfDay,
   type WeekDay,
 } from "./schedule-helpers";
-import { ChevronRight, Sparkle } from "./icons";
+import { ChevronLeft, ChevronRight, Sparkle } from "./icons";
 
 const PODS: PartOfDay[] = ["morning", "afternoon", "evening"];
 
 export function ScheduleView({
   classes,
   week,
-  month,
+  rangeLabel,
+  weekOffset,
+  maxWeekOffset,
 }: {
   classes: BookableClass[];
   week: WeekDay[];
-  month: Bilingual;
+  rangeLabel: Bilingual;
+  /** Forward offset of the viewed week (0 = current week). */
+  weekOffset: number;
+  /** Furthest forward offset reachable (disables "next" at the horizon). */
+  maxWeekOffset: number;
 }) {
   const { t, tt, lang } = useCustomerLang();
-  const [day, setDay] = useState(week[0]?.d ?? 1); // default to today
+  const router = useRouter();
+  const [day, setDay] = useState(week[0]?.d ?? 1); // default to the week's first day
   const [filter, setFilter] = useState<"all" | ClassType>("all");
+
+  const canPrev = weekOffset > 0;
+  const canNext = weekOffset < maxWeekOffset;
+  // Navigate to another week via the URL so the server refetches that week's
+  // bookable list; the page keys ScheduleView by offset, so day/filter reset.
+  const goToWeek = (next: number) => {
+    router.push(next <= 0 ? "/schedule" : `/schedule?week=${next}`);
+  };
 
   // Group the selected day's (optionally filtered) classes by time-of-day.
   const groups = useMemo(() => {
@@ -61,9 +77,23 @@ export function ScheduleView({
           </h1>
         </div>
 
-        {/* The schedule is a rolling 7 days by design — no week paging. */}
-        <div className="flex items-center px-[18px] pb-1.5 pt-2">
-          <span className="font-body text-[13.5px] font-semibold text-ink-soft">{tt(month)}</span>
+        {/* week pager: ‹ prev · date range · next › (clamped to [current, +max]) */}
+        <div className="flex items-center justify-between px-[18px] pb-1.5 pt-2">
+          <PagerButton
+            direction="prev"
+            disabled={!canPrev}
+            label={t("prev_week")}
+            onClick={() => goToWeek(weekOffset - 1)}
+          />
+          <span className="font-body text-[13.5px] font-semibold tabular-nums text-ink-soft">
+            {tt(rangeLabel)}
+          </span>
+          <PagerButton
+            direction="next"
+            disabled={!canNext}
+            label={t("next_week")}
+            onClick={() => goToWeek(weekOffset + 1)}
+          />
         </div>
 
         {/* day chips */}
@@ -150,6 +180,31 @@ export function ScheduleView({
   );
 }
 
+function PagerButton({
+  direction,
+  disabled,
+  label,
+  onClick,
+}: {
+  direction: "prev" | "next";
+  disabled: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  const Icon = direction === "prev" ? ChevronLeft : ChevronRight;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line bg-surface-2 text-ink-soft transition-opacity disabled:pointer-events-none disabled:opacity-30"
+    >
+      <Icon size={18} />
+    </button>
+  );
+}
+
 function FilterChip({
   active,
   onClick,
@@ -185,6 +240,9 @@ function FilterChip({
 function SessionRow({ c, lang }: { c: BookableClass; lang: Lang }) {
   const { t, tt } = makeT(lang);
   const start = hhmm(c.startsAt);
+  // A rental whose monthly booking window hasn't opened yet reads as locked (not a
+  // seat-count) — the server sends rentalOpensAt only while it is still locked.
+  const rentalLocked = c.rentalOpensAt !== null;
   return (
     <Link
       href={`/schedule/${c.id}`}
@@ -242,7 +300,11 @@ function SessionRow({ c, lang }: { c: BookableClass; lang: Lang }) {
 
       {/* status */}
       <div className="flex shrink-0 flex-col items-end justify-center gap-[5px]">
-        {c.full ? (
+        {rentalLocked ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-cream-2 px-2.5 py-[5px] font-body text-[11.5px] font-semibold text-taupe-deep">
+            {t("rental_locked")}
+          </span>
+        ) : c.full ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-cream-2 px-2.5 py-[5px] font-body text-[11.5px] font-semibold text-rose">
             {t("full")}
           </span>

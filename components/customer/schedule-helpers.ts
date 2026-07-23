@@ -12,8 +12,10 @@ import {
   addDays,
   formatStudioDate,
   formatStudioTime,
+  studioIsoDow,
   studioParts,
   studioStartOfDay,
+  studioStartOfWeekMonday,
 } from "@/lib/time";
 
 export type PartOfDay = "morning" | "afternoon" | "evening";
@@ -115,7 +117,7 @@ export function windowHoursLabel(hours: number, t: (k: StrKey) => string): strin
 }
 
 /** Order class types appear as filter chips (matches the prototype). */
-export const FILTER_TYPES: ClassType[] = ["group", "private", "duo", "trio"]; // rental hidden 2026-07-20
+export const FILTER_TYPES: ClassType[] = ["group", "private", "duo", "trio", "rental"]; // rental re-shown 2026-07-23
 
 // ───────── week / month chrome (dynamic — anchored to the real current day) ─────────
 // The bookable strip is 7 consecutive days starting today, with real weekday
@@ -158,10 +160,14 @@ export function currentWeekStart(now: Date = new Date()): Date {
   return studioStartOfDay(now);
 }
 
-/** 7 consecutive days from `start`, with real weekday labels, dates and today flag. */
-export function buildWeek(start: Date, now: Date = new Date()): WeekDay[] {
+/**
+ * `count` consecutive days from `start` (default 7), with real weekday labels,
+ * dates and today flag. `count` lets the viewed-week strip be shorter than 7 for
+ * the current week (today → Sunday only, so no un-bookable past days show).
+ */
+export function buildWeek(start: Date, now: Date = new Date(), count = 7): WeekDay[] {
   const today = currentWeekStart(now).getTime();
-  return Array.from({ length: 7 }, (_, i) => {
+  return Array.from({ length: count }, (_, i) => {
     const d = addDays(studioStartOfDay(start), i);
     const parts = studioParts(d);
     const dow = parts.isoDow; // Mon=1 … Sun=7
@@ -180,6 +186,72 @@ export function monthLabel(start: Date): Bilingual {
   return {
     en: formatStudioDate(start, "en", { month: "long", year: "numeric" }),
     th: `${TH_MONTHS[month0]} ${year + 543}`,
+  };
+}
+
+// ───────── forward week paging (customer /schedule) ─────────
+// The schedule can page FORWARD through weeks so open future rentals (whose
+// monthly booking window opens on the 1st of the prior month) and future group
+// classes become reachable. Paging is clamped: never into the past (past classes
+// aren't bookable), and forward only as far as MAX_WEEK_OFFSET — a horizon that
+// comfortably covers the ~1-month rental release window. All anchoring goes
+// through the Bangkok-correct time helpers so it never drifts with the host TZ.
+
+/** Furthest week (in whole weeks ahead of the current one) the customer can page
+ *  to. 5 weeks comfortably covers a rental anywhere in the next calendar month. */
+export const MAX_WEEK_OFFSET = 5;
+
+/** Parse a `?week=` offset param, clamped to [0, MAX_WEEK_OFFSET]; anything absent,
+ *  malformed or negative (i.e. the past) fails closed to 0 = the current week. */
+export function clampWeekOffset(raw: string | undefined | null): number {
+  const n = Number.parseInt(raw ?? "", 10);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.min(n, MAX_WEEK_OFFSET);
+}
+
+/**
+ * The `weekStart` instant fed to `listBookableClasses` for a forward `offset`
+ * (0 = current week). Offset 0 anchors to Bangkok 00:00 TODAY (a rolling window,
+ * so no already-past days are fetched); offset n>0 anchors to Bangkok Monday of
+ * the nth week ahead, so each future week is a clean Mon–Sun span.
+ */
+export function scheduleWeekStart(offset: number, now: Date = new Date()): Date {
+  if (offset <= 0) return studioStartOfDay(now);
+  return addDays(studioStartOfWeekMonday(now), offset * 7);
+}
+
+/**
+ * The day chips for the viewed week: the current week runs today → Sunday (so the
+ * strip never offers un-bookable past days), every future week is a full Mon–Sun.
+ */
+export function scheduleWeekDays(offset: number, now: Date = new Date()): WeekDay[] {
+  const start = scheduleWeekStart(offset, now);
+  // Mon=1 … Sun=7 → 7,6,…,1 remaining days this week; future weeks always show 7.
+  const count = offset <= 0 ? 8 - studioIsoDow(start) : 7;
+  return buildWeek(start, now, count);
+}
+
+/**
+ * Bilingual date-range label for the viewed week (e.g. "23–29 Jun" within a month,
+ * "28 Jun – 4 Jul" across a boundary; TH uses the short Thai months). Anchored to
+ * the same Bangkok days as the strip, so header and chips can never disagree.
+ */
+export function weekRangeLabel(offset: number, now: Date = new Date()): Bilingual {
+  const days = scheduleWeekDays(offset, now);
+  const start = scheduleWeekStart(offset, now);
+  const end = addDays(start, Math.max(0, days.length - 1));
+  const sp = studioParts(start);
+  const ep = studioParts(end);
+  const enShort = (d: Date) => formatStudioDate(d, "en", { month: "short" });
+  if (sp.month0 === ep.month0) {
+    return {
+      en: `${sp.day}–${ep.day} ${enShort(end)}`,
+      th: `${sp.day}–${ep.day} ${TH_MONTHS_SHORT[ep.month0]}`,
+    };
+  }
+  return {
+    en: `${sp.day} ${enShort(start)} – ${ep.day} ${enShort(end)}`,
+    th: `${sp.day} ${TH_MONTHS_SHORT[sp.month0]} – ${ep.day} ${TH_MONTHS_SHORT[ep.month0]}`,
   };
 }
 

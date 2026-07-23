@@ -246,7 +246,13 @@ async function sellForCash(params: {
   // A retried sale (same idempotency key) reuses the ALREADY-STORED snapshot, so a
   // catalog edit between the first attempt and the retry can't change the grant.
   const [stored] = await db
-    .select({ hours: charges.hours, validity: charges.validity, category: charges.category })
+    .select({
+      hours: charges.hours,
+      validity: charges.validity,
+      validityAmount: charges.validityAmount,
+      validityUnit: charges.validityUnit,
+      category: charges.category,
+    })
     .from(charges)
     .where(eq(charges.chargeId, chargeId))
     .limit(1);

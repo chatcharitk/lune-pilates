@@ -101,6 +101,16 @@ export const STR = {
   studio_level: { en: "Level 3", th: "ชั้น 3" },
   book_now: { en: "Book class", th: "จองคลาส" },
   join_waitlist: { en: "Join waitlist", th: "เข้าคิวรอ" },
+  // Private/Duo/Trio are front-desk-only (CUSTOMER_BOOKABLE_TYPES) — the customer CTA
+  // is replaced with this contact prompt instead of a Book button.
+  book_admin_only: { en: "Contact front desk", th: "ติดต่อหน้าเคาน์เตอร์" },
+  book_admin_only_hint: {
+    en: "This class is booked through the front desk.",
+    th: "คลาสนี้จองผ่านหน้าเคาน์เตอร์",
+  },
+  // Rental whose monthly booking window hasn't opened yet: locked CTA + open date.
+  rental_locked: { en: "Booking not open yet", th: "ยังไม่เปิดให้จอง" },
+  rental_opens_on: { en: "Opens {date}", th: "เปิดจอง {date}" },
   costs: { en: "Costs", th: "ใช้" },
 
   // reformer position picker
@@ -170,6 +180,22 @@ export const STR = {
   err_invalid_position: {
     en: "That reformer position isn’t available. Please choose another.",
     th: "ตำแหน่งเครื่องนี้ใช้ไม่ได้ กรุณาเลือกตำแหน่งอื่น",
+  },
+  // ADMIN_ONLY — a front-desk-only type (private/duo/trio) reached the book action.
+  // The CTA is normally replaced before this, but the code is mapped defensively.
+  err_admin_only: {
+    en: "This class is booked through the front desk. Please contact us to reserve.",
+    th: "คลาสนี้จองผ่านหน้าเคาน์เตอร์ กรุณาติดต่อเราเพื่อจอง",
+  },
+  // RENTAL_WINDOW_CLOSED — the rental's monthly booking window hasn't opened yet.
+  err_rental_window_closed: {
+    en: "Booking for this rental isn’t open yet.",
+    th: "การจองเช่านี้ยังไม่เปิด",
+  },
+  // ROOM_CONFLICT — the rental slot now overlaps another class (re-checked on book).
+  err_room_conflict: {
+    en: "This time is no longer free in the studio. Please pick another slot.",
+    th: "ช่วงเวลานี้ในสตูดิโอไม่ว่างแล้ว กรุณาเลือกเวลาอื่น",
   },
   retry: { en: "Try again", th: "ลองใหม่" },
 
@@ -1078,6 +1104,13 @@ export const STR = {
   cat_show_archived: { en: "Show archived", th: "แสดงที่เก็บถาวร" },
   cat_archive: { en: "Archive", th: "เก็บถาวร" },
   cat_restore: { en: "Put back on sale", th: "นำกลับมาขาย" },
+  // Delete is a DIFFERENT affordance from Archive: it removes the package entirely
+  // when it was never sold; if it has past purchases the server archives it instead.
+  cat_delete: { en: "Delete", th: "ลบ" },
+  cat_delete_confirm: {
+    en: "Delete this package for good? If it has past purchases it will be archived instead, so nothing sold breaks.",
+    th: "ลบแพ็กเกจนี้อย่างถาวรหรือไม่? หากมีการซื้อที่ผ่านมา ระบบจะเก็บถาวรแทนเพื่อไม่ให้กระทบสิ่งที่ขายไปแล้ว",
+  },
   cat_id: { en: "Package ID", th: "รหัสแพ็กเกจ" },
   cat_id_hint: {
     en: "Permanent — used by every past purchase. Cannot be changed later.",
@@ -1092,6 +1125,9 @@ export const STR = {
   cat_price: { en: "Price (THB)", th: "ราคา (บาท)" },
   cat_per_hour: { en: "Per hour", th: "ต่อชั่วโมง" },
   cat_validity: { en: "Validity", th: "อายุการใช้งาน" },
+  // Structured-validity unit labels (2026-07-23) for the number + unit picker.
+  validity_unit_day: { en: "days", th: "วัน" },
+  validity_unit_month: { en: "months", th: "เดือน" },
   cat_tag: { en: "Badge (optional)", th: "ป้ายกำกับ (ไม่บังคับ)" },
   cat_tag_none: { en: "No badge", th: "ไม่มีป้าย" },
   cat_tag_popular: { en: "Popular", th: "ยอดนิยม" },
@@ -1113,6 +1149,12 @@ export const STR = {
   toast_cat_updated: { en: "Package updated", th: "อัปเดตแพ็กเกจแล้ว" },
   toast_cat_archived: { en: "Package archived", th: "เก็บแพ็กเกจถาวรแล้ว" },
   toast_cat_restored: { en: "Package back on sale", th: "นำแพ็กเกจกลับมาขายแล้ว" },
+  // deleteCatalogItem outcomes: hard-deleted vs archived-instead (had references).
+  toast_cat_deleted: { en: "Package deleted", th: "ลบแพ็กเกจแล้ว" },
+  toast_cat_archived_instead: {
+    en: "Package archived — it has past purchases, so it can't be deleted.",
+    th: "เก็บแพ็กเกจถาวรแทน — มีการซื้อที่ผ่านมา จึงลบไม่ได้",
+  },
   err_cat_id_taken: {
     en: "That package ID is already used. Pick another.",
     th: "รหัสแพ็กเกจนี้ถูกใช้แล้ว กรุณาเลือกรหัสอื่น",

@@ -99,7 +99,15 @@ export const catalogItems = pgTable(
     category: packageCategory("category").notNull(),
     hours: integer("hours").notNull(),
     price: integer("price").notNull(), // THB, integer (no minor units / floats)
-    validity: text("validity").notNull(), // single_visit | one_month | two_months | three_months
+    // DEAD legacy column (kept, not dropped — additive migration only). Superseded by
+    // validity_amount + validity_unit (2026-07-23). New writes still stamp a
+    // best-effort token here to satisfy its NOT NULL; reads prefer the structured pair
+    // and only fall back to this text for pre-migration rows (validityFromRow).
+    validity: text("validity").notNull(),
+    // Structured validity (2026-07-23): a positive whole `amount` of `day`s or
+    // `month`s. The single source of a package's lifetime for new rows.
+    validityAmount: integer("validity_amount"),
+    validityUnit: text("validity_unit"), // 'day' | 'month'
     tag: text("tag"), // popular | best_value | null
     labelEn: text("label_en").notNull(),
     labelTh: text("label_th").notNull(),
@@ -110,6 +118,16 @@ export const catalogItems = pgTable(
   (t) => [
     check("catalog_item_hours_positive", sql`${t.hours} > 0`),
     check("catalog_item_price_nonneg", sql`${t.price} >= 0`),
+    // Structured validity is nullable (pre-migration rows), but when present it must
+    // be a positive amount in a known unit.
+    check(
+      "catalog_item_validity_amount_positive",
+      sql`${t.validityAmount} is null or ${t.validityAmount} > 0`,
+    ),
+    check(
+      "catalog_item_validity_unit_valid",
+      sql`${t.validityUnit} is null or ${t.validityUnit} in ('day','month')`,
+    ),
   ],
 );
 
@@ -148,6 +166,11 @@ export const charges = pgTable("charges", {
   // before (see lib/catalog/chargeTerms.ts). New rows always write all three.
   hours: integer("hours"),
   validity: text("validity"),
+  // Structured validity snapshot (2026-07-23) alongside the legacy `validity` text.
+  // Nullable: pre-migration charges (and legacy-only new writes) leave them null and
+  // fall back to `validity` text when credited (lib/catalog/chargeTerms.ts).
+  validityAmount: integer("validity_amount"),
+  validityUnit: text("validity_unit"), // 'day' | 'month'
   category: packageCategory("category"),
   // Opaque reference tying charge → user + item + instant (audit / provider match).
   reference: text("reference").notNull(),

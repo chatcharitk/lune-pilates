@@ -63,7 +63,8 @@ describe.skipIf(!HAS_DB)("purchased-terms snapshot (integration · requires DATA
       category: "group",
       hours: 10,
       price: 5500,
-      validity: "two_months",
+      validityAmount: 2,
+      validityUnit: "month",
       labelEn: "10 hours",
       labelTh: "10 ชั่วโมง",
     });
@@ -158,7 +159,8 @@ describe.skipIf(!HAS_DB)("purchased-terms snapshot (integration · requires DATA
       id: itemId,
       hours: 20,
       price: 5500,
-      validity: "two_months",
+      validityAmount: 2,
+      validityUnit: "month",
       labelEn: "20 hours",
       labelTh: "20 ชั่วโมง",
     });
@@ -193,7 +195,8 @@ describe.skipIf(!HAS_DB)("purchased-terms snapshot (integration · requires DATA
       id: itemId,
       hours: 5,
       price: 5500,
-      validity: "two_months",
+      validityAmount: 2,
+      validityUnit: "month",
       labelEn: "5 hours",
       labelTh: "5 ชั่วโมง",
     });
@@ -213,7 +216,8 @@ describe.skipIf(!HAS_DB)("purchased-terms snapshot (integration · requires DATA
       id: itemId,
       hours: 10,
       price: 5500,
-      validity: "three_months",
+      validityAmount: 3,
+      validityUnit: "month",
       labelEn: "10 hours",
       labelTh: "10 ชั่วโมง",
     });
@@ -230,10 +234,10 @@ describe.skipIf(!HAS_DB)("purchased-terms snapshot (integration · requires DATA
 
     // Two months from approval (the snapshot), NOT three (the edited item). Bracketed
     // by the call window so the assertion doesn't race the clock.
-    expect(expiresAt).toBeGreaterThanOrEqual(expiryFromValidity("two_months", before).getTime() - 1000);
-    expect(expiresAt).toBeLessThanOrEqual(expiryFromValidity("two_months", after).getTime() + 1000);
+    expect(expiresAt).toBeGreaterThanOrEqual(expiryFromValidity(2, "month", before).getTime() - 1000);
+    expect(expiresAt).toBeLessThanOrEqual(expiryFromValidity(2, "month", after).getTime() + 1000);
     // And comfortably short of the three-month window the live item now advertises.
-    expect(expiresAt).toBeLessThan(expiryFromValidity("three_months", before).getTime() - 86_400_000);
+    expect(expiresAt).toBeLessThan(expiryFromValidity(3, "month", before).getTime() - 86_400_000);
   });
 
   // ─────────────── audit H1: the archive window ───────────────
@@ -262,7 +266,8 @@ describe.skipIf(!HAS_DB)("purchased-terms snapshot (integration · requires DATA
           id: itemId,
           hours: 99,
           price: 1,
-          validity: "three_months",
+          validityAmount: 3,
+          validityUnit: "month",
           labelEn: "99 hours",
           labelTh: "99 ชั่วโมง",
         })
@@ -310,7 +315,8 @@ describe.skipIf(!HAS_DB)("purchased-terms snapshot (integration · requires DATA
           id: itemId,
           hours: 20,
           price: 5500,
-          validity: "two_months",
+          validityAmount: 2,
+          validityUnit: "month",
           labelEn: "20 hours",
           labelTh: "20 ชั่วโมง",
         })

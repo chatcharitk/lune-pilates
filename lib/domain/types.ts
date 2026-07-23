@@ -10,6 +10,23 @@ export type BookingStatus = "booked" | "cancelled";
 export type WaitlistStatus = "waiting" | "offered" | "claimed" | "expired";
 export type ReformerPosition = "left" | "middle" | "right";
 
+/**
+ * The class types a CUSTOMER may self-book (and self-waitlist). Private, Duo and
+ * Trio are ADMIN-ONLY — bookable only through the front desk (adminBookForCustomer),
+ * never from the customer app (decided 2026-07-23). This is the SINGLE source of
+ * truth the booking action, the atomic debit guard, and the waitlist join all key
+ * off, so the rule can never disagree across paths.
+ */
+export const CUSTOMER_BOOKABLE_TYPES: ReadonlySet<ClassType> = new Set<ClassType>([
+  "group",
+  "rental",
+]);
+
+/** True iff a customer may self-book `type` (group/rental). See CUSTOMER_BOOKABLE_TYPES. */
+export function isCustomerBookable(type: ClassType): boolean {
+  return CUSTOMER_BOOKABLE_TYPES.has(type);
+}
+
 /** Hard capacity per class type. Reformer max is 3 per class. */
 export const CAPACITY: Record<ClassType, number> = {
   group: 3,

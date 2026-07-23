@@ -33,10 +33,11 @@ vi.mock("next/cache", () => ({
 }));
 
 import { getDb, closeDb } from "@/lib/db/client";
-import { catalogItems } from "@/lib/db/schema";
+import { catalogItems, charges } from "@/lib/db/schema";
 import {
   archiveCatalogItem,
   createCatalogItem,
+  deleteCatalogItem,
   listCatalogForAdmin,
   reorderCatalog,
   restoreCatalogItem,
@@ -61,7 +62,8 @@ describe.skipIf(!HAS_DB)("admin catalog CRUD (integration · requires DATABASE_U
     category: "group" as const,
     hours: 10,
     price: 5500,
-    validity: "two_months" as const,
+    validityAmount: 2,
+    validityUnit: "month" as const,
     labelEn: "10 hours",
     labelTh: "10 ชั่วโมง",
   };
@@ -158,7 +160,8 @@ describe.skipIf(!HAS_DB)("admin catalog CRUD (integration · requires DATABASE_U
         id,
         hours: 20,
         price: 10000,
-        validity: "three_months",
+        validityAmount: 3,
+        validityUnit: "month",
         tag: "best_value",
         labelEn: "20 hours",
         labelTh: "20 ชั่วโมง",
@@ -168,6 +171,9 @@ describe.skipIf(!HAS_DB)("admin catalog CRUD (integration · requires DATABASE_U
       const [row] = await getDb().select().from(catalogItems).where(eq(catalogItems.id, id));
       expect(row!.hours).toBe(20);
       expect(row!.price).toBe(10000);
+      // Structured validity is the real source; the legacy text mirrors it.
+      expect(row!.validityAmount).toBe(3);
+      expect(row!.validityUnit).toBe("month");
       expect(row!.validity).toBe("three_months");
       expect(row!.tag).toBe("best_value");
       expect(row!.category).toBe("group"); // never in the SET clause
@@ -184,7 +190,8 @@ describe.skipIf(!HAS_DB)("admin catalog CRUD (integration · requires DATABASE_U
           category: "private",
           hours: 10,
           price: 5500,
-          validity: "two_months",
+          validityAmount: 2,
+          validityUnit: "month",
           labelEn: "10 hours",
           labelTh: "10 ชั่วโมง",
         }),
@@ -222,6 +229,73 @@ describe.skipIf(!HAS_DB)("admin catalog CRUD (integration · requires DATABASE_U
 
     it("archiving an id that does not exist is UNKNOWN_ITEM", async () => {
       expect(await archiveCatalogItem(`${tag}-ghost`)).toEqual({ ok: false, code: "UNKNOWN_ITEM" });
+    });
+  });
+
+  describe("custom structured validity (days + months)", () => {
+    it("persists a DAY validity and resolves it back structured", async () => {
+      const id = mkId("day45");
+      const res = await createCatalogItem({ ...base, id, validityAmount: 45, validityUnit: "day" });
+      expect(res.ok).toBe(true);
+      if (res.ok) expect(res.item.validity).toEqual({ amount: 45, unit: "day" });
+
+      const [row] = await getDb().select().from(catalogItems).where(eq(catalogItems.id, id));
+      expect(row!.validityAmount).toBe(45);
+      expect(row!.validityUnit).toBe("day");
+
+      const resolved = await getCatalogItem(id);
+      expect(resolved?.validity).toEqual({ amount: 45, unit: "day" });
+      expect(resolved?.sublabel).toEqual({ en: "Valid 45 days", th: "ใช้ได้ 45 วัน" });
+    });
+  });
+
+  describe("deleteCatalogItem — hard-delete when unused, archive when referenced", () => {
+    it("hard-DELETES an unused item: the row is gone and getCatalogItem returns undefined", async () => {
+      const id = mkId("del-unused");
+      expect((await createCatalogItem({ ...base, id })).ok).toBe(true);
+
+      expect(await deleteCatalogItem(id)).toEqual({ ok: true, deleted: true, archived: false });
+
+      const [row] = await getDb().select().from(catalogItems).where(eq(catalogItems.id, id));
+      expect(row).toBeUndefined();
+      expect(await getCatalogItem(id)).toBeUndefined();
+    });
+
+    it("ARCHIVES instead of deleting when a charge references the item", async () => {
+      const id = mkId("del-ref");
+      expect((await createCatalogItem({ ...base, id })).ok).toBe(true);
+
+      // Insert a charge that references this catalog id (charges.package_id).
+      const chargeId = `${id}-chg`;
+      const [u] = await getDb()
+        .select({ id: charges.userId })
+        .from(charges)
+        .limit(1);
+      // Need a real user id for the FK; reuse any existing charge's user, else skip.
+      if (!u) return;
+      await getDb().insert(charges).values({
+        chargeId,
+        packageId: id,
+        userId: u.id,
+        amount: 5500,
+        reference: `ref_${chargeId}`,
+      });
+
+      const res = await deleteCatalogItem(id);
+      expect(res).toEqual({ ok: true, deleted: false, archived: true });
+
+      // The row SURVIVES (archived), still resolvable for the historical charge.
+      const [row] = await getDb().select().from(catalogItems).where(eq(catalogItems.id, id));
+      expect(row).toBeDefined();
+      expect(row!.active).toBe(false);
+      expect((await getCatalogItem(id))?.hours).toBe(10);
+
+      // Cleanup the charge we inserted (catalog row is cleaned by afterAll).
+      await getDb().delete(charges).where(eq(charges.chargeId, chargeId));
+    });
+
+    it("an unknown id is UNKNOWN_ITEM", async () => {
+      expect(await deleteCatalogItem(`${tag}-nope`)).toEqual({ ok: false, code: "UNKNOWN_ITEM" });
     });
   });
 

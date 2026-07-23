@@ -60,7 +60,7 @@ import {
   waitlist,
 } from "@/lib/db/schema";
 import { bookClass, cancelBookingAction } from "@/app/actions/booking";
-import { adminReschedule } from "@/app/actions/admin-bookings";
+import { adminBookForCustomer, adminReschedule } from "@/app/actions/admin-bookings";
 import { confirmWaitlistOffer, joinWaitlist } from "@/app/actions/waitlist";
 import { offerNextWaitlistSeat } from "@/lib/waitlist/queries";
 import { creditCostForClassType } from "@/lib/credits/cost";
@@ -206,8 +206,8 @@ describe.skipIf(!HAS_DB)(
       // 48h ahead ⇒ booked ≥6h ⇒ free window = 6h; cancelling now (≈48h out) is free.
       const classId = await makeClass("private", 1, 48);
 
-      enqueueSession(members[0]!);
-      const booked = await bookClass({ classInstanceId: classId });
+      // Private is front-desk-only now — book it via the admin path (bookedByAdmin).
+      const booked = await adminBookForCustomer({ classInstanceId: classId, userId: members[0]!.id });
       expect(booked.ok).toBe(true);
       if (!booked.ok) return;
       expect(await hoursLeftOf(packageId)).toBe(POOL - PRIVATE_COST);
@@ -239,8 +239,7 @@ describe.skipIf(!HAS_DB)(
       // BLOCKED entirely (CLAUDE.md §5 inv 7, window widened 5h → 6h 2026-07-20).
       const classId = await makeClass("private", 1, 0.5);
 
-      enqueueSession(members[0]!);
-      const booked = await bookClass({ classInstanceId: classId });
+      const booked = await adminBookForCustomer({ classInstanceId: classId, userId: members[0]!.id });
       expect(booked.ok).toBe(true);
       if (!booked.ok) return;
       expect(booked.freeCancelHours).toBe(6); // fixed window stamp
@@ -268,8 +267,7 @@ describe.skipIf(!HAS_DB)(
       const oldClass = await makeClass("private", 1, 48);
       const newClass = await makeClass("private", 1, 72);
 
-      enqueueSession(members[0]!);
-      const booked = await bookClass({ classInstanceId: oldClass });
+      const booked = await adminBookForCustomer({ classInstanceId: oldClass, userId: members[0]!.id });
       expect(booked.ok).toBe(true);
       if (!booked.ok) return;
       const afterBook = await hoursLeftOf(packageId);
@@ -310,8 +308,7 @@ describe.skipIf(!HAS_DB)(
       const oldClass = await makeClass("private", 1, 2);
       const newClass = await makeClass("private", 1, 72);
 
-      enqueueSession(members[0]!);
-      const booked = await bookClass({ classInstanceId: oldClass });
+      const booked = await adminBookForCustomer({ classInstanceId: oldClass, userId: members[0]!.id });
       expect(booked.ok).toBe(true);
       if (!booked.ok) return;
       const afterBook = await hoursLeftOf(packageId);

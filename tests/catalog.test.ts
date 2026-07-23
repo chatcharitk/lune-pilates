@@ -11,48 +11,63 @@ import { expiryFromValidity } from "@/lib/catalog/validity";
 
 // ───────────────────────── validity → expiry ─────────────────────────
 
-describe("expiryFromValidity", () => {
+describe("expiryFromValidity (structured amount + unit)", () => {
   const now = new Date("2026-06-18T09:30:00Z");
 
-  it("gives single_visit a 1-month window (drop-in still needs time to use the credit)", () => {
-    expect(expiryFromValidity("single_visit", now).toISOString()).toBe("2026-07-18T09:30:00.000Z");
+  it("adds whole months (the old single_visit/one_month = +1 month)", () => {
+    expect(expiryFromValidity(1, "month", now).toISOString()).toBe("2026-07-18T09:30:00.000Z");
   });
-  it("maps one_month → +1 month", () => {
-    expect(expiryFromValidity("one_month", now).toISOString()).toBe("2026-07-18T09:30:00.000Z");
+  it("adds +2 months (old two_months)", () => {
+    expect(expiryFromValidity(2, "month", now).toISOString()).toBe("2026-08-18T09:30:00.000Z");
   });
-  it("maps two_months → +2 months", () => {
-    expect(expiryFromValidity("two_months", now).toISOString()).toBe("2026-08-18T09:30:00.000Z");
+  it("adds +3 months (old three_months)", () => {
+    expect(expiryFromValidity(3, "month", now).toISOString()).toBe("2026-09-18T09:30:00.000Z");
   });
-  it("maps three_months → +3 months", () => {
-    expect(expiryFromValidity("three_months", now).toISOString()).toBe("2026-09-18T09:30:00.000Z");
+
+  it("adds exact 24h multiples for days", () => {
+    expect(expiryFromValidity(1, "day", now).toISOString()).toBe("2026-06-19T09:30:00.000Z");
+    expect(expiryFromValidity(45, "day", now).toISOString()).toBe("2026-08-02T09:30:00.000Z");
   });
 
   it("is pure: does not mutate the passed `now`", () => {
     const before = now.getTime();
-    expiryFromValidity("three_months", now);
+    expiryFromValidity(3, "month", now);
+    expiryFromValidity(30, "day", now);
     expect(now.getTime()).toBe(before);
   });
 
   it("always returns a future expiry strictly after `now`", () => {
-    const validities = ["single_visit", "one_month", "two_months", "three_months"] as const;
-    for (const v of validities) {
-      expect(expiryFromValidity(v, now).getTime()).toBeGreaterThan(now.getTime());
+    for (const [amount, unit] of [
+      [1, "month"],
+      [2, "month"],
+      [3, "month"],
+      [1, "day"],
+      [90, "day"],
+    ] as const) {
+      expect(expiryFromValidity(amount, unit, now).getTime()).toBeGreaterThan(now.getTime());
     }
   });
 
   it("rolls month overflow forward, never shortening the window (Jan 31 + 1mo)", () => {
     // 2025 is not a leap year: Jan 31 + 1 month normalises into early March, not Feb.
     const jan31 = new Date("2025-01-31T00:00:00Z");
-    const exp = expiryFromValidity("one_month", jan31);
+    const exp = expiryFromValidity(1, "month", jan31);
     expect(exp.getTime()).toBeGreaterThan(jan31.getTime());
     expect(exp.getUTCMonth()).toBe(2); // March (0-indexed)
   });
 
   it("crosses a year boundary correctly (Dec + 2mo → Feb next year)", () => {
     const dec = new Date("2026-12-10T00:00:00Z");
-    const exp = expiryFromValidity("two_months", dec);
+    const exp = expiryFromValidity(2, "month", dec);
     expect(exp.getUTCFullYear()).toBe(2027);
     expect(exp.getUTCMonth()).toBe(1); // February
+  });
+
+  it("SEED expiries are byte-for-byte unchanged vs the old fixed enum", () => {
+    // The seed still maps single_visit/one_month→1mo, two_months→2mo, three_months→3mo.
+    expect(expiryFromValidity(1, "month", now).toISOString()).toBe("2026-07-18T09:30:00.000Z");
+    expect(expiryFromValidity(2, "month", now).toISOString()).toBe("2026-08-18T09:30:00.000Z");
+    expect(expiryFromValidity(3, "month", now).toISOString()).toBe("2026-09-18T09:30:00.000Z");
   });
 });
 
@@ -87,7 +102,7 @@ describe("getCatalogItem (server-side price/hours source of truth)", () => {
     expect(item?.category).toBe("private");
     expect(item?.hours).toBe(8);
     expect(item?.price).toBe(12000);
-    expect(item?.validity).toBe("two_months");
+    expect(item?.validity).toEqual({ amount: 2, unit: "month" });
   });
 
   it("maps duo/trio packs to the private category (they debit the private pool)", async () => {
@@ -107,11 +122,9 @@ describe("getCatalogItem (server-side price/hours source of truth)", () => {
     expect(await getCatalogItem("")).toBeUndefined();
   });
 
-  it("resolves a HIDDEN-category item that listPackageCatalog omits (legacy charges)", async () => {
-    // r-solo is in the hidden "rental" category, so it never appears in the buy UI —
-    // but a historical charge referencing it MUST still resolve its price/hours.
+  it("rental items are now PURCHASABLE again (un-hidden 2026-07-23)", async () => {
     const listed = (await listPackageCatalog()).flatMap((c) => c.items).map((i) => i.id);
-    expect(listed).not.toContain("r-solo");
+    expect(listed).toContain("r-solo");
     expect((await getCatalogItem("r-solo"))?.price).toBe(600);
   });
 
@@ -125,14 +138,14 @@ describe("getCatalogItem (server-side price/hours source of truth)", () => {
 });
 
 describe("listPackageCatalog", () => {
-  it("groups items under the visible categories in display order (rental hidden)", async () => {
+  it("groups items under the visible categories in display order (rental un-hidden)", async () => {
     const cats = await listPackageCatalog();
-    expect(cats.map((c) => c.id)).toEqual(["group", "private"]);
+    expect(cats.map((c) => c.id)).toEqual(["group", "private", "rental"]);
   });
 
   it("every item's id resolves back through getCatalogItem to an equal item", async () => {
     const all = (await listPackageCatalog()).flatMap((c) => c.items);
-    expect(all.length).toBe(10); // 4 group + 6 private (rental hidden 2026-07-20)
+    expect(all.length).toBe(13); // 4 group + 6 private + 3 rental (rental un-hidden 2026-07-23)
     for (const item of all) {
       expect(await getCatalogItem(item.id)).toEqual(item);
     }

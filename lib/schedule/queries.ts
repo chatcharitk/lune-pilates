@@ -21,6 +21,7 @@ import { selectUsablePackageRow } from "@/lib/credits/selectPackage";
 import { getMockSession } from "@/lib/mock/session";
 import { addDays, studioInstant, studioParts, studioStartOfWeekMonday } from "@/lib/time";
 import { isBookableForViewer } from "./visibility";
+import { isRentalBookingOpen, rentalBookingOpensAt } from "./rental";
 import { mockDataMode } from "@/lib/mock-mode";
 
 // ───────────────────────── shared shapes ─────────────────────────
@@ -57,6 +58,13 @@ export interface BookableClass {
   booked: number;
   seatsLeft: number;
   full: boolean;
+  /**
+   * For a RENTAL whose customer booking window has NOT yet opened: the ISO instant
+   * that window opens (00:00 Bangkok on the 1st of the month before start — see
+   * lib/schedule/rental.ts), so the UI can show a locked rental with its open date.
+   * `null` for non-rentals AND for rentals already open (already bookable).
+   */
+  rentalOpensAt: string | null;
 }
 
 /** Per-reformer-position availability for the detail screen. */
@@ -169,6 +177,17 @@ export async function getUsableBalance(
 /** Bilingual display metadata for a class type (mirrors lune-data.jsx TYPES). */
 export function metaFor(type: ClassType): ClassTypeMeta {
   return TYPE_META[type];
+}
+
+/**
+ * The `rentalOpensAt` read-model value: the ISO instant a still-locked rental opens
+ * for customer booking, or `null` for a non-rental or an already-open rental. The
+ * ONE place this is derived so the list and detail read models can never disagree.
+ */
+function rentalOpensAtFor(type: ClassType, startsAt: Date, now: Date): string | null {
+  if (type !== "rental") return null;
+  if (isRentalBookingOpen(startsAt, now)) return null;
+  return rentalBookingOpensAt(startsAt).toISOString();
 }
 
 /**
@@ -300,6 +319,7 @@ export async function listBookableClasses(args: ListBookableArgs): Promise<Booka
         booked,
         seatsLeft,
         full: seatsLeft <= 0,
+        rentalOpensAt: rentalOpensAtFor(r.type, r.startsAt, now),
       };
     });
 }
@@ -383,6 +403,7 @@ export async function getClassDetail(
     booked,
     seatsLeft,
     full: seatsLeft <= 0,
+    rentalOpensAt: rentalOpensAtFor(cls.type, cls.startsAt, now),
     positions: buildPositions(capacity, takenPositions),
   };
 }
@@ -465,6 +486,9 @@ function mockToBookable(weekStart: Date, seed: MockSessionSeed): BookableClass {
     booked,
     seatsLeft,
     full: seatsLeft <= 0,
+    // Mock rentals are treated as already-open (no DB, no release gating on the mock
+    // catalogue) so the UI always renders them bookable.
+    rentalOpensAt: null,
   };
 }
 

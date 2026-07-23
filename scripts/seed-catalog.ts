@@ -17,12 +17,13 @@
 import "./_load-env";
 import { getDb } from "@/lib/db/client";
 import { catalogItems } from "@/lib/db/schema";
-import { SEED_CATALOG } from "@/lib/catalog/packages";
+import { SEED_CATALOG, legacyValidityText } from "@/lib/catalog/packages";
 
 async function main() {
   const db = getDb();
 
   for (const item of SEED_CATALOG) {
+    const validityText = legacyValidityText(item.validity);
     await db
       .insert(catalogItems)
       .values({
@@ -30,7 +31,10 @@ async function main() {
         category: item.category,
         hours: item.hours,
         price: item.price,
-        validity: item.validity,
+        // Structured validity is the real source; the legacy text satisfies NOT NULL.
+        validity: validityText,
+        validityAmount: item.validity.amount,
+        validityUnit: item.validity.unit,
         tag: item.tag ?? null,
         labelEn: item.label.en,
         labelTh: item.label.th,
@@ -47,7 +51,9 @@ async function main() {
           // silently un-archives an item the owner retired.
           hours: item.hours,
           price: item.price,
-          validity: item.validity,
+          validity: validityText,
+          validityAmount: item.validity.amount,
+          validityUnit: item.validity.unit,
           tag: item.tag ?? null,
           labelEn: item.label.en,
           labelTh: item.label.th,

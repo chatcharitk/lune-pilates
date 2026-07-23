@@ -33,15 +33,18 @@ import { Badge, Drawer } from "./ui";
 import {
   archiveCatalogItem,
   createCatalogItem,
+  deleteCatalogItem,
   reorderCatalog,
   restoreCatalogItem,
   updateCatalogItem,
   type CreateCatalogItemFailureCode,
   type UpdateCatalogItemFailureCode,
   type ArchiveCatalogItemFailureCode,
+  type DeleteCatalogItemFailureCode,
   type ReorderCatalogFailureCode,
 } from "@/app/actions/admin-catalog";
-import type { AdminCatalogItem, CatalogTag, Validity } from "@/lib/catalog/packages";
+import type { AdminCatalogItem, CatalogTag, ValidityUnit } from "@/lib/catalog/packages";
+import { VALIDITY_UNITS } from "@/lib/catalog/packages";
 import type { PackageCategory } from "@/lib/domain/types";
 import { thb, type StrKey } from "@/lib/i18n";
 
@@ -57,13 +60,11 @@ const CATEGORY_KEY: Record<PackageCategory, StrKey> = {
   rental: "cat_rental",
 };
 
-/** Validity options; each value is itself the i18n key for its label. */
-const VALIDITY_OPTIONS: readonly Validity[] = [
-  "single_visit",
-  "one_month",
-  "two_months",
-  "three_months",
-] as const;
+/** Validity unit → its i18n label key (structured validity, 2026-07-23). */
+const VALIDITY_UNIT_KEY: Record<ValidityUnit, StrKey> = {
+  day: "validity_unit_day",
+  month: "validity_unit_month",
+};
 
 const TAG_KEY: Record<CatalogTag, StrKey> = {
   popular: "cat_tag_popular",
@@ -116,6 +117,19 @@ function updateErrorKey(code: UpdateCatalogItemFailureCode): StrKey {
 }
 
 function archiveErrorKey(code: ArchiveCatalogItemFailureCode): StrKey {
+  switch (code) {
+    case "UNAUTHORIZED":
+      return "err_cat_forbidden";
+    case "UNKNOWN_ITEM":
+      return "err_cat_unknown";
+    case "MOCK_NO_DB":
+      return "err_cat_mock_no_db";
+    default:
+      return "err_cat_save";
+  }
+}
+
+function deleteErrorKey(code: DeleteCatalogItemFailureCode): StrKey {
   switch (code) {
     case "UNAUTHORIZED":
       return "err_cat_forbidden";
@@ -418,7 +432,7 @@ function ItemRow({
               {thb(item.perHour)}/{t("hour")}
             </span>
             <span aria-hidden>·</span>
-            <span>{t(item.validity)}</span>
+            <span>{tt(item.sublabel)}</span>
           </span>
         </button>
 
@@ -491,11 +505,15 @@ function ItemFormDrawer({
   const [category, setCategory] = useState<PackageCategory>("group");
   const [hours, setHours] = useState("1");
   const [price, setPrice] = useState("0");
-  const [validity, setValidity] = useState<Validity>("one_month");
+  // Structured validity (2026-07-23): a whole amount + a day/month unit.
+  const [validityAmount, setValidityAmount] = useState("1");
+  const [validityUnit, setValidityUnit] = useState<ValidityUnit>("month");
   const [tag, setTag] = useState<CatalogTag | "none">("none");
   const [labelEn, setLabelEn] = useState("");
   const [labelTh, setLabelTh] = useState("");
   const [errorKey, setErrorKey] = useState<StrKey | null>(null);
+  // Inline "delete for good?" confirmation within the edit drawer (destructive).
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   // Prefill from the target item (edit) or reset to sane defaults (new) on (re)open.
   useEffect(() => {
@@ -504,17 +522,26 @@ function ItemFormDrawer({
     setCategory(item?.category ?? "group");
     setHours(String(item?.hours ?? 1));
     setPrice(String(item?.price ?? 0));
-    setValidity(item?.validity ?? "one_month");
+    setValidityAmount(String(item?.validity.amount ?? 1));
+    setValidityUnit(item?.validity.unit ?? "month");
     setTag(item?.tag ?? "none");
     setLabelEn(item?.label.en ?? "");
     setLabelTh(item?.label.th ?? "");
     setErrorKey(null);
+    setConfirmingDelete(false);
   }, [state, item]);
 
   const hoursNum = Number.parseInt(hours, 10);
   const priceNum = Number.parseInt(price, 10);
+  const validityAmountNum = Number.parseInt(validityAmount, 10);
   const numbersOk =
-    Number.isSafeInteger(hoursNum) && hoursNum > 0 && Number.isSafeInteger(priceNum) && priceNum >= 0;
+    Number.isSafeInteger(hoursNum) &&
+    hoursNum > 0 &&
+    Number.isSafeInteger(priceNum) &&
+    priceNum >= 0 &&
+    Number.isSafeInteger(validityAmountNum) &&
+    validityAmountNum > 0 &&
+    validityAmountNum <= 60;
   // Typing aid only — the authoritative perHour is derived server-side on read.
   const perHour = numbersOk ? Math.round(priceNum / hoursNum) : null;
 
@@ -539,7 +566,8 @@ function ItemFormDrawer({
     const common = {
       hours: hoursNum,
       price: priceNum,
-      validity,
+      validityAmount: validityAmountNum,
+      validityUnit,
       tag: tag === "none" ? null : tag,
       labelEn: labelEn.trim(),
       labelTh: labelTh.trim(),
@@ -564,6 +592,26 @@ function ItemFormDrawer({
         router.refresh();
       } else {
         setErrorKey(createErrorKey(res.code));
+      }
+    });
+  }
+
+  /**
+   * Delete the edited item. The server hard-deletes it only when it was NEVER sold;
+   * if any charge/credit references it, it ARCHIVES instead and reports `archived`.
+   * The toast reflects which outcome happened so the owner isn't misled.
+   */
+  function del() {
+    if (!item) return;
+    setErrorKey(null);
+    startTransition(async () => {
+      const res = await deleteCatalogItem(item.id);
+      if (res.ok) {
+        onSaved(res.deleted ? "toast_cat_deleted" : "toast_cat_archived_instead");
+        router.refresh();
+      } else {
+        setConfirmingDelete(false);
+        setErrorKey(deleteErrorKey(res.code));
       }
     });
   }
@@ -699,14 +747,34 @@ function ItemFormDrawer({
         </span>
       </div>
 
+      {/* validity — a whole amount + a day/month unit (structured, 2026-07-23) */}
       <Field label={t("cat_validity")}>
         {(fieldId) => (
-          <Select
-            id={fieldId}
-            value={validity}
-            onChange={(v) => setValidity(v as Validity)}
-            options={VALIDITY_OPTIONS.map((v) => ({ value: v, label: t(v) }))}
-          />
+          <div className="grid grid-cols-[1fr_1.3fr] gap-3.5">
+            <input
+              id={fieldId}
+              type="number"
+              min={1}
+              max={60}
+              step={1}
+              value={validityAmount}
+              onChange={(e) => setValidityAmount(e.target.value)}
+              inputMode="numeric"
+              className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3 font-body text-sm font-medium text-ink tabular-nums"
+            />
+            <select
+              aria-label={t("cat_validity")}
+              value={validityUnit}
+              onChange={(e) => setValidityUnit(e.target.value as ValidityUnit)}
+              className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm font-medium text-ink"
+            >
+              {VALIDITY_UNITS.map((u) => (
+                <option key={u} value={u}>
+                  {t(VALIDITY_UNIT_KEY[u])}
+                </option>
+              ))}
+            </select>
+          </div>
         )}
       </Field>
 
@@ -755,6 +823,48 @@ function ItemFormDrawer({
           />
         )}
       </Field>
+
+      {/* Delete — a DIFFERENT affordance from Archive. Delete removes the package
+          entirely when it was never sold; if it has past purchases the server
+          archives it instead (and the toast says so). Guarded by an inline confirm. */}
+      {isEdit && item && (
+        <div className="mt-2 border-t border-dashed border-line-strong pt-4">
+          {confirmingDelete ? (
+            <div className="rounded-xl border border-[#e2b7a6] bg-rose/10 px-3.5 py-3">
+              <p className="m-0 font-body text-[13px] leading-relaxed text-ink">
+                {t("cat_delete_confirm")}
+              </p>
+              <div className="mt-3 flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={del}
+                  disabled={pending}
+                  className="inline-flex h-10 items-center rounded-xl bg-[#a56a52] px-4 font-body text-[13.5px] font-semibold text-cream disabled:opacity-50"
+                >
+                  {t("cat_delete")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingDelete(false)}
+                  disabled={pending}
+                  className="inline-flex h-10 items-center rounded-xl border border-line-strong px-4 font-body text-[13.5px] font-semibold text-ink disabled:opacity-50"
+                >
+                  {t("cancel")}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmingDelete(true)}
+              className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[#e2b7a6] px-4 font-body text-[13.5px] font-semibold text-[#a56a52] transition-colors hover:bg-rose/10"
+            >
+              <TrashIcon />
+              {t("cat_delete")}
+            </button>
+          )}
+        </div>
+      )}
     </Drawer>
   );
 }
@@ -933,6 +1043,15 @@ function Check() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6" />
+      <path d="M10 11v6M14 11v6" />
     </svg>
   );
 }

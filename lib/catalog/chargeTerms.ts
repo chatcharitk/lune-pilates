@@ -30,19 +30,20 @@
 // retroactively (the terms they were sold under are simply not recorded anywhere).
 
 import type { PackageCategory } from "@/lib/domain/types";
-import type { CatalogItem, Validity } from "@/lib/catalog/packages";
-import { VALIDITIES } from "@/lib/catalog/packages";
+import type { CatalogItem, Validity, ValidityUnit } from "@/lib/catalog/packages";
+import { legacyValidityText, validityFromRow } from "@/lib/catalog/packages";
 
-/** The snapshot columns as they come off a `charges` row (all nullable = legacy). */
+/**
+ * The snapshot columns as they come off a `charges` row (all nullable = legacy).
+ * `validity` is the DEAD legacy free-text column; `validityAmount`/`validityUnit` are
+ * the structured pair (2026-07-23). A snapshot "has a validity" if EITHER is present.
+ */
 export interface ChargeTermsSnapshot {
   hours: number | null;
   validity: string | null;
+  validityAmount: number | null;
+  validityUnit: string | null;
   category: PackageCategory | null;
-}
-
-/** Narrow a stored free-text validity, failing safe to a 1-month window. */
-function asValidity(v: string): Validity {
-  return (VALIDITIES as readonly string[]).includes(v) ? (v as Validity) : "one_month";
 }
 
 /**
@@ -54,27 +55,45 @@ function asValidity(v: string): Validity {
  * 1+1 trial promo keys off the literal "drop" (lib/credits/creditPackage.ts) and
  * `packages.type` must keep resolving through `getCatalogItem`.
  *
- * A snapshot counts only when ALL THREE columns are present — a half-written row
- * would silently mix paid-for terms with current ones, so it is treated as legacy.
+ * A snapshot counts only when hours + category are present AND the row carries a
+ * validity (structured columns OR the legacy text). A half-written row would silently
+ * mix paid-for terms with current ones, so it is treated as legacy (fall back to live).
  */
 export function itemForCredit(live: CatalogItem, snapshot: ChargeTermsSnapshot): CatalogItem {
-  const complete =
-    snapshot.hours !== null && snapshot.validity !== null && snapshot.category !== null;
+  const hasValidity =
+    (snapshot.validityAmount !== null && snapshot.validityUnit !== null) ||
+    snapshot.validity !== null;
+  const complete = snapshot.hours !== null && snapshot.category !== null && hasValidity;
   if (!complete) return live; // legacy row — pre-snapshot behaviour, see the header
 
   return {
     ...live,
     hours: snapshot.hours!,
-    validity: asValidity(snapshot.validity!),
+    validity: validityFromRow(snapshot.validityAmount, snapshot.validityUnit, snapshot.validity),
     category: snapshot.category!,
   };
 }
 
-/** The snapshot to WRITE when opening a charge for `item` — one place, all sites. */
+/**
+ * The snapshot to WRITE when opening a charge for `item` — one place, all sites.
+ * Writes BOTH the structured pair AND the legacy text (so a downstream reader that
+ * only knows the old column still resolves the terms).
+ */
 export function termsSnapshotFor(item: CatalogItem): {
   hours: number;
-  validity: Validity;
+  validity: string;
+  validityAmount: number;
+  validityUnit: ValidityUnit;
   category: PackageCategory;
 } {
-  return { hours: item.hours, validity: item.validity, category: item.category };
+  return {
+    hours: item.hours,
+    validity: legacyValidityText(item.validity),
+    validityAmount: item.validity.amount,
+    validityUnit: item.validity.unit,
+    category: item.category,
+  };
 }
+
+// Re-exported for callers that build a snapshot object directly (kept for parity).
+export type { Validity };

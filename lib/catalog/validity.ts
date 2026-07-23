@@ -1,32 +1,28 @@
 // Pure validity → expiry mapping. The single place a package's lifetime is
 // computed, so purchase crediting and any future renewal logic can never drift.
 //
-// Per the 2026-06-17 decision (see CLAUDE.md §1 pricing): drop-in / single-visit
-// packs still need a window to use their one credit, so they get 1 month.
+// Validity is a STRUCTURED amount + unit (2026-07-23): the owner grants any positive
+// whole number of days or months. Months use UTC calendar-month arithmetic (the
+// deterministic, never-shortens direction); days add exact 24h multiples.
 //
 // Side-effect-free and clock-injectable for unit tests (tests/catalog.test.ts).
 
-import type { Validity } from "./packages";
-
-/** Whole-month window each validity grants, measured from the purchase instant. */
-const VALIDITY_MONTHS: Record<Validity, number> = {
-  single_visit: 1,
-  one_month: 1,
-  two_months: 2,
-  three_months: 3,
-};
+import type { ValidityUnit } from "./packages";
 
 /**
- * The `expires_at` a package bought at `now` should carry, given its `validity`.
+ * The `expires_at` a package bought at `now` should carry, given its validity.
  *
- * Adds whole calendar months to `now`. Uses UTC month arithmetic so the result
- * is deterministic and DST-independent; month overflow (e.g. Jan 31 + 1mo) is
- * handled by JS Date normalisation (rolls into the following month), which is the
- * safe, never-shortens direction for an expiry.
+ * - `month`: adds `amount` whole calendar months via UTC month arithmetic. Month
+ *   overflow (e.g. Jan 31 + 1mo) is normalised forward by JS Date (rolls into the
+ *   following month), the safe never-shortens direction for an expiry.
+ * - `day`: adds `amount × 24h` exactly (DST-independent — the studio is UTC+7, no DST).
  */
-export function expiryFromValidity(validity: Validity, now: Date): Date {
-  const months = VALIDITY_MONTHS[validity];
+export function expiryFromValidity(amount: number, unit: ValidityUnit, now: Date): Date {
   const d = new Date(now.getTime());
-  d.setUTCMonth(d.getUTCMonth() + months);
+  if (unit === "day") {
+    d.setTime(d.getTime() + amount * 24 * 3_600_000);
+    return d;
+  }
+  d.setUTCMonth(d.getUTCMonth() + amount);
   return d;
 }

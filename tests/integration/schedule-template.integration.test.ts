@@ -240,7 +240,7 @@ describe.skipIf(!HAS_DB)("schedule template (integration · requires DATABASE_UR
 
       // Re-running is idempotent (0 created) → NO further event.
       const again = await generateWeekFromBaseline({ weekStart: weekStart.toISOString() });
-      expect(again).toEqual({ ok: true, created: 0 });
+      expect(again).toEqual({ ok: true, created: 0, skippedConflicts: 0 });
       expect(events.length).toBe(1);
     } finally {
       off();
