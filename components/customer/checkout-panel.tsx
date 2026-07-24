@@ -47,9 +47,7 @@ import {
   Clock,
   Info,
   Qr,
-  Share,
   Sparkle,
-  Pin,
   Upload,
   ImageIcon,
 } from "./icons";
@@ -516,34 +514,6 @@ export function CheckoutPanel({ catalog, isMember, house }: CheckoutPanelProps) 
           <span>{t("non_transfer_note")}</span>
         </div>
 
-        {/* member sharing perk */}
-        <div
-          className="relative mt-4 overflow-hidden rounded-lune border border-line px-[18px] py-[18px]"
-          style={{ background: "linear-gradient(150deg, var(--color-cream-2), var(--color-surface))" }}
-        >
-          <Sparkle
-            size={90}
-            className="absolute -bottom-5 -right-4"
-            style={{ color: "rgba(140,122,99,0.06)" }}
-          />
-          <div className="mb-2 flex items-center gap-2">
-            <Share size={18} className="text-taupe-deep" />
-            <span className="font-head text-[17px] font-semibold text-ink">
-              {t("member_perk_title")}
-            </span>
-          </div>
-          <p className="m-0 font-body text-[13px] leading-[1.58] text-ink-soft">
-            {t("member_perk_body")}
-          </p>
-          {isMember && house && (
-            <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-2 px-3 py-1.5">
-              <Pin size={14} className="text-taupe" />
-              <span className="font-body text-[12px] font-semibold text-ink-soft">
-                {t("house_label")} {house}
-              </span>
-            </div>
-          )}
-        </div>
       </div>
 
       {/* sticky checkout bar */}

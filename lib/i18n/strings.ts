@@ -340,8 +340,8 @@ export const STR = {
   popular: { en: "Most popular", th: "ยอดนิยม" },
   non_transfer: { en: "Non-transferable", th: "โอนสิทธิ์ไม่ได้" },
   non_transfer_note: {
-    en: "Hours are non-transferable (except member household sharing)",
-    th: "ชั่วโมงในแพ็กเกจโอนสิทธิ์ไม่ได้ (ยกเว้นการแบ่งปันสำหรับสมาชิก)",
+    en: "Hours are non-transferable",
+    th: "ชั่วโมงในแพ็กเกจโอนสิทธิ์ไม่ได้",
   },
   member_perk_title: {
     en: "Member benefit · Sharable hours",
