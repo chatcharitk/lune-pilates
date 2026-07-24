@@ -1,8 +1,9 @@
 # LUNE Pilates — Deploy Runbook
 
 How to stand up the app on a fresh environment (Vercel + Neon). v1 ships the core
-for real; LINE login, LINE messaging, and PromptPay are **mocked behind interfaces**
-(see CLAUDE.md §2) and are swapped for real providers post-v1.
+for real. LINE login and messaging, and PromptPay QR generation, are **mockable
+behind interfaces** (see CLAUDE.md §2) — real PromptPay QR generation is now
+available (§5b; still no automatic payment *verification*, see there).
 
 ---
 
@@ -14,7 +15,8 @@ Copy `.env.example` → `.env` (local) or set these in the Vercel project. Requi
 |-----|----------|-------|
 | `DATABASE_URL` | **yes** | Neon **pooled** connection string (`…-pooler.…neon.tech`). The credit ledger uses interactive transactions over the WebSocket `Pool` driver — the pooled URL is mandatory. |
 | `CRON_SECRET` | **yes (prod)** | Shared secret for `/api/cron/waitlist-sweep`. The route **fails closed (503)** if unset. Set it in Vercel and Vercel Cron sends it as `Authorization: Bearer <secret>` automatically. |
-| `PAYMENTS_MODE` | no | `mock` (default) or `live`. `live` **throws at construction** until a real PromptPay provider is wired — production can never silently run on the always-paid mock. |
+| `PAYMENTS_MODE` | no | `mock` (default) or `live`. **`live` = a real, scannable PromptPay QR** against `PROMPTPAY_ID` — see §5b. Throws at construction if `PROMPTPAY_ID` is missing/malformed (fail closed). |
+| `PROMPTPAY_ID` | **yes when `PAYMENTS_MODE=live`** | The studio's PromptPay proxy: a 10-digit mobile number, 13-digit national/tax ID, or 15-digit e-Wallet ID. This is a real financial identifier — set it directly in Vercel, never commit it. |
 | `LINE_MODE` | no | `mock` (default) or `live`. Same fail-closed behavior. |
 | `STORAGE_MODE` | no | `mock` (default), `blob`, or `r2`. The slip-image store for PromptPay verification. `mock` persists the slip as a base64 data-URL in the DB; `blob` uses **Vercel Blob** and `r2` uses **Cloudflare R2** — for both, slip bytes live in the object store (not the DB) and are served only server-side via the owner-gated `getSlip`, so the PII image never reaches the client. Any other value **throws** (fail closed). |
 | `BLOB_READ_WRITE_TOKEN` | only if `STORAGE_MODE=blob` | Vercel Blob read/write token. Auto-injected by Vercel when you create a Blob store; set manually only for local `blob` testing. Construction throws if `STORAGE_MODE=blob` and this is missing. |
@@ -94,15 +96,54 @@ npm run build            # next build
       in plaintext on disk. It is gitignored, but rotate it before launch as a precaution
       and keep only `.env.example` (placeholders) in the repo.
 - [ ] Set `CRON_SECRET` (random, ≥32 chars) in Vercel; confirm the cron runs (check logs).
-- [ ] Confirm `PAYMENTS_MODE`/`LINE_MODE` are `mock` for v1 (they fail closed otherwise).
+- [ ] Confirm `LINE_MODE` is `mock` or ready for `live` per its own rollout.
+- [ ] **Enable real PromptPay QR generation:** set `PAYMENTS_MODE=live` and `PROMPTPAY_ID`
+      (see §5b). Until this is done, checkout renders the `MOCKPROMPTPAY` placeholder.
 - [ ] Decide `ADMIN_AUTH`: keep the mock only behind a locked-down URL, or wire a real
       staff provider in `lib/auth/admin.ts` before the admin app is publicly reachable.
 - [ ] (Pro plan) verify sub-daily cron is permitted; otherwise rely on lazy expiry +
       a manual/external sweep.
+
+## 5b. Real PromptPay QR (PAYMENTS_MODE=live)
+
+Generates an authentic, scannable PromptPay QR against the studio's own account —
+no bank/gateway integration is needed for this part: a PromptPay QR is an
+offline-computable EMVCo standard (`lib/payments/promptpay.ts`), not an API call.
+Verified during development against a real bank-issued QR (the CRC-16 this app
+computes matches the one a real banking app computed for the same account, byte
+for byte — see `tests/promptpay-payload.test.ts`).
+
+To turn it on:
+
+1. Set `PAYMENTS_MODE=live` and `PROMPTPAY_ID` (the studio's mobile number,
+   national/tax ID, or e-Wallet ID) in the environment.
+2. Deploy. `/buy` and the admin POS PromptPay path now render a real, amount-locked
+   QR instead of the `MOCKPROMPTPAY` placeholder.
+
+**What this does NOT do — read before enabling:** it does not verify payment.
+There is no bank webhook or payment-gateway API wired (a real one — Omise, GB Prime
+Pay, 2C2P, a bank merchant API — needs merchant onboarding, KYC, and per-transaction
+fees; explicitly out of v1 scope). Two flows use PromptPay, and only one depends on
+this distinction:
+
+- **Customer self-checkout** (`/buy`) is unaffected either way — its money gate is
+  the customer's uploaded transfer slip + admin photo review (Feature 3), which
+  never asks the payment provider whether a charge is "paid".
+- **Admin POS PromptPay** (a walk-in sale) has the front desk press **Confirm**
+  after visually checking the transfer landed in the studio's own banking app —
+  the same trust level as a cash sale (also credited on the front desk's word,
+  with no independent verification). `lib/payments/real.ts` documents this
+  explicitly: `getStatus()` always resolves "paid" because there is no gateway to
+  ask, and that is a deliberate, reviewed trade-off, not an oversight.
+
+If a real payment gateway is integrated later, replace `getStatus()` in
+`lib/payments/real.ts` with a genuine webhook/API check.
 
 ## 6. Post-v1 integration swaps (out of v1 scope)
 
 Each is a one-file swap behind its interface — no business-logic change:
 - **LINE LIFF login** → replace the mock identity in `lib/auth/session.ts`.
 - **LINE Messaging** → implement the `live` branch in `lib/line/index.ts`.
-- **PromptPay** → implement the `live` branch in `lib/payments/index.ts`.
+- **A real PromptPay payment gateway** (automatic payment verification, replacing
+  the manual confirm described in §5b) → replace `getStatus()` in
+  `lib/payments/real.ts` with a genuine webhook/API integration.

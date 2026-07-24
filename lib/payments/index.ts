@@ -1,32 +1,35 @@
 import type { PaymentProvider } from "./types";
 import { MockPaymentProvider } from "./mock";
+import { RealPromptPayProvider } from "./real";
 
 let _payments: PaymentProvider | null = null;
 
 /**
- * Resolve the payment provider by `PAYMENTS_MODE` (CLAUDE.md §2 — PromptPay is
- * mocked in v1 behind a clean interface).
+ * Resolve the payment provider by `PAYMENTS_MODE` (CLAUDE.md §2 — the mockable
+ * adapter boundary).
  *
- * Fails CLOSED (security finding S1): the mock's `getStatus()` reports "paid"
- * unconditionally — correct for v1 dev, but a production operator who flips
- * `PAYMENTS_MODE=live` must NOT silently keep running on the always-paid mock and
- * grant credits for unpaid PromptPay. There is no real provider wired yet, so any
- * non-"mock" value throws at construction rather than degrading to the mock.
- *
- *   - unset / "mock" → the v1 mock (default for dev).
- *   - "live" (or any other value) → throw; wire the real PromptPay provider here.
+ *   - unset / "mock" → the v1 mock: a fake QR payload and an always-"paid" status.
+ *   - "live"         → `RealPromptPayProvider` — a REAL, scannable PromptPay QR
+ *     against `PROMPTPAY_ID` (no bank/gateway integration; QR generation is an
+ *     offline standard, see lib/payments/promptpay.ts). Its `getStatus()` still
+ *     always resolves "paid" — a deliberate, documented trade-off (there is no
+ *     payment gateway to ask), not a silent gap: see the class-level doc in
+ *     lib/payments/real.ts for exactly why that is safe (the only caller is an
+ *     owner-gated, front-desk-triggered action; the customer flow's real money
+ *     gate is slip upload + admin review and never calls this).
+ *   - anything else → throws at construction (fail closed — a typo in the env
+ *     var must never silently fall back to the always-paid mock in production).
  */
 export function getPaymentProvider(): PaymentProvider {
   if (!_payments) {
     const mode = process.env.PAYMENTS_MODE ?? "mock";
-    if (mode !== "mock") {
-      // When a real PromptPay provider is wired, construct it for "live" here.
-      throw new Error(
-        `PAYMENTS_MODE=${mode} but no live PromptPay provider is configured. ` +
-          `Set PAYMENTS_MODE=mock for v1, or wire a real provider in lib/payments/index.ts.`,
-      );
+    if (mode === "mock") {
+      _payments = new MockPaymentProvider();
+    } else if (mode === "live") {
+      _payments = new RealPromptPayProvider();
+    } else {
+      throw new Error(`Unknown PAYMENTS_MODE="${mode}". Use "mock" or "live".`);
     }
-    _payments = new MockPaymentProvider();
   }
   return _payments;
 }
