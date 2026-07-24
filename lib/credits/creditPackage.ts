@@ -67,22 +67,25 @@ export function ownerForPool(ctx: PoolOwnerContext): CreditOwner {
 }
 
 /**
- * The catalog item whose FIRST-EVER paid purchase triggers the 1+1 trial promo
- * (the ฿650 1-hour group drop-in), and the bonus hours it grants. A single tunable
- * pair — no schema change to adjust (creditLedger.reason is free TEXT).
+ * The catalog item the 1+1 trial promo was keyed to (the ฿650 1-hour group
+ * drop-in) and the bonus hours it granted, kept for a future re-enable — no
+ * schema change needed to turn it back on (creditLedger.reason is free TEXT).
  */
 const PROMO_ITEM_ID = "drop";
 const PROMO_BONUS_HOURS = 1;
 
 /**
- * The 1+1 promo rule, pure: bonus hours granted for buying `itemId` given whether
- * the customer has ANY prior paid purchase. Exactly the drop-in on a first-ever
- * purchase earns the free trial hour; everything else earns 0. Kept pure (no I/O)
- * so it is unit-testable; `creditPackage` feeds it the in-transaction
- * `hasPriorPaidCharge` answer.
+ * The 1+1 trial promo is DISABLED (owner decision, 2026-07-25) — every purchase
+ * grants exactly the catalog item's hours, nothing extra. Always returns 0.
+ *
+ * Kept as the single call site rather than deleted so re-enabling is a one-line
+ * revert (`return itemId === PROMO_ITEM_ID && !hasPriorPaidPurchase ? PROMO_BONUS_HOURS : 0`)
+ * with no schema or call-site changes. `hasPriorPaidPurchase` is unused while
+ * disabled; the call site below skips computing it entirely so a disabled promo
+ * costs no extra DB read.
  */
-export function promoBonusHours(itemId: string, hasPriorPaidPurchase: boolean): number {
-  return itemId === PROMO_ITEM_ID && !hasPriorPaidPurchase ? PROMO_BONUS_HOURS : 0;
+export function promoBonusHours(_itemId: string, _hasPriorPaidPurchase: boolean): number {
+  return 0;
 }
 
 /** The result of crediting a paid charge — what both flows return for a receipt. */
@@ -226,14 +229,10 @@ export async function creditPackage(params: {
         };
       }
 
-      // 1+1 first-purchase promo (IN-TX, before the insert): a first-ever paid
-      // purchase of the group drop-in is born with one extra free trial hour. The
-      // prior-purchase query only runs for the promo item (short-circuit — every
-      // other purchase skips the extra read).
-      const bonusHours =
-        item.id === PROMO_ITEM_ID
-          ? promoBonusHours(item.id, await hasPriorPaidCharge(tx, actorUserId, chargeId))
-          : 0;
+      // The 1+1 first-purchase promo is disabled (promoBonusHours always returns 0
+      // — see its doc comment for the one-line re-enable). Skip the
+      // hasPriorPaidCharge read entirely while disabled; no purchase needs it.
+      const bonusHours = promoBonusHours(item.id, false);
       const hoursGranted = item.hours + bonusHours;
 
       const expiresAt = expiryFromValidity(item.validity.amount, item.validity.unit, now);

@@ -84,17 +84,17 @@ describe("evaluateCancellation (fixed 6h free window)", () => {
   });
 });
 
-describe("promoBonusHours (first-purchase 1+1 trial promo)", () => {
-  it("first-ever paid purchase of the group drop-in earns the +1 bonus", () => {
-    expect(promoBonusHours("drop", false)).toBe(1);
+describe("promoBonusHours (1+1 trial promo — DISABLED, owner decision 2026-07-25)", () => {
+  it("a first-ever paid purchase of the group drop-in earns NO bonus (promo off)", () => {
+    expect(promoBonusHours("drop", false)).toBe(0);
   });
 
   it("a repeat buyer of the drop-in earns nothing", () => {
     expect(promoBonusHours("drop", true)).toBe(0);
   });
 
-  it("no other catalog item earns the bonus, even on a first purchase", () => {
-    for (const id of ["p5", "p10", "p15", "pv-drop", "pv8", "duo-drop", "trio8", "r-solo"]) {
+  it("no catalog item earns a bonus, on a first purchase or otherwise", () => {
+    for (const id of ["drop", "p5", "p10", "p15", "pv-drop", "pv8", "duo-drop", "trio8", "r-solo"]) {
       expect(promoBonusHours(id, false)).toBe(0);
       expect(promoBonusHours(id, true)).toBe(0);
     }

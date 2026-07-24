@@ -1,25 +1,24 @@
-// DB-backed integration tests for the FIRST-TIME BUYER 1+1 PROMO (decided
-// 2026-07-07): when a customer's FIRST-EVER paid purchase is the 1-hour group
-// drop-in (catalog id "drop", ฿650), the package is born with ONE extra free trial
-// hour — hours_total = hours_left = 2, carried by TWO ledger rows (+1 "purchase"
-// AND +1 "promo") so the ledger stays the source of truth (sum of deltas ==
-// hours_total, CLAUDE.md §5 inv 1/2).
+// DB-backed integration tests for the FIRST-TIME BUYER 1+1 PROMO mechanism
+// (introduced 2026-07-07, DISABLED by owner decision 2026-07-25 — see
+// lib/credits/creditPackage.ts `promoBonusHours`, which now always returns 0).
 //
-// The rule lives INSIDE creditPackage's transaction (lib/credits/creditPackage.ts):
-// eligibility = item.id === "drop" AND no OTHER paid charge exists for the recipient
-// (charges.status = 'paid', userId = actorUserId, chargeId ≠ this one). This suite
-// pins the four behavioral corners against a real DB:
+// The promo previously granted an extra free trial hour on a first-ever paid
+// purchase of the 1-hour group drop-in (catalog id "drop", ฿650). With it
+// disabled, every purchase of any item grants EXACTLY its catalog hours —
+// nothing extra, regardless of purchase history. This suite now pins that
+// disabled reality against a real DB (rather than testing the dead promo path),
+// while still exercising the same atomic-credit/ledger machinery the promo used
+// to run through, so the transaction/idempotency coverage isn't lost:
 //
-//   1. first paid "drop"  → hoursAdded 2, package 2/2, +1 purchase AND +1 promo rows,
-//      charge flipped to "paid";
-//   2. SECOND "drop" by the same user → hoursAdded 1, package 1/1, NO promo row;
-//   3. first purchase of "p10" → 10 hours, NO promo (drop-in only);
-//   4. idempotent replay of the promo charge → created:false, hoursAdded 2 (the REAL
-//      total granted, read back from hours_total — never a recomputed item.hours),
-//      and still exactly one promo row / no double-credit.
-//
-// Tests 2 and 4 intentionally run AFTER test 1 on the same fixture user (vitest runs
-// a file's tests sequentially) — that IS the scenario: a prior paid charge exists.
+//   1. first paid "drop"  → hoursAdded 1, package 1/1, ONE "purchase" ledger row,
+//      NO "promo" row, charge flipped to "paid";
+//   2. SECOND "drop" by the same user → still hoursAdded 1, still NO promo row
+//      (repeat-purchase behavior is unaffected by the promo being off);
+//   3. first purchase of "p10" → 10 hours, NO promo (never applied to non-drop
+//      items either way);
+//   4. idempotent replay of test 1's charge → created:false, hoursAdded still 1
+//      (the REAL total granted, read back from hours_total), and still exactly
+//      one purchase row / no double-credit.
 //
 // Gated on DATABASE_URL (loaded by setup-env.ts); skips under the no-DB `npm test`.
 // Fixtures are per-run tagged and torn down FK-safely in afterAll (ledger → packages
@@ -40,20 +39,20 @@ import { getCatalogItem, type CatalogItem } from "@/lib/catalog/packages";
 
 const HAS_DB = !!process.env.DATABASE_URL;
 
-describe.skipIf(!HAS_DB)("first-purchase 1+1 trial promo (integration · requires DATABASE_URL)", () => {
+describe.skipIf(!HAS_DB)("first-purchase 1+1 trial promo — DISABLED (integration · requires DATABASE_URL)", () => {
   const run = `promo_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
   // DB-backed catalog: resolved async in beforeAll (see drizzle/0001_catalog_items.sql).
-  let drop: CatalogItem; // ฿650 · 1h group drop-in — THE promo item (id "drop")
+  let drop: CatalogItem; // ฿650 · 1h group drop-in — the item the promo USED to key off
   let p10: CatalogItem; // 10h group pack — a non-promo control
 
   // Two throwaway GUESTS (owner = user_id satisfies the single-owner XOR): one walks
-  // the drop-in promo journey (tests 1/2/4), one buys p10 first (test 3).
+  // the drop-in journey (tests 1/2/4), one buys p10 first (test 3).
   let buyerId: string; // first-ever purchase = "drop"
   let packBuyerId: string; // first-ever purchase = "p10"
   const userIds: string[] = [];
 
-  // The promo charge from test 1, replayed in test 4.
-  let promoChargeId: string;
+  // The charge from test 1, replayed in test 4.
+  let firstDropChargeId: string;
 
   const ownerOf = (userId: string) => ({ ownerHouseholdId: null, ownerUserId: userId });
 
@@ -81,7 +80,7 @@ describe.skipIf(!HAS_DB)("first-purchase 1+1 trial promo (integration · require
   const packagesForCharge = (chargeId: string) =>
     getDb().select().from(packages).where(eq(packages.purchaseChargeId, chargeId));
 
-  /** ALL ledger rows for a package, oldest-first — promo assertions read the full set. */
+  /** ALL ledger rows for a package, oldest-first — assertions read the full set. */
   const ledgerFor = (packageId: string) =>
     getDb()
       .select()
@@ -136,43 +135,39 @@ describe.skipIf(!HAS_DB)("first-purchase 1+1 trial promo (integration · require
     }
   });
 
-  it("FIRST paid 'drop' purchase: born 2/2 with +1 purchase AND +1 promo ledger rows", async () => {
-    promoChargeId = await mintPendingCharge(buyerId, drop, "first_drop");
+  it("FIRST paid 'drop' purchase: 1/1, ONE purchase ledger row, NO promo row (promo disabled)", async () => {
+    firstDropChargeId = await mintPendingCharge(buyerId, drop, "first_drop");
 
     const outcome = await creditPackage({
-      chargeId: promoChargeId,
+      chargeId: firstDropChargeId,
       item: drop,
       owner: ownerOf(buyerId),
       actorUserId: buyerId,
     });
 
     expect(outcome.created).toBe(true);
-    expect(outcome.hoursAdded).toBe(2); // the REAL grant: 1 bought + 1 promo
-    expect(outcome.hoursLeft).toBe(2);
+    expect(outcome.hoursAdded).toBe(1); // no bonus — the promo is off
+    expect(outcome.hoursLeft).toBe(1);
 
-    const pkgs = await packagesForCharge(promoChargeId);
+    const pkgs = await packagesForCharge(firstDropChargeId);
     expect(pkgs).toHaveLength(1);
-    expect(pkgs[0]!.hoursTotal).toBe(2);
-    expect(pkgs[0]!.hoursLeft).toBe(2);
+    expect(pkgs[0]!.hoursTotal).toBe(1);
+    expect(pkgs[0]!.hoursLeft).toBe(1);
 
-    // Ledger is the source of truth: exactly one +1 "purchase" and one +1 "promo",
-    // and the deltas sum to hours_total (invariant 1/2 reconciliation).
+    // Ledger is the source of truth: exactly one +1 "purchase" row, no "promo" row,
+    // and the delta sums to hours_total (invariant 1/2 reconciliation).
     const rows = await ledgerFor(pkgs[0]!.id);
-    expect(rows).toHaveLength(2);
-    const purchase = rows.filter((r) => r.reason === "purchase");
-    const promo = rows.filter((r) => r.reason === "promo");
-    expect(purchase).toHaveLength(1);
-    expect(purchase[0]!.delta).toBe(drop.hours);
-    expect(promo).toHaveLength(1);
-    expect(promo[0]!.delta).toBe(1);
-    expect(promo[0]!.actorUserId).toBe(buyerId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.reason).toBe("purchase");
+    expect(rows[0]!.delta).toBe(drop.hours);
+    expect(rows.filter((r) => r.reason === "promo")).toHaveLength(0);
     expect(rows.reduce((sum, r) => sum + r.delta, 0)).toBe(pkgs[0]!.hoursTotal);
 
     // The charge flipped to "paid" in the same transaction.
-    expect(await chargeStatus(promoChargeId)).toBe("paid");
+    expect(await chargeStatus(firstDropChargeId)).toBe("paid");
   });
 
-  it("SECOND 'drop' purchase by the same user: 1/1, hoursAdded 1, NO promo row", async () => {
+  it("SECOND 'drop' purchase by the same user: still 1/1, hoursAdded 1, NO promo row", async () => {
     const chargeId = await mintPendingCharge(buyerId, drop, "second_drop");
 
     const outcome = await creditPackage({
@@ -183,7 +178,7 @@ describe.skipIf(!HAS_DB)("first-purchase 1+1 trial promo (integration · require
     });
 
     expect(outcome.created).toBe(true);
-    expect(outcome.hoursAdded).toBe(1); // no bonus — a paid charge already exists
+    expect(outcome.hoursAdded).toBe(1);
     expect(outcome.hoursLeft).toBe(1);
 
     const pkgs = await packagesForCharge(chargeId);
@@ -197,7 +192,7 @@ describe.skipIf(!HAS_DB)("first-purchase 1+1 trial promo (integration · require
     expect(rows[0]!.delta).toBe(drop.hours);
   });
 
-  it("FIRST purchase of 'p10': 10 hours, NO promo (the bonus is drop-in only)", async () => {
+  it("FIRST purchase of 'p10': 10 hours, NO promo (never applied to non-drop items)", async () => {
     const chargeId = await mintPendingCharge(packBuyerId, p10, "first_p10");
 
     const outcome = await creditPackage({
@@ -221,11 +216,11 @@ describe.skipIf(!HAS_DB)("first-purchase 1+1 trial promo (integration · require
     expect(rows[0]!.delta).toBe(p10.hours);
   });
 
-  it("IDEMPOTENT REPLAY of the promo charge: created:false, hoursAdded still 2", async () => {
-    expect(promoChargeId).toBeTruthy(); // set by test 1 (sequential in-file order)
+  it("IDEMPOTENT REPLAY of test 1's charge: created:false, hoursAdded still 1", async () => {
+    expect(firstDropChargeId).toBeTruthy(); // set by test 1 (sequential in-file order)
 
     const replay = await creditPackage({
-      chargeId: promoChargeId,
+      chargeId: firstDropChargeId,
       item: drop,
       owner: ownerOf(buyerId),
       actorUserId: buyerId,
@@ -233,15 +228,15 @@ describe.skipIf(!HAS_DB)("first-purchase 1+1 trial promo (integration · require
 
     expect(replay.created).toBe(false);
     // The replay reports the REAL total the charge granted (from hours_total), not
-    // a recomputed item.hours — the receipt stays truthful about the promo.
-    expect(replay.hoursAdded).toBe(2);
-    expect(replay.hoursLeft).toBe(2); // balance NOT doubled by the repeat
+    // a recomputed item.hours.
+    expect(replay.hoursAdded).toBe(1);
+    expect(replay.hoursLeft).toBe(1); // balance NOT doubled by the repeat
 
-    // Still exactly one package, one purchase row, one promo row.
-    const pkgs = await packagesForCharge(promoChargeId);
+    // Still exactly one package, one purchase row, no promo row.
+    const pkgs = await packagesForCharge(firstDropChargeId);
     expect(pkgs).toHaveLength(1);
     const rows = await ledgerFor(pkgs[0]!.id);
-    expect(rows).toHaveLength(2);
-    expect(rows.filter((r) => r.reason === "promo")).toHaveLength(1);
+    expect(rows).toHaveLength(1);
+    expect(rows.filter((r) => r.reason === "promo")).toHaveLength(0);
   });
 });

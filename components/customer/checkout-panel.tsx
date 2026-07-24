@@ -480,34 +480,6 @@ export function CheckoutPanel({ catalog, isMember, house }: CheckoutPanelProps) 
           </div>
         </div>
 
-        {/* trial promo — group only */}
-        {catId === "group" && (
-          <div className="relative mt-4 flex items-center gap-3.5 overflow-hidden rounded-lune bg-ink px-[18px] py-4">
-            <Sparkle
-              size={84}
-              className="absolute -right-3 -top-4"
-              style={{ color: "rgba(201,184,158,0.12)" }}
-            />
-            <span
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-xl"
-              style={{ background: "rgba(201,184,158,0.16)" }}
-            >
-              <Sparkle size={22} style={{ color: "#C9B89E" }} />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="font-head text-[17px] font-semibold" style={{ color: "#F3ECE2" }}>
-                {t("trial_title")}
-              </div>
-              <p
-                className="m-0 mt-[3px] font-body text-[12.5px] leading-[1.5]"
-                style={{ color: "rgba(243,236,226,0.7)" }}
-              >
-                {t("trial_body")}
-              </p>
-            </div>
-          </div>
-        )}
-
         {/* shared non-transferable note */}
         <div className="mt-3.5 flex items-center gap-[7px] px-1 font-body text-[12px] text-muted">
           <Info size={13} className="shrink-0" />
