@@ -9,11 +9,12 @@
 // NO draft→publish ceremony (owner request 2026-07-04, "remove เผยแพร่สัปดาห์"):
 // classes go LIVE the moment they are created. createClass and
 // generateWeekFromBaseline insert instances born `published`, stamped
-// published_at = members_visible_at = now and public_visible_at =
-// computePublicVisibleAt(starts_at, type) (invariant 4 holds on this auto-publish
-// path), and each emits exactly ONE `schedule.published` broadcast event per call
-// that created ≥ 1 instance. publishWeek remains only as the cleanup path for any
-// pre-existing drafts — the UI no longer calls it.
+// published_at = now and members_visible_at / public_visible_at from the
+// owner-configurable visibility-window map (lib/schedule/visibilityWindows.ts —
+// starts_at − memberLeadHours / − guestLeadHours per type, invariant 4 holds on
+// this auto-publish path), and each emits exactly ONE `schedule.published`
+// broadcast event per call that created ≥ 1 instance. publishWeek remains only
+// as the cleanup path for any pre-existing drafts — the UI no longer calls it.
 //
 // Every action is OWNER-ONLY: gated by `requireOwner()` (lib/auth/admin.ts — v1
 // mock provider, real one swaps in later). An instructor is rejected like unauth
@@ -28,7 +29,8 @@ import { bookings, classInstances, classTemplates, instructors, waitlist } from 
 import { cancelBooking } from "@/lib/credits/debit";
 import type { ClassType } from "@/lib/domain/types";
 import { CAPACITY, effectiveCapacity } from "@/lib/domain/types";
-import { computePublicVisibleAt } from "@/lib/schedule/visibility";
+import { computeVisibleAt } from "@/lib/schedule/visibility";
+import { loadVisibilityWindows, leadHoursForType } from "@/lib/schedule/visibilityWindows";
 import { hasRoomConflict, rentalRoomOverlap } from "@/lib/schedule/rental";
 import { startOfWeekMonday, startsAtFor } from "@/lib/schedule/baseline";
 import { addDays, studioDayFromYmd, studioIsoDow } from "@/lib/time";
@@ -79,9 +81,11 @@ export type CreateClassResult =
 
 /**
  * Add a single class instance to a week — born PUBLISHED (live immediately, no
- * draft→publish ceremony). Stamps published_at = members_visible_at = now and
- * public_visible_at = computePublicVisibleAt(starts_at, type) (invariant 4), then
- * emits ONE `schedule.published` event after the insert. Never touches the baseline.
+ * draft→publish ceremony). Stamps published_at = now, and both
+ * members_visible_at / public_visible_at from the owner-configurable
+ * visibility-window map (starts_at − memberLeadHours / − guestLeadHours,
+ * invariant 4), then emits ONE `schedule.published` event after the insert.
+ * Never touches the baseline.
  */
 export async function createClass(raw: CreateClassInput): Promise<CreateClassResult> {
   if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
@@ -113,6 +117,8 @@ export async function createClass(raw: CreateClassInput): Promise<CreateClassRes
   }
 
   const now = new Date();
+  const windows = await loadVisibilityWindows();
+  const { memberLeadHours, guestLeadHours } = leadHoursForType(windows, input.type);
   const [row] = await db
     .insert(classInstances)
     .values({
@@ -124,8 +130,8 @@ export async function createClass(raw: CreateClassInput): Promise<CreateClassRes
       instructorId,
       status: "published",
       publishedAt: now,
-      membersVisibleAt: now,
-      publicVisibleAt: computePublicVisibleAt(startsAt, input.type),
+      membersVisibleAt: computeVisibleAt(startsAt, memberLeadHours),
+      publicVisibleAt: computeVisibleAt(startsAt, guestLeadHours),
     })
     .returning({ id: classInstances.id });
 
@@ -165,7 +171,8 @@ export type UpdateClassResult = { ok: true } | { ok: false; code: UpdateClassFai
 /**
  * Edit one class instance (keeps its calendar day; only the time-of-day changes).
  * Capacity can't drop below the live booked count. A published class's
- * public-visibility window is recomputed from the new start time.
+ * member AND guest visibility windows are both recomputed from the new start
+ * time/type (owner-configurable per lib/schedule/visibilityWindows.ts).
  */
 export async function updateClass(raw: UpdateClassInput): Promise<UpdateClassResult> {
   if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
@@ -204,6 +211,11 @@ export async function updateClass(raw: UpdateClassInput): Promise<UpdateClassRes
     return { ok: false, code: "ROOM_CONFLICT" };
   }
 
+  // Recompute BOTH visibility timestamps from the (possibly new) start time/type
+  // — a published class's window moves with an edited time or type, for both tiers.
+  const windows = await loadVisibilityWindows();
+  const { memberLeadHours, guestLeadHours } = leadHoursForType(windows, input.type);
+
   await db
     .update(classInstances)
     .set({
@@ -213,9 +225,11 @@ export async function updateClass(raw: UpdateClassInput): Promise<UpdateClassRes
       name: input.name?.trim() || null,
       capacity: cap,
       instructorId,
-      // A published class stays visible to members; only its drop-in window moves.
       ...(existing.status === "published"
-        ? { publicVisibleAt: computePublicVisibleAt(startsAt, input.type) }
+        ? {
+            membersVisibleAt: computeVisibleAt(startsAt, memberLeadHours),
+            publicVisibleAt: computeVisibleAt(startsAt, guestLeadHours),
+          }
         : {}),
     })
     .where(eq(classInstances.id, input.id));
@@ -433,6 +447,10 @@ export async function generateWeekFromBaseline(raw: WeekInput): Promise<Generate
     );
   const present = new Set(existing.map((e) => `${e.startsAt.getTime()}|${e.type}`));
 
+  // Loaded ONCE per call (not per instance in the loop below) — mirrors the
+  // loadCatalogMap convention (lib/catalog/packages.ts).
+  const windows = await loadVisibilityWindows();
+
   const now = new Date();
   const toInsert: (typeof classInstances.$inferInsert)[] = [];
   // Accepted candidates so far, for the in-memory rental room-conflict check between
@@ -458,6 +476,7 @@ export async function generateWeekFromBaseline(raw: WeekInput): Promise<Generate
       }
       accepted.push(candidate);
 
+      const { memberLeadHours, guestLeadHours } = leadHoursForType(windows, slot.type);
       toInsert.push({
         templateId: slot.templateId ?? null,
         startsAt,
@@ -469,8 +488,8 @@ export async function generateWeekFromBaseline(raw: WeekInput): Promise<Generate
         // Born published (live immediately) — invariant 4 stamps per instance.
         status: "published",
         publishedAt: now,
-        membersVisibleAt: now,
-        publicVisibleAt: computePublicVisibleAt(startsAt, slot.type),
+        membersVisibleAt: computeVisibleAt(startsAt, memberLeadHours),
+        publicVisibleAt: computeVisibleAt(startsAt, guestLeadHours),
       });
     }
   }
@@ -517,6 +536,7 @@ export async function publishWeek(raw: WeekInput): Promise<PublishResult> {
 
   const db = getDb();
   const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 3_600_000);
+  const windows = await loadVisibilityWindows();
 
   const published = await db.transaction(async (tx) => {
     const drafts = await tx
@@ -537,15 +557,16 @@ export async function publishWeek(raw: WeekInput): Promise<PublishResult> {
 
     if (drafts.length === 0) return 0;
 
-    // public_visible_at depends on each row's start + type, so flip per row.
+    // Both visible-at timestamps depend on each row's start + type, so flip per row.
     for (const d of drafts) {
+      const { memberLeadHours, guestLeadHours } = leadHoursForType(windows, d.type as ClassType);
       await tx
         .update(classInstances)
         .set({
           status: "published",
           publishedAt: now,
-          membersVisibleAt: now,
-          publicVisibleAt: computePublicVisibleAt(d.startsAt, d.type as ClassType),
+          membersVisibleAt: computeVisibleAt(d.startsAt, memberLeadHours),
+          publicVisibleAt: computeVisibleAt(d.startsAt, guestLeadHours),
         })
         .where(eq(classInstances.id, d.id));
     }

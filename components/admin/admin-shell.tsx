@@ -22,6 +22,7 @@ const MOBILE_OVERFLOW: ReadonlySet<string> = new Set([
   "/admin/instructors",
   "/admin/sales",
   "/admin/packages",
+  "/admin/visibility",
 ]);
 
 interface NavItem {
@@ -121,6 +122,17 @@ const NAV: NavItem[] = [
         <path d="M21 8v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8" />
         <rect x="2" y="4" width="20" height="4" rx="1" />
         <path d="M12 4v16" />
+      </>
+    ),
+  },
+  {
+    href: "/admin/visibility",
+    key: "admin_visibility",
+    ownerOnly: true,
+    icon: (
+      <>
+        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+        <circle cx="12" cy="12" r="3" />
       </>
     ),
   },

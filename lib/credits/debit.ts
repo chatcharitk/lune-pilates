@@ -154,7 +154,12 @@ export async function bookClassWithDebit(
     // client. (status/startsAt are already re-validated just above.)
     if (
       !isBookableForViewer(
-        { status: cls.status, startsAt: cls.startsAt, publicVisibleAt: cls.publicVisibleAt },
+        {
+          status: cls.status,
+          startsAt: cls.startsAt,
+          membersVisibleAt: cls.membersVisibleAt,
+          publicVisibleAt: cls.publicVisibleAt,
+        },
         { tier: input.viewerTier },
         now,
       )
@@ -378,7 +383,12 @@ export async function rescheduleWithinTransaction(
     }
     if (
       !isBookableForViewer(
-        { status: newCls.status, startsAt: newCls.startsAt, publicVisibleAt: newCls.publicVisibleAt },
+        {
+          status: newCls.status,
+          startsAt: newCls.startsAt,
+          membersVisibleAt: newCls.membersVisibleAt,
+          publicVisibleAt: newCls.publicVisibleAt,
+        },
         { tier: input.viewerTier },
         now,
       )

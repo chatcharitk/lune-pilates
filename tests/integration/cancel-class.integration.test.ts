@@ -86,6 +86,8 @@ describe.skipIf(!HAS_DB)("class-level cancel (integration · requires DATABASE_U
         capacity,
         status: "published",
         publishedAt: new Date(),
+        // Members are gated by their OWN window too (CLAUDE.md §5 inv 4).
+        membersVisibleAt: new Date(),
       })
       .returning({ id: classInstances.id });
     classIds.push(c!.id);

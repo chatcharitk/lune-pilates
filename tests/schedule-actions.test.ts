@@ -11,9 +11,10 @@
 //     drafts (auth-gate ordering pinned in tests/admin-auth.test.ts); its no-DB
 //     path publishes 0 and emits nothing.
 //
-// The DB-side guarantee — created/generated instances are `published` with all
-// three stamps (published_at = members_visible_at = now, public_visible_at =
-// computePublicVisibleAt) — lives in the integration suite.
+// The DB-side guarantee — created/generated instances are `published` with
+// published_at = now and BOTH members_visible_at / public_visible_at resolved
+// from the owner-configurable visibility-window map — lives in the
+// integration suite.
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createClass, generateWeekFromBaseline, publishWeek } from "@/app/actions/schedule";

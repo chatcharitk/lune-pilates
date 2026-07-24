@@ -269,6 +269,7 @@ export async function listBookableClasses(args: ListBookableArgs): Promise<Booka
       name: classInstances.name,
       capacity: classInstances.capacity,
       status: classInstances.status,
+      membersVisibleAt: classInstances.membersVisibleAt,
       publicVisibleAt: classInstances.publicVisibleAt,
       instructorId: classInstances.instructorId,
       instructorName: instructors.name,
@@ -290,7 +291,12 @@ export async function listBookableClasses(args: ListBookableArgs): Promise<Booka
   return rows
     .filter((r) =>
       isBookableForViewer(
-        { status: r.status, startsAt: r.startsAt, publicVisibleAt: r.publicVisibleAt },
+        {
+          status: r.status,
+          startsAt: r.startsAt,
+          membersVisibleAt: r.membersVisibleAt,
+          publicVisibleAt: r.publicVisibleAt,
+        },
         args.viewer,
         now,
       ),
@@ -352,6 +358,7 @@ export async function getClassDetail(
         name: classInstances.name,
         capacity: classInstances.capacity,
         status: classInstances.status,
+        membersVisibleAt: classInstances.membersVisibleAt,
         publicVisibleAt: classInstances.publicVisibleAt,
         instructorId: classInstances.instructorId,
         instructorName: instructors.name,
@@ -371,7 +378,12 @@ export async function getClassDetail(
   if (!cls) return null;
   if (
     !isBookableForViewer(
-      { status: cls.status, startsAt: cls.startsAt, publicVisibleAt: cls.publicVisibleAt },
+      {
+        status: cls.status,
+        startsAt: cls.startsAt,
+        membersVisibleAt: cls.membersVisibleAt,
+        publicVisibleAt: cls.publicVisibleAt,
+      },
       viewer,
       now,
     )

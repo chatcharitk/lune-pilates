@@ -160,6 +160,10 @@ describe.skipIf(!HAS_DB)(
           capacity,
           status: "published",
           publishedAt: new Date(),
+          // Members are gated by their OWN window too (CLAUDE.md §5 inv 4) — stamp
+          // it already-past so these fixtures stay visible to the member viewers
+          // these tests use, exactly as createClass would for an immediately-live class.
+          membersVisibleAt: new Date(),
         })
         .returning({ id: classInstances.id });
       classIds.push(c!.id);

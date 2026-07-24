@@ -91,6 +91,7 @@ export async function joinWaitlist(raw: JoinWaitlistInput): Promise<JoinWaitlist
         capacity: classInstances.capacity,
         status: classInstances.status,
         startsAt: classInstances.startsAt,
+        membersVisibleAt: classInstances.membersVisibleAt,
         publicVisibleAt: classInstances.publicVisibleAt,
       })
       .from(classInstances)
@@ -115,7 +116,12 @@ export async function joinWaitlist(raw: JoinWaitlistInput): Promise<JoinWaitlist
     // server-side from the session, never the client.
     if (
       !isBookableForViewer(
-        { status: cls.status, startsAt: cls.startsAt, publicVisibleAt: cls.publicVisibleAt },
+        {
+          status: cls.status,
+          startsAt: cls.startsAt,
+          membersVisibleAt: cls.membersVisibleAt,
+          publicVisibleAt: cls.publicVisibleAt,
+        },
         { tier: viewer.tier },
         now,
       )

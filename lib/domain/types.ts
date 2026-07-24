@@ -61,20 +61,5 @@ export const FREE_CANCEL_HOURS = 6;
 /** Waitlist confirm hold, in minutes, once a freed seat is offered. */
 export const WAITLIST_HOLD_MINUTES = 30;
 
-/**
- * Default lead, in hours, before `starts_at` at which guests (non-members) can
- * first see/book a published class. `public_visible_at = starts_at − N`.
- * Tunable per class type without a schema change.
- */
-export const DEFAULT_PUBLIC_LEAD_HOURS: Record<ClassType, number> = {
-  group: 24,
-  private: 24,
-  duo: 24,
-  trio: 24,
-  // Rentals open to all viewers up to 14 days (336h) before start — a far longer
-  // booking horizon than studio-led classes (CLAUDE.md §5, decided 2026-06-28).
-  rental: 336,
-};
-
 export const STUDIO_OPEN_HOUR = 8; // 08:00
 export const STUDIO_CLOSE_HOUR = 20; // 20:00

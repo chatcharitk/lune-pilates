@@ -19,7 +19,8 @@ import {
   packages,
   users,
 } from "@/lib/db/schema";
-import { computePublicVisibleAt } from "@/lib/schedule/visibility";
+import { computeVisibleAt } from "@/lib/schedule/visibility";
+import { loadVisibilityWindows, leadHoursForType } from "@/lib/schedule/visibilityWindows";
 import { BASELINE_SLOTS } from "@/lib/schedule/baseline";
 // The recurring weekly baseline is the single source of truth (lib/schedule/baseline.ts);
 // the seed generates its published week from it so the seed and the admin
@@ -109,6 +110,7 @@ async function main() {
 
   let created = 0;
   if (future.length === 0) {
+    const windows = await loadVisibilityWindows();
     // 7 days starting today (offset 0..6) to match the schedule view's window.
     for (let dayOffset = 0; dayOffset <= 6; dayOffset++) {
       const day = new Date(now);
@@ -116,6 +118,7 @@ async function main() {
       // Canonical slots for this calendar day's weekday, straight from the baseline.
       for (const slot of baselineSlotsForDate(day)) {
         const startsAt = startsAtFor(day, slot.time);
+        const { memberLeadHours, guestLeadHours } = leadHoursForType(windows, slot.type);
         await db.insert(classInstances).values({
           startsAt,
           durationMin: slot.durationMin,
@@ -123,8 +126,8 @@ async function main() {
           capacity: slot.capacity,
           status: "published",
           publishedAt: now,
-          membersVisibleAt: now,
-          publicVisibleAt: computePublicVisibleAt(startsAt, slot.type),
+          membersVisibleAt: computeVisibleAt(startsAt, memberLeadHours),
+          publicVisibleAt: computeVisibleAt(startsAt, guestLeadHours),
         });
         created++;
       }

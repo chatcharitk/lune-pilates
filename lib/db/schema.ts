@@ -131,6 +131,43 @@ export const catalogItems = pgTable(
   ],
 );
 
+// ───────────────────────── visibility windows (owner-editable, per class type) ─────────────────────────
+// Owner-configurable tiered-visibility lead time (CLAUDE.md §5 invariant 4),
+// replacing the hardcoded DEFAULT_PUBLIC_LEAD_HOURS constant (lib/domain/types.ts).
+// PK is the class type itself (mirrors how catalogItems.category reuses
+// packageCategory) — exactly one row per type. Mirrors the class_templates /
+// catalog_items pattern: this table is authoritative once populated; the hardcoded
+// SEED_VISIBILITY_WINDOWS (lib/schedule/visibilityWindows.ts) is only the seed +
+// the empty-table/no-DB fallback.
+//
+// Each tier gets its own `{amount, unit}` lead time — members typically see a
+// class far earlier than guests. `leadHoursFor` (lib/schedule/visibilityWindows.ts)
+// converts amount+unit to hours with a flat day=24/week=168/month=720 conversion
+// (a UX visibility cutoff, not money — calendar-exactness does not matter here).
+export const visibilityWindows = pgTable(
+  "visibility_windows",
+  {
+    type: classType("type").primaryKey(),
+    memberAmount: integer("member_amount").notNull(),
+    memberUnit: text("member_unit").notNull(), // 'day' | 'week' | 'month'
+    guestAmount: integer("guest_amount").notNull(),
+    guestUnit: text("guest_unit").notNull(), // 'day' | 'week' | 'month'
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check("visibility_window_member_amount_positive", sql`${t.memberAmount} > 0`),
+    check("visibility_window_guest_amount_positive", sql`${t.guestAmount} > 0`),
+    check(
+      "visibility_window_member_unit_valid",
+      sql`${t.memberUnit} in ('day','week','month')`,
+    ),
+    check(
+      "visibility_window_guest_unit_valid",
+      sql`${t.guestUnit} in ('day','week','month')`,
+    ),
+  ],
+);
+
 // ───────────────────────── charges (purchase intent) ─────────────────────────
 // Server-side binding of a PromptPay charge → exactly what it pays for. Written at
 // createCheckout time from the catalog item + session user (never the client), and

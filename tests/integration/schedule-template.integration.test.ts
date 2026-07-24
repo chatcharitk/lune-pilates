@@ -17,9 +17,9 @@
 //   4. GENERATE: a created slot shows up as a generated class_instance for a week
 //      (materialised straight from the DB template), carrying templateId = the slot id.
 //      Instances are born PUBLISHED (the draft→publish ceremony was removed): stamped
-//      published_at = members_visible_at = now, public_visible_at =
-//      computePublicVisibleAt(starts_at, type), with ONE schedule.published event per
-//      generate call that created ≥ 1 instance.
+//      published_at = now, and members_visible_at / public_visible_at from the
+//      owner-configurable visibility-window map (starts_at − per-tier lead hours),
+//      with ONE schedule.published event per generate call that created ≥ 1 instance.
 //   5. CREATE CLASS: createClass inserts a born-published instance with the same
 //      three stamps and emits ONE schedule.published event.
 //
@@ -51,7 +51,8 @@ import {
 } from "@/app/actions/schedule";
 import { getScheduleTemplate, getTemplateSlotsByDow } from "@/lib/admin/schedule-template";
 import { on } from "@/lib/events/bus";
-import { computePublicVisibleAt } from "@/lib/schedule/visibility";
+import { computeVisibleAt } from "@/lib/schedule/visibility";
+import { loadVisibilityWindows, leadHoursForType } from "@/lib/schedule/visibilityWindows";
 import { startOfWeekMonday, startsAtFor } from "@/lib/schedule/baseline";
 import { studioParts } from "@/lib/time";
 
@@ -279,10 +280,15 @@ describe.skipIf(!HAS_DB)("schedule template (integration · requires DATABASE_UR
     expect(inst!.publishedAt).not.toBeNull();
     expect(inst!.membersVisibleAt).not.toBeNull();
     expect(inst!.publicVisibleAt).not.toBeNull();
-    expect(inst!.membersVisibleAt!.getTime()).toBe(inst!.publishedAt!.getTime());
-    expect(inst!.publicVisibleAt!.getTime()).toBe(
-      computePublicVisibleAt(startsAt, "group").getTime(),
-    );
+
+    // Both visibility timestamps are now resolved from the owner-configurable
+    // visibility-window map (per class type, per tier) rather than a hardcoded
+    // constant — read the SAME map the action used so this holds regardless of
+    // whether `visibility_windows` has been seeded with real rows.
+    const windows = await loadVisibilityWindows();
+    const { memberLeadHours, guestLeadHours } = leadHoursForType(windows, "group");
+    expect(inst!.membersVisibleAt!.getTime()).toBe(computeVisibleAt(startsAt, memberLeadHours).getTime());
+    expect(inst!.publicVisibleAt!.getTime()).toBe(computeVisibleAt(startsAt, guestLeadHours).getTime());
   });
 
   it("CREATE CLASS: createClass inserts a born-PUBLISHED instance (all three stamps) and emits ONE schedule.published event", async () => {
@@ -335,9 +341,14 @@ describe.skipIf(!HAS_DB)("schedule template (integration · requires DATABASE_UR
     expect(inst!.publishedAt).not.toBeNull();
     expect(inst!.membersVisibleAt).not.toBeNull();
     expect(inst!.publicVisibleAt).not.toBeNull();
-    expect(inst!.membersVisibleAt!.getTime()).toBe(inst!.publishedAt!.getTime());
+
+    const windows = await loadVisibilityWindows();
+    const { memberLeadHours, guestLeadHours } = leadHoursForType(windows, "group");
+    expect(inst!.membersVisibleAt!.getTime()).toBe(
+      computeVisibleAt(inst!.startsAt, memberLeadHours).getTime(),
+    );
     expect(inst!.publicVisibleAt!.getTime()).toBe(
-      computePublicVisibleAt(inst!.startsAt, "group").getTime(),
+      computeVisibleAt(inst!.startsAt, guestLeadHours).getTime(),
     );
   });
 });

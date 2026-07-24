@@ -1095,6 +1095,7 @@ export const STR = {
 
   // ───────── admin · package catalog management (owner-only CRUD) ─────────
   admin_packages: { en: "Packages", th: "แพ็กเกจ" },
+  admin_visibility: { en: "Booking windows", th: "ช่วงเวลาเปิดจอง" },
   cat_title: { en: "Packages", th: "แพ็กเกจ" },
   cat_subtitle: { en: "What customers can buy", th: "แพ็กเกจที่ลูกค้าซื้อได้" },
   cat_add: { en: "Add package", th: "เพิ่มแพ็กเกจ" },
@@ -1196,6 +1197,52 @@ export const STR = {
   cat_empty: { en: "No packages yet.", th: "ยังไม่มีแพ็กเกจ" },
   cat_move_up: { en: "Move up", th: "เลื่อนขึ้น" },
   cat_move_down: { en: "Move down", th: "เลื่อนลง" },
+
+  // ───────────────────────── visibility windows (owner settings) ─────────────────────────
+  // Admin "Booking window" / tiered-visibility settings screen (CLAUDE.md §5
+  // invariant 4): per-class-type, per-tier lead time before a class becomes
+  // visible/bookable. Backed by app/actions/admin-visibility.ts.
+  vis_title: { en: "Booking windows", th: "ช่วงเวลาเปิดจอง" },
+  vis_subtitle: {
+    en: "How far before a class starts it becomes visible and bookable, per class type and per customer tier.",
+    th: "กำหนดว่าก่อนคลาสเริ่มกี่นาน จึงจะมองเห็นและจองได้ แยกตามประเภทคลาสและระดับสมาชิก",
+  },
+  vis_member_lead: { en: "Members can book from", th: "สมาชิกจองได้ตั้งแต่" },
+  vis_guest_lead: { en: "Guests can book from", th: "บุคคลทั่วไปจองได้ตั้งแต่" },
+  vis_amount: { en: "Amount", th: "จำนวน" },
+  vis_unit: { en: "Unit", th: "หน่วย" },
+  // Unit picker labels — day/month already exist as validity_unit_*; week is new.
+  validity_unit_week: { en: "weeks", th: "สัปดาห์" },
+  vis_before_start: { en: "before the class starts", th: "ก่อนคลาสเริ่ม" },
+  vis_save: { en: "Save", th: "บันทึก" },
+  vis_saved_toast: { en: "Booking window updated", th: "อัปเดตช่วงเวลาเปิดจองแล้ว" },
+  vis_no_retro_note: {
+    en: "Changes apply only to classes created from now on — already-scheduled classes keep the window they were created with.",
+    th: "การเปลี่ยนแปลงมีผลกับคลาสที่สร้างใหม่เท่านั้น — คลาสที่จัดตารางไว้แล้วยังคงใช้ช่วงเวลาเดิม",
+  },
+  err_vis_forbidden: {
+    en: "Only the studio owner can manage booking windows.",
+    th: "เฉพาะเจ้าของสตูดิโอเท่านั้นที่จัดการช่วงเวลาเปิดจองได้",
+  },
+  err_vis_numbers: {
+    en: "Enter a whole number greater than zero for both amounts.",
+    th: "กรอกจำนวนเต็มมากกว่าศูนย์สำหรับทั้งสองช่อง",
+  },
+  err_vis_mock_no_db: {
+    en: "Demo mode — this change wasn’t saved.",
+    th: "โหมดตัวอย่าง — การเปลี่ยนแปลงนี้ไม่ได้ถูกบันทึก",
+  },
+  err_vis_save: {
+    en: "Couldn’t save the booking window. Please try again.",
+    th: "บันทึกช่วงเวลาเปิดจองไม่สำเร็จ กรุณาลองใหม่",
+  },
+  // Gentle, non-blocking hint — members normally get early access, but the owner
+  // is allowed to set it the other way around on purpose.
+  vis_guest_ge_member_hint: {
+    en: "Guests would see this class as early as (or earlier than) members. Usually members get early access — this may be intentional, but double-check.",
+    th: "บุคคลทั่วไปจะเห็นคลาสนี้เร็วเท่ากับ (หรือเร็วกว่า) สมาชิก โดยปกติสมาชิกจะเห็นก่อน — หากตั้งใจก็ไม่เป็นไร แต่ลองตรวจสอบอีกครั้ง",
+  },
+  vis_edit: { en: "Edit booking window", th: "แก้ไขช่วงเวลาเปิดจอง" },
 } as const;
 
 export type StrKey = keyof typeof STR;
