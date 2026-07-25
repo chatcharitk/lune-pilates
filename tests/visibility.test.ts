@@ -5,17 +5,36 @@ import { leadHoursFor } from "@/lib/schedule/visibilityWindows";
 const NOW = new Date("2026-06-01T12:00:00Z");
 const future = (h: number) => new Date(NOW.getTime() + h * 3_600_000);
 
-describe("computeVisibleAt", () => {
-  it("is starts_at − leadHours", () => {
+describe("computeVisibleAt — day-scale (floored to Bangkok 00:00), not hour-scale", () => {
+  it("starts_at − leadHours, floored to the START of that Bangkok day (not the exact hour)", () => {
+    // starts = 2026-06-03T12:00:00Z. raw = starts − 24h = 2026-06-02T12:00:00Z, which
+    // is 2026-06-02T19:00 Bangkok — floors to 2026-06-02T00:00 Bangkok, i.e.
+    // 2026-06-01T17:00:00Z. NOT the raw hour-precise instant.
     const starts = future(48);
     const pv = computeVisibleAt(starts, 24);
-    expect(pv.getTime()).toBe(starts.getTime() - 24 * 3_600_000);
+    const rawHourPrecise = new Date(starts.getTime() - 24 * 3_600_000);
+    expect(pv.getTime()).not.toBe(rawHourPrecise.getTime()); // day-floored, not hour-precise
+    expect(pv.toISOString()).toBe("2026-06-01T17:00:00.000Z"); // Bangkok midnight (UTC+7)
+    expect(pv.getTime()).toBeLessThanOrEqual(rawHourPrecise.getTime()); // floor only moves EARLIER
   });
 
-  it("opens a rental 14 days (336h) before start (2 weeks via leadHoursFor)", () => {
+  it("opens a rental ~14 days before start (2 weeks via leadHoursFor), floored to Bangkok midnight", () => {
     const starts = future(400);
     const pv = computeVisibleAt(starts, leadHoursFor(2, "week"));
-    expect(pv.getTime()).toBe(starts.getTime() - 336 * 3_600_000);
+    const rawHourPrecise = new Date(starts.getTime() - 336 * 3_600_000);
+    // Floored to midnight — at most 24h earlier than the raw hour-precise instant,
+    // and never later than it (the safe direction: reveal sooner, never hide later).
+    expect(pv.getTime()).toBeLessThanOrEqual(rawHourPrecise.getTime());
+    expect(rawHourPrecise.getTime() - pv.getTime()).toBeLessThan(24 * 3_600_000);
+    // The result itself IS a Bangkok-midnight instant (00:00 Bangkok = 17:00 UTC).
+    expect(pv.toISOString().endsWith("T17:00:00.000Z")).toBe(true);
+  });
+
+  it("a class whose raw cutoff already lands exactly on Bangkok midnight is unchanged by flooring", () => {
+    // 2026-06-04T17:00:00Z = 2026-06-05T00:00 Bangkok exactly (verified: UTC+7).
+    const starts = new Date("2026-06-04T17:00:00Z");
+    const pv = computeVisibleAt(starts, 0);
+    expect(pv.toISOString()).toBe("2026-06-04T17:00:00.000Z"); // no shift — already midnight
   });
 });
 

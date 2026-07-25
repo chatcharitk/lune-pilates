@@ -10,6 +10,7 @@
 // resulting hours in here.
 
 import type { UserTier } from "@/lib/domain/types";
+import { studioStartOfDay } from "@/lib/time";
 
 export interface VisibilityInput {
   status: "draft" | "published" | "cancelled";
@@ -21,12 +22,23 @@ export interface VisibilityInput {
 }
 
 /**
- * A visible-at instant: `startsAt − leadHours`. The ONE pure conversion, called
- * twice per instance (once per tier) by the async call sites that resolve
- * `leadHours` from the owner-configurable visibility-window map.
+ * A visible-at instant: `startsAt − leadHours`, THEN floored to Bangkok 00:00 of
+ * that day. Visibility opens on DAY boundaries, not at the exact hour-of-day the
+ * class happens to start — e.g. a Wednesday 18:00 class with a 1-day guest window
+ * opens Tuesday 00:00 Bangkok (not Tuesday 18:00), so "1 day ahead" reads the way
+ * an owner/customer actually expects ("visible starting midnight"), regardless of
+ * what time the class starts. Flooring only ever moves the instant EARLIER (or
+ * leaves it unchanged if it already lands exactly on midnight) — it can never
+ * newly hide something that would otherwise be visible, only ever reveal it
+ * sooner, which is the safe direction for this invariant.
+ *
+ * The ONE pure conversion, called twice per instance (once per tier) by the async
+ * call sites that resolve `leadHours` from the owner-configurable visibility-window
+ * map.
  */
 export function computeVisibleAt(startsAt: Date, leadHours: number): Date {
-  return new Date(startsAt.getTime() - leadHours * 3_600_000);
+  const raw = new Date(startsAt.getTime() - leadHours * 3_600_000);
+  return studioStartOfDay(raw);
 }
 
 /**
