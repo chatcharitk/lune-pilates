@@ -52,9 +52,19 @@ async function collectLineId(userId: string | null): Promise<string[]> {
 
 let registered = false;
 
+/**
+ * All outbound LINE notification pushes are OFF by default (owner decision
+ * 2026-07-25) — set LINE_NOTIFICATIONS_ENABLED=true to turn them back on.
+ * This only gates outbound messages; LINE LIFF login is untouched.
+ */
+function notificationsEnabled(): boolean {
+  return process.env.LINE_NOTIFICATIONS_ENABLED === "true";
+}
+
 export function registerNotificationHandlers(): void {
   if (registered) return;
   registered = true;
+  if (!notificationsEnabled()) return;
   const line = getLineClient();
 
   on("schedule.published", async () => {
