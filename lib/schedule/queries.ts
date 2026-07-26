@@ -191,9 +191,15 @@ function rentalOpensAtFor(type: ClassType, startsAt: Date, now: Date): string | 
 }
 
 /**
- * Bilingual instructor metadata for a known catalog id (mirrors lune-data.jsx
- * INSTRUCTORS), or a row-derived meta when the id is a DB instructor outside the
- * static catalog. Returns null for an unassigned (null) instructor.
+ * Bilingual instructor metadata for `id`. A row-derived meta (built from `name`/
+ * `nameTh`/`tag`, the caller's live DB join) ALWAYS wins when provided — the
+ * static catalog is only a fallback for callers with no row to hand in (the no-DB
+ * mock/seed paths, which pass just an id). This order matters: `mai`/`ploy`/`nina`
+ * are the original seed ids, and the instructor CRUD (lib/admin/instructors.ts)
+ * lets an owner rename or retag any of them — checking the frozen catalog first
+ * would silently resurrect the seed-time name/tag over the real one everywhere
+ * a class's instructor is displayed. Returns null for an unassigned (null)
+ * instructor, or an unrecognized id with no row data.
  */
 export function instructorMetaFor(
   id: string | null,
@@ -202,13 +208,10 @@ export function instructorMetaFor(
   tag?: string | null,
 ): InstructorMeta | null {
   if (!id) return null;
-  const known = INSTRUCTOR_META[id];
-  if (known) return known;
-  // DB instructor not in the static catalog — build from the row.
   if (name) {
     return { id, name: { en: name, th: nameTh ?? name }, tag: tag ? { en: tag, th: tag } : null };
   }
-  return null;
+  return INSTRUCTOR_META[id] ?? null;
 }
 
 // ───────────────────────── DB path helpers ─────────────────────────

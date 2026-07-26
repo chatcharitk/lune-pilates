@@ -1,5 +1,6 @@
 import { getWeekSchedule } from "@/lib/admin/schedule";
 import { getScheduleTemplate } from "@/lib/admin/schedule-template";
+import { listActiveInstructorOptions } from "@/lib/admin/instructors";
 import { studioDayFromYmd } from "@/lib/time";
 import { requireAdmin } from "@/lib/auth/admin";
 import { ScheduleView } from "@/components/admin/schedule-view";
@@ -29,13 +30,24 @@ export default async function AdminSchedulePage({
   // is Bangkok-aligned regardless of the runtime timezone. studioDayFromYmd fails
   // closed to the current Bangkok day for an absent/malformed param.
   const anchor = studioDayFromYmd(week);
-  const [schedule, template] = await Promise.all([
+  const [schedule, template, instructors] = await Promise.all([
     getWeekSchedule(
       anchor,
       isInstructor && session.instructorId ? { instructorId: session.instructorId } : undefined,
     ),
     // The template editor is owner-only chrome — skip the read for instructors.
     isInstructor ? Promise.resolve([]) : getScheduleTemplate(),
+    // Both the class-edit and template-edit instructor pickers need the CURRENT
+    // active roster (read-only instructors never open either editor, but the
+    // fetch is cheap enough not to bother gating it on role).
+    listActiveInstructorOptions(),
   ]);
-  return <ScheduleView schedule={schedule} template={template} readOnly={isInstructor} />;
+  return (
+    <ScheduleView
+      schedule={schedule}
+      template={template}
+      instructors={instructors}
+      readOnly={isInstructor}
+    />
+  );
 }

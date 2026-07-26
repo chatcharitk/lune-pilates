@@ -144,6 +144,37 @@ const byStart = (a: AvailabilityRange, b: AvailabilityRange): number => a.start.
  * No-DB fallback: returns mock data mirroring the prototype seed so the screen
  * renders without a database. The DB path is authoritative.
  */
+
+/** A picker option: just enough to label + submit an instructor choice. */
+export interface InstructorOption {
+  id: string;
+  name: Bilingual;
+}
+
+/**
+ * Active instructors as bare `{id, name}` picker options — for the class-edit /
+ * template-edit instructor pickers (components/admin/schedule-view.tsx,
+ * template-editor.tsx), which need the CURRENT roster, not the heavier
+ * `getAdminInstructors` card view (today's classes, full-week availability).
+ * Ordered by name for a stable listing. No-DB fallback mirrors the static
+ * mock catalog so the picker still renders without a database.
+ */
+export async function listActiveInstructorOptions(): Promise<InstructorOption[]> {
+  if (mockDataMode()) {
+    return MOCK_ORDER.map((id) => {
+      const meta = instructorMetaFor(id)!; // mai/ploy/nina are in the static catalog
+      return { id, name: meta.name };
+    });
+  }
+  const db = getDb();
+  const rows = await db
+    .select({ id: instructors.id, name: instructors.name, nameTh: instructors.nameTh })
+    .from(instructors)
+    .where(eq(instructors.active, true))
+    .orderBy(asc(instructors.name));
+  return rows.map((r) => ({ id: r.id, name: { en: r.name, th: r.nameTh } }));
+}
+
 export async function getAdminInstructors(now: Date = new Date()): Promise<AdminInstructor[]> {
   const dayStart = startOfDay(now);
 

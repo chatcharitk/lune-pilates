@@ -23,8 +23,9 @@ import {
   type TemplateCrudFailureCode,
 } from "@/app/actions/schedule";
 import type { TemplateSlot } from "@/lib/admin/schedule-template";
+import type { InstructorOption } from "@/lib/admin/instructors";
 import { CAPACITY, type ClassType } from "@/lib/domain/types";
-import type { Bilingual, StrKey } from "@/lib/i18n";
+import type { StrKey } from "@/lib/i18n";
 
 const TYPES: ClassType[] = ["group", "private", "duo", "trio"]; // rental hidden 2026-07-20
 const DURATIONS = [30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90];
@@ -39,14 +40,6 @@ const DAY_KEYS: { dow: number; key: StrKey }[] = [
   { dow: 5, key: "day_fri" },
   { dow: 6, key: "day_sat" },
   { dow: 7, key: "day_sun" },
-];
-
-// The three known instructors (mirrors schedule-view.tsx INSTRUCTORS / admin-data.jsx
-// AINSTR). Static so this client view never imports server-only query code.
-const INSTRUCTORS: { id: string; name: Bilingual }[] = [
-  { id: "mai", name: { en: "Kru Mai", th: "ครูใหม่" } },
-  { id: "ploy", name: { en: "Kru Ploy", th: "ครูพลอย" } },
-  { id: "nina", name: { en: "Kru Nina", th: "ครูนีน่า" } },
 ];
 
 /** Map a template CRUD failure code to keyed copy. */
@@ -75,10 +68,13 @@ interface FormState {
 export function TemplateEditor({
   open,
   template,
+  instructors,
   onClose,
 }: {
   open: boolean;
   template: TemplateSlot[];
+  /** The CURRENT active roster — server-fetched, never hardcoded. */
+  instructors: InstructorOption[];
   onClose: () => void;
 }) {
   const { t } = useAdminLang();
@@ -135,6 +131,7 @@ export function TemplateEditor({
       {/* add / edit form (nested drawer over the list) */}
       <SlotFormDrawer
         state={form}
+        instructors={instructors}
         onClose={() => setForm(null)}
         onSaved={(key) => {
           setForm(null);
@@ -249,10 +246,12 @@ function DaySection({
 
 function SlotFormDrawer({
   state,
+  instructors,
   onClose,
   onSaved,
 }: {
   state: FormState | null;
+  instructors: InstructorOption[];
   onClose: () => void;
   onSaved: (toastKey: StrKey) => void;
 }) {
@@ -419,7 +418,7 @@ function SlotFormDrawer({
             on={instructorId === null}
             onClick={() => setInstructorId(null)}
           />
-          {INSTRUCTORS.map((ins) => (
+          {instructors.map((ins) => (
             <InstrPill
               key={ins.id}
               label={tt(ins.name)}

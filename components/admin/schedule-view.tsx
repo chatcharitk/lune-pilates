@@ -23,8 +23,9 @@ import {
 } from "@/app/actions/schedule";
 import type { AdminScheduleClass, AdminWeekSchedule } from "@/lib/admin/schedule";
 import type { TemplateSlot } from "@/lib/admin/schedule-template";
+import type { InstructorOption } from "@/lib/admin/instructors";
 import { CAPACITY, type ClassType } from "@/lib/domain/types";
-import type { Bilingual, StrKey } from "@/lib/i18n";
+import type { StrKey } from "@/lib/i18n";
 import { addDays, formatStudioDate, studioParts, studioStartOfDay } from "@/lib/time";
 
 const TYPES: ClassType[] = ["group", "private", "duo", "trio"]; // rental hidden 2026-07-20
@@ -33,14 +34,6 @@ const TIME_OPTIONS = [
   "13:00", "16:00", "17:00", "17:30", "18:00", "18:30", "19:00",
 ];
 const DURATIONS = [30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90];
-
-// The three known instructors (mirrors admin-data.jsx AINSTR). Static so this
-// client view never imports server-only query code.
-const INSTRUCTORS: { id: string; name: Bilingual }[] = [
-  { id: "mai", name: { en: "Kru Mai", th: "ครูใหม่" } },
-  { id: "ploy", name: { en: "Kru Ploy", th: "ครูพลอย" } },
-  { id: "nina", name: { en: "Kru Nina", th: "ครูนีน่า" } },
-];
 
 const DOW_KEYS: StrKey[] = [
   "dow_mon", "dow_tue", "dow_wed", "dow_thu", "dow_fri", "dow_sat", "dow_sun",
@@ -60,10 +53,14 @@ interface EditorState {
 export function ScheduleView({
   schedule,
   template,
+  instructors,
   readOnly = false,
 }: {
   schedule: AdminWeekSchedule;
   template: TemplateSlot[];
+  /** The CURRENT active roster — server-fetched, never hardcoded (owner can
+   *  rename/add/retire instructors at any time via the Instructors screen). */
+  instructors: InstructorOption[];
   /** Instructor mode: their scoped week, no owner controls (create/edit/template). */
   readOnly?: boolean;
 }) {
@@ -283,6 +280,7 @@ export function ScheduleView({
         <ClassEditor
           state={editor}
           dayDate={ymd(new Date(day.date))}
+          instructors={instructors}
           onClose={() => setEditor(null)}
           onSaved={() => {
             setEditor(null);
@@ -300,6 +298,7 @@ export function ScheduleView({
         <TemplateEditor
           open={templateOpen}
           template={template}
+          instructors={instructors}
           onClose={() => setTemplateOpen(false)}
         />
       )}
@@ -321,12 +320,14 @@ const FAILURE_STR: Record<string, StrKey> = {
 function ClassEditor({
   state,
   dayDate,
+  instructors,
   onClose,
   onSaved,
   onCancelled,
 }: {
   state: EditorState;
   dayDate: string;
+  instructors: InstructorOption[];
   onClose: () => void;
   onSaved: () => void;
   onCancelled: (refundedBookings: number) => void;
@@ -474,7 +475,7 @@ function ClassEditor({
             on={instructorId === null}
             onClick={() => setInstructorId(null)}
           />
-          {INSTRUCTORS.map((ins) => (
+          {instructors.map((ins) => (
             <InstrPill
               key={ins.id}
               label={tt(ins.name)}
