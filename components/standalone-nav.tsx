@@ -1,6 +1,8 @@
 "use client";
 
-// iOS home-screen (standalone) PWA fix.
+// iOS home-screen (standalone) PWA fix — mounted ONCE in the root layout, so it
+// covers BOTH surfaces (customer LIFF app and admin). Both install to the home
+// screen from their own manifest, and both hit this identically.
 //
 // When LUNE is launched from the iOS home-screen icon it runs chrome-free — until
 // you navigate to another page, at which point iOS opens the destination in an

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { StandaloneNav } from "@/components/standalone-nav";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -38,7 +39,13 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        {/* iOS home-screen PWA: keep internal navigations inside the standalone
+            window for BOTH surfaces (customer + admin). Without this, iOS pops the
+            address bar back open on every tab switch. No-op anywhere else. */}
+        <StandaloneNav />
+        {children}
+      </body>
     </html>
   );
 }
