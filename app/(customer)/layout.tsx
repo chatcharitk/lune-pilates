@@ -29,8 +29,6 @@ export default async function CustomerLayout({ children }: { children: React.Rea
 
   return (
     <CustomerLangProvider>
-      {/* StandaloneNav (iOS home-screen PWA nav fix) is mounted once in the root
-          layout so both surfaces get it — no per-surface mount needed here. */}
       <div className="mx-auto flex min-h-dvh max-w-[440px] flex-col bg-cream">
         {/* Shared brand header + EN/TH toggle on the in-nav tab screens; hidden on
             the pushed booking/checkout flows (Header decides via the pathname). */}
