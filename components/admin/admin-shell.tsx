@@ -6,7 +6,7 @@
 // language comes from AdminLangProvider so chrome + pages switch together.
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { AdminLangProvider, useAdminLang } from "./admin-context";
 import { BrandLogo } from "@/components/brand";
@@ -283,6 +283,7 @@ function Topbar() {
 function MobileNav({ role }: { role: AdminRole }) {
   const { t } = useAdminLang();
   const pathname = usePathname();
+  const router = useRouter();
   const [moreOpen, setMoreOpen] = useState(false);
 
   const nav = navForRole(role);
@@ -299,8 +300,9 @@ function MobileNav({ role }: { role: AdminRole }) {
           const active = pathname === n.href || pathname.startsWith(n.href + "/");
           return (
             <li key={n.href}>
-              <Link
-                href={n.href}
+              <button
+                type="button"
+                onClick={() => router.push(n.href)}
                 aria-current={active ? "page" : undefined}
                 className={`flex flex-col items-center gap-1 px-2.5 py-1 ${
                   active ? "text-cream" : "text-cream/60"
@@ -308,7 +310,7 @@ function MobileNav({ role }: { role: AdminRole }) {
               >
                 <NavIcon icon={n.icon} size={21} />
                 <span className="font-body text-[10px] font-medium">{t(n.key)}</span>
-              </Link>
+              </button>
             </li>
           );
         })}
@@ -350,6 +352,7 @@ function MoreSheet({
   onClose: () => void;
 }) {
   const { t } = useAdminLang();
+  const router = useRouter();
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -418,17 +421,20 @@ function MoreSheet({
             const active = pathname === n.href || pathname.startsWith(n.href + "/");
             return (
               <li key={n.href}>
-                <Link
-                  href={n.href}
-                  onClick={onClose}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    router.push(n.href);
+                  }}
                   aria-current={active ? "page" : undefined}
-                  className={`flex items-center gap-3 rounded-xl px-3.5 py-3.5 font-body text-[15px] transition-colors ${
+                  className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-3.5 text-left font-body text-[15px] transition-colors ${
                     active ? "bg-cream-2 font-semibold text-ink" : "font-medium text-ink-soft hover:bg-cream-2"
                   }`}
                 >
                   <NavIcon icon={n.icon} />
                   <span>{t(n.key)}</span>
-                </Link>
+                </button>
               </li>
             );
           })}
