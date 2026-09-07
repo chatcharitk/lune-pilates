@@ -1243,6 +1243,108 @@ export const STR = {
     th: "บุคคลทั่วไปจะเห็นคลาสนี้เร็วเท่ากับ (หรือเร็วกว่า) สมาชิก โดยปกติสมาชิกจะเห็นก่อน — หากตั้งใจก็ไม่เป็นไร แต่ลองตรวจสอบอีกครั้ง",
   },
   vis_edit: { en: "Edit booking window", th: "แก้ไขช่วงเวลาเปิดจอง" },
+
+  // ───────── terms & conditions: customer consent gate (2026-09-07) ─────────
+  terms_title: { en: "Terms & Conditions", th: "ข้อกำหนดและเงื่อนไข" },
+  terms_intro: {
+    en: "Please read and accept the studio’s terms before paying.",
+    th: "กรุณาอ่านและยอมรับข้อกำหนดของสตูดิโอก่อนชำระเงิน",
+  },
+  terms_agree_label: {
+    en: "I have read and agree to the Terms & Conditions.",
+    th: "ฉันได้อ่านและยอมรับข้อกำหนดและเงื่อนไขแล้ว",
+  },
+  terms_accept_continue: { en: "Agree & continue", th: "ยอมรับและดำเนินการต่อ" },
+  terms_decline: { en: "Not now", th: "ยังไม่ตอนนี้" },
+  // {version} → the active T&C version number the customer is accepting.
+  terms_version_label: { en: "Terms version {version}", th: "ข้อกำหนดเวอร์ชัน {version}" },
+  err_terms_outdated: {
+    en: "The studio just updated its terms. Please review and accept the new version.",
+    th: "สตูดิโอเพิ่งปรับปรุงข้อกำหนด กรุณาอ่านและยอมรับเวอร์ชันใหม่อีกครั้ง",
+  },
+
+  // ───────── admin: Settings section ─────────
+  admin_settings: { en: "Settings", th: "ตั้งค่า" },
+  settings_subtitle: {
+    en: "Studio policy, details, and booking configuration.",
+    th: "นโยบาย ข้อมูลสตูดิโอ และการตั้งค่าการจอง",
+  },
+  settings_terms_title: { en: "Terms & Conditions", th: "ข้อกำหนดและเงื่อนไข" },
+  settings_terms_desc: {
+    en: "The terms every customer must accept before buying credits.",
+    th: "ข้อกำหนดที่ลูกค้าทุกคนต้องยอมรับก่อนซื้อชั่วโมงเรียน",
+  },
+  settings_studio_title: { en: "Studio info", th: "ข้อมูลสตูดิโอ" },
+  settings_studio_desc: {
+    en: "Name, address, phone, and opening hours.",
+    th: "ชื่อ ที่อยู่ เบอร์โทร และเวลาทำการ",
+  },
+  settings_windows_desc: {
+    en: "How far ahead members and guests can see and book each class type.",
+    th: "ระยะเวลาที่สมาชิกและบุคคลทั่วไปเห็นและจองคลาสแต่ละประเภทได้ล่วงหน้า",
+  },
+  settings_packages_desc: {
+    en: "Packages, prices, hours, and validity.",
+    th: "แพ็กเกจ ราคา จำนวนชั่วโมง และอายุการใช้งาน",
+  },
+
+  // ───────── admin: Terms & Conditions editor ─────────
+  terms_editor_note: {
+    en: "Publishing saves a new version. Past purchases keep the exact terms their customer accepted — editing here never changes them.",
+    th: "การเผยแพร่จะบันทึกเป็นเวอร์ชันใหม่ การซื้อที่ผ่านมาจะยังคงผูกกับข้อกำหนดเวอร์ชันที่ลูกค้ายอมรับไว้ การแก้ไขที่นี่ไม่กระทบย้อนหลัง",
+  },
+  terms_body_en: { en: "Terms (English)", th: "ข้อกำหนด (อังกฤษ)" },
+  terms_body_th: { en: "Terms (Thai)", th: "ข้อกำหนด (ไทย)" },
+  terms_publish: { en: "Publish new version", th: "เผยแพร่เวอร์ชันใหม่" },
+  terms_publishing: { en: "Publishing…", th: "กำลังเผยแพร่…" },
+  terms_published: { en: "Published", th: "เผยแพร่แล้ว" },
+  terms_active_version: { en: "Active version", th: "เวอร์ชันที่ใช้งาน" },
+  terms_history: { en: "Version history", th: "ประวัติเวอร์ชัน" },
+  terms_history_empty: { en: "No versions published yet.", th: "ยังไม่มีเวอร์ชันที่เผยแพร่" },
+  err_terms_unchanged: {
+    en: "Nothing changed — edit the text before publishing.",
+    th: "ไม่มีการเปลี่ยนแปลง กรุณาแก้ไขข้อความก่อนเผยแพร่",
+  },
+  err_terms_empty: {
+    en: "Both the English and Thai terms are required.",
+    th: "ต้องกรอกข้อกำหนดทั้งภาษาอังกฤษและภาษาไทย",
+  },
+  err_terms_save: {
+    en: "Couldn’t publish the terms. Please try again.",
+    th: "เผยแพร่ข้อกำหนดไม่สำเร็จ กรุณาลองใหม่",
+  },
+
+  // ───────── admin: Studio info editor ─────────
+  studio_name_en: { en: "Studio name (English)", th: "ชื่อสตูดิโอ (อังกฤษ)" },
+  studio_name_th: { en: "Studio name (Thai)", th: "ชื่อสตูดิโอ (ไทย)" },
+  studio_address_en: { en: "Address (English)", th: "ที่อยู่ (อังกฤษ)" },
+  studio_address_th: { en: "Address (Thai)", th: "ที่อยู่ (ไทย)" },
+  studio_phone: { en: "Phone", th: "เบอร์โทรศัพท์" },
+  studio_map_url: { en: "Map link", th: "ลิงก์แผนที่" },
+  studio_map_url_hint: {
+    en: "An https:// link to the studio on Google Maps. Leave empty for none.",
+    th: "ลิงก์ https:// ไปยังสตูดิโอบน Google Maps เว้นว่างได้หากไม่มี",
+  },
+  studio_hours_en: { en: "Opening hours (English)", th: "เวลาทำการ (อังกฤษ)" },
+  studio_hours_th: { en: "Opening hours (Thai)", th: "เวลาทำการ (ไทย)" },
+  studio_save: { en: "Save studio info", th: "บันทึกข้อมูลสตูดิโอ" },
+  studio_saved: { en: "Saved", th: "บันทึกแล้ว" },
+  err_studio_invalid: {
+    en: "Check the highlighted fields — a studio name is required and the map link must start with https://.",
+    th: "กรุณาตรวจสอบช่องที่ระบุ — ต้องกรอกชื่อสตูดิโอ และลิงก์แผนที่ต้องขึ้นต้นด้วย https://",
+  },
+  err_studio_save: {
+    en: "Couldn’t save the studio info. Please try again.",
+    th: "บันทึกข้อมูลสตูดิโอไม่สำเร็จ กรุณาลองใหม่",
+  },
+  err_settings_mock_no_db: {
+    en: "Demo mode — this change wasn’t saved.",
+    th: "โหมดตัวอย่าง — การเปลี่ยนแปลงนี้ไม่ได้ถูกบันทึก",
+  },
+  err_settings_unauthorized: {
+    en: "Only the studio owner can change these settings.",
+    th: "เฉพาะเจ้าของสตูดิโอเท่านั้นที่เปลี่ยนการตั้งค่านี้ได้",
+  },
 } as const;
 
 export type StrKey = keyof typeof STR;

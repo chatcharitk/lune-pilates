@@ -21,9 +21,30 @@ const MOBILE_OVERFLOW: ReadonlySet<string> = new Set([
   "/admin/dashboard",
   "/admin/instructors",
   "/admin/sales",
-  "/admin/packages",
-  "/admin/visibility",
+  "/admin/settings",
 ]);
+
+/**
+ * Routes that BELONG to Settings but keep their own top-level paths.
+ *
+ * /admin/packages and /admin/visibility predate the Settings section: they are
+ * bookmarked, and their actions' revalidatePath calls name those exact paths — so
+ * re-homing them under /admin/settings/* would break both for no user-visible gain.
+ * Instead Settings links out to them (components/admin/settings-view.tsx) and they
+ * are dropped from the primary nav, leaving one obvious way in. Listing them here
+ * keeps the Settings tab highlighted while the owner is on one of those pages, so
+ * the nav never looks like nothing is selected.
+ */
+const SETTINGS_ROUTES: readonly string[] = ["/admin/packages", "/admin/visibility"] as const;
+
+/** Whether `href` is the nav entry the current `pathname` sits under. */
+function isNavActive(pathname: string, href: string): boolean {
+  if (pathname === href || pathname.startsWith(href + "/")) return true;
+  if (href === "/admin/settings") {
+    return SETTINGS_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));
+  }
+  return false;
+}
 
 interface NavItem {
   href: string;
@@ -113,26 +134,16 @@ const NAV: NavItem[] = [
       </>
     ),
   },
+  // Packages + Booking windows are reached THROUGH Settings now (SETTINGS_ROUTES
+  // above) — they are deliberately absent from this list, not forgotten.
   {
-    href: "/admin/packages",
-    key: "admin_packages",
+    href: "/admin/settings",
+    key: "admin_settings",
     ownerOnly: true,
     icon: (
       <>
-        <path d="M21 8v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8" />
-        <rect x="2" y="4" width="20" height="4" rx="1" />
-        <path d="M12 4v16" />
-      </>
-    ),
-  },
-  {
-    href: "/admin/visibility",
-    key: "admin_visibility",
-    ownerOnly: true,
-    icon: (
-      <>
-        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
         <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
       </>
     ),
   },
@@ -197,7 +208,7 @@ function Sidebar({ role }: { role: AdminRole }) {
       </div>
       <nav className="flex flex-1 flex-col gap-1 px-3">
         {nav.map((n) => {
-          const active = pathname === n.href || pathname.startsWith(n.href + "/");
+          const active = isNavActive(pathname, n.href);
           return (
             <Link
               key={n.href}
@@ -290,14 +301,14 @@ function MobileNav({ role }: { role: AdminRole }) {
   const primary = nav.filter((n) => !MOBILE_OVERFLOW.has(n.href));
   const overflow = nav.filter((n) => MOBILE_OVERFLOW.has(n.href));
   const overflowActive = overflow.some(
-    (n) => pathname === n.href || pathname.startsWith(n.href + "/"),
+    (n) => isNavActive(pathname, n.href),
   );
 
   return (
     <nav className="sticky bottom-0 z-20 border-t border-cream/10 bg-admin-ink pb-[env(safe-area-inset-bottom)] text-cream md:hidden">
       <ul className="flex items-stretch justify-around px-1 py-2">
         {primary.map((n) => {
-          const active = pathname === n.href || pathname.startsWith(n.href + "/");
+          const active = isNavActive(pathname, n.href);
           return (
             <li key={n.href}>
               <button
@@ -418,7 +429,7 @@ function MoreSheet({
         </div>
         <ul className="flex flex-col gap-1 p-3">
           {items.map((n) => {
-            const active = pathname === n.href || pathname.startsWith(n.href + "/");
+            const active = isNavActive(pathname, n.href);
             return (
               <li key={n.href}>
                 <button

@@ -36,6 +36,7 @@ import { getDb } from "@/lib/db/client";
 import { charges, paymentSlips } from "@/lib/db/schema";
 import { getCatalogItem, type CatalogItem } from "@/lib/catalog/packages";
 import { termsSnapshotFor } from "@/lib/catalog/chargeTerms";
+import { loadActiveTerms, SEED_TERMS } from "@/lib/settings/terms";
 import { getPaymentProvider } from "@/lib/payments";
 import { validateSlipDataUrl } from "@/lib/payments/slip";
 import { getSlipStorage } from "@/lib/storage";
@@ -49,6 +50,12 @@ import { mockDataMode } from "@/lib/mock-mode";
 
 const createCheckoutInput = z.object({
   packageId: z.string().min(1),
+  /**
+   * The id of the Terms & Conditions version the customer was shown and ticked to
+   * accept. Not a permission — an ACKNOWLEDGEMENT the server re-validates against
+   * the currently-active version (see TERMS_OUTDATED below).
+   */
+  termsVersionId: z.string().min(1),
 });
 export type CreateCheckoutInput = z.infer<typeof createCheckoutInput>;
 
@@ -65,7 +72,16 @@ export interface CheckoutItemSummary {
   sublabel: Bilingual;
 }
 
-export type CreateCheckoutFailureCode = "INVALID_INPUT" | "UNKNOWN_PACKAGE";
+export type CreateCheckoutFailureCode =
+  | "INVALID_INPUT"
+  | "UNKNOWN_PACKAGE"
+  /**
+   * The customer ticked a T&C version that is no longer the active one — the owner
+   * published new terms while this buy screen was open. The purchase is refused so
+   * nobody is ever bound to text they did not read; the UI re-fetches and re-shows
+   * the current terms for a fresh acceptance.
+   */
+  | "TERMS_OUTDATED";
 
 export interface CheckoutSession {
   chargeId: string;
@@ -100,6 +116,17 @@ export async function createCheckout(raw: CreateCheckoutInput): Promise<CreateCh
     return { ok: false, code: "UNKNOWN_PACKAGE" };
   }
 
+  // T&C CONSENT GATE (2026-09-07). The customer must have ticked the CURRENTLY
+  // active terms. Re-resolved here server-side: the client tells us which version
+  // it displayed, and if the owner has published a newer one since that screen
+  // loaded we refuse rather than binding the customer to unseen text. A charge is
+  // never opened without a recorded acceptance.
+  const activeTerms = await loadActiveTerms();
+  if (parsed.data.termsVersionId !== activeTerms.id) {
+    return { ok: false, code: "TERMS_OUTDATED" };
+  }
+  const termsAcceptedAt = new Date();
+
   const viewer = await getCurrentUser();
 
   // Reference ties the charge to this user + item + an instant, so confirm can be
@@ -128,6 +155,18 @@ export async function createCheckout(raw: CreateCheckoutInput): Promise<CreateCh
         userId: viewer.id,
         amount: item.price,
         reference: charge.reference,
+        // The consent record: WHICH terms this customer accepted, and when. Because
+        // terms_versions is append-only, this stays a verbatim pointer to the exact
+        // text they saw, however many times the owner rewrites the T&C later.
+        //
+        // The id is stored ONLY when the active version is a real row. An unseeded
+        // database serves SEED_TERMS, whose synthetic id has no row to reference —
+        // writing it would violate the foreign key and fail the whole checkout. The
+        // acceptance TIMESTAMP is always recorded either way, so consent is never
+        // silently missing; the version pointer is simply null until the owner
+        // publishes their own terms (which is the first thing Settings does).
+        termsVersionId: activeTerms.id === SEED_TERMS.id ? null : activeTerms.id,
+        termsAcceptedAt,
         // Freeze the PURCHASED TERMS alongside the price. The catalog is
         // owner-editable at runtime, and this charge may sit in awaiting_review for
         // days — approveSlip credits from this snapshot so an edit to the item can

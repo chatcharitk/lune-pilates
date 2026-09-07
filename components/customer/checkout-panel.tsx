@@ -78,18 +78,41 @@ const CAT_TAB_KEY: Record<PackageCategory, StrKey> = {
 // Lets a step component label the dialog via the sheet's generated id.
 const SheetTitleContext = createContext<string>("");
 
-// Feature 3 flow: idle → loading (QR prep) → pay (QR + "attach slip") → uploading
-// (pick + preview + submit) → submitted (under review). From "submitted" the sheet
-// POLLS confirmPayment — the admin approve/reject is the money gate — and resolves to
-// either "paid" (credited; success screen) or "rejected" (shows the admin's reason and
-// lets the customer re-upload). No credit is ever granted on the client path itself.
-type Phase = "idle" | "loading" | "pay" | "uploading" | "submitted" | "paid" | "rejected";
+// Feature 3 flow, with the T&C consent gate in front of it (2026-09-07):
+// idle → terms (read + tick) → loading (QR prep) → pay (QR + "attach slip") →
+// uploading (pick + preview + submit) → submitted (under review). From "submitted"
+// the sheet POLLS confirmPayment — the admin approve/reject is the money gate — and
+// resolves to either "paid" (credited; success screen) or "rejected" (shows the
+// admin's reason and lets the customer re-upload). No credit is ever granted on the
+// client path itself.
+type Phase =
+  | "idle"
+  | "terms"
+  | "loading"
+  | "pay"
+  | "uploading"
+  | "submitted"
+  | "paid"
+  | "rejected";
+
+/**
+ * The active Terms & Conditions as handed to the client: the version id that a
+ * checkout binds its consent to, the human-facing version number, and the body in
+ * both languages. Server-fetched in app/(customer)/buy/page.tsx.
+ */
+export interface CustomerTerms {
+  id: string;
+  version: number;
+  body: Bilingual;
+}
 
 /** Map a createCheckout failure code to friendly, keyed copy. */
 function checkoutErrorKey(code: string): StrKey {
   switch (code) {
     case "UNKNOWN_PACKAGE":
       return "err_unknown_package";
+    case "TERMS_OUTDATED":
+      return "err_terms_outdated";
     default:
       return "err_checkout";
   }
@@ -200,9 +223,11 @@ interface CheckoutPanelProps {
   isMember: boolean;
   /** The member's house number, for the perk badge (display only). */
   house: string | null;
+  /** The active Terms & Conditions the customer must accept before a charge opens. */
+  terms: CustomerTerms;
 }
 
-export function CheckoutPanel({ catalog, isMember, house }: CheckoutPanelProps) {
+export function CheckoutPanel({ catalog, isMember, house, terms }: CheckoutPanelProps) {
   const { t, tt, lang } = useCustomerLang();
   const router = useRouter();
 
@@ -267,7 +292,13 @@ export function CheckoutPanel({ catalog, isMember, house }: CheckoutPanelProps) 
   // The admin's rejection reason (from confirmPayment) shown on the rejected screen.
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
 
+  // Whether the T&C tick box is currently checked. Reset to false every time the
+  // consent step opens (see openTerms) — the studio requires a FRESH acceptance on
+  // every purchase, so a tick is never carried over from a previous checkout.
+  const [agreed, setAgreed] = useState(false);
+
   const sheetOpen =
+    phase === "terms" ||
     phase === "loading" ||
     phase === "pay" ||
     phase === "uploading" ||
@@ -275,18 +306,42 @@ export function CheckoutPanel({ catalog, isMember, house }: CheckoutPanelProps) 
     phase === "paid" ||
     phase === "rejected";
 
-  async function startCheckout() {
+  /**
+   * Step 1 of every purchase: open the Terms & Conditions for reading. No charge
+   * exists yet and nothing is sent to the server until the customer ticks and
+   * confirms. The tick always starts unchecked.
+   */
+  function openTerms() {
     if (!selected) return;
+    setErrorKey(null);
+    setAgreed(false);
+    setPhase("terms");
+  }
+
+  /**
+   * Step 2: the customer has ticked the box, so open the charge — sending the id of
+   * the terms version they were just shown. The server re-validates it against the
+   * active version and refuses if the owner published newer terms meanwhile
+   * (TERMS_OUTDATED), which surfaces as an error asking them to review again.
+   */
+  async function startCheckout() {
+    if (!selected || !agreed) return;
     setErrorKey(null);
     setPhase("loading");
     try {
-      const res = await createCheckout({ packageId: selected.id });
+      const res = await createCheckout({
+        packageId: selected.id,
+        termsVersionId: terms.id,
+      });
       if (res.ok) {
         setCheckout(res.checkout);
         setPhase("pay");
       } else {
         setErrorKey(checkoutErrorKey(res.code));
         setPhase("idle");
+        // Stale terms: pull the newly-published text down so the next attempt shows
+        // the current policy rather than re-offering the version just refused.
+        if (res.code === "TERMS_OUTDATED") router.refresh();
       }
     } catch {
       // A thrown server action (network / unexpected) must surface, not hang.
@@ -376,6 +431,9 @@ export function CheckoutPanel({ catalog, isMember, house }: CheckoutPanelProps) 
     setCheckout(null);
     setErrorKey(null);
     setSubmitting(false);
+    // Backing out of the terms (or any later step) drops the acceptance — the next
+    // purchase attempt must tick again from scratch.
+    setAgreed(false);
   }
 
   function finishSubmitted() {
@@ -502,7 +560,7 @@ export function CheckoutPanel({ catalog, isMember, house }: CheckoutPanelProps) 
           </div>
           <button
             type="button"
-            onClick={startCheckout}
+            onClick={openTerms}
             disabled={!selected || phase !== "idle"}
             className="flex h-12 flex-1 items-center justify-center gap-2.5 rounded-lune-sm bg-ink font-body text-base font-semibold text-cream shadow-lift transition-transform active:scale-[0.985] disabled:bg-cream-2 disabled:text-muted disabled:shadow-none"
           >
@@ -519,7 +577,17 @@ export function CheckoutPanel({ catalog, isMember, house }: CheckoutPanelProps) 
 
       {/* checkout sheet */}
       <CheckoutSheet open={sheetOpen} onClose={phase === "submitted" ? finishSubmitted : closeSheet}>
-        {phase === "paid" ? (
+        {phase === "terms" ? (
+          <TermsStep
+            lang={lang}
+            terms={terms}
+            item={selected}
+            agreed={agreed}
+            onToggleAgree={setAgreed}
+            onAccept={startCheckout}
+            onDecline={closeSheet}
+          />
+        ) : phase === "paid" ? (
           <PaymentPaidStep lang={lang} item={checkout?.item} onDone={finishPaid} />
         ) : phase === "rejected" ? (
           <SlipRejectedStep
@@ -722,6 +790,133 @@ function CheckoutSheet({
           <SheetTitleContext.Provider value={titleId}>{children}</SheetTitleContext.Provider>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ───────────────────────── terms & conditions step ─────────────────────────
+
+/**
+ * The consent gate every purchase passes through. Shows the studio's active T&C in
+ * the viewer's language, a required tick box, and the item + amount being bought so
+ * the customer knows exactly what they are agreeing to pay for.
+ *
+ * The "Agree & continue" button stays disabled until the box is ticked — the tick
+ * is the record the studio keeps (bound to this exact terms version on the charge),
+ * so it must be a deliberate action, never pre-checked or inferred from continuing.
+ *
+ * Accessibility: the scrollable body is a focusable region with an accessible name,
+ * so a keyboard or screen-reader user can reach and scroll the text; the tick box is
+ * a real checkbox tied to its label.
+ */
+function TermsStep({
+  lang,
+  terms,
+  item,
+  agreed,
+  onToggleAgree,
+  onAccept,
+  onDecline,
+}: {
+  lang: Lang;
+  terms: CustomerTerms;
+  item: CatalogItem | undefined;
+  agreed: boolean;
+  onToggleAgree: (v: boolean) => void;
+  onAccept: () => void;
+  onDecline: () => void;
+}) {
+  const { t, tt } = makeT(lang);
+  const titleId = useContext(SheetTitleContext);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const bodyId = useId();
+  const checkboxId = useId();
+
+  useEffect(() => {
+    headingRef.current?.focus();
+  }, []);
+
+  return (
+    <div className="pt-1">
+      <h2
+        id={titleId}
+        ref={headingRef}
+        tabIndex={-1}
+        className="mb-1 mt-1.5 text-center font-head text-[24px] font-semibold tracking-[0.01em] text-ink outline-none"
+      >
+        {t("terms_title")}
+      </h2>
+      <p className="mx-auto mb-4 max-w-[300px] text-center font-body text-[12.5px] leading-[1.55] text-muted">
+        {t("terms_intro")}
+      </p>
+
+      {/* the terms body — scrollable, focusable, and labelled for assistive tech */}
+      <div
+        id={bodyId}
+        role="region"
+        aria-label={t("terms_title")}
+        tabIndex={0}
+        className="max-h-[38vh] overflow-y-auto whitespace-pre-line rounded-lune-sm border border-line bg-surface-2 px-4 py-3.5 font-body text-[13px] leading-[1.65] text-ink-soft"
+      >
+        {tt(terms.body)}
+      </div>
+
+      {/* what they're agreeing to buy */}
+      {item && (
+        <div className="mt-3 overflow-hidden rounded-lune-sm border border-line">
+          <ReceiptLine label={tt(item.label)} value={tt(item.sublabel)} />
+          <ReceiptLine label={t("amount")} value={thb(item.price)} last />
+        </div>
+      )}
+
+      {/* the required tick */}
+      <label
+        htmlFor={checkboxId}
+        className={`mt-3.5 flex cursor-pointer items-start gap-3 rounded-lune-sm border-[1.5px] px-4 py-3.5 transition-colors ${
+          agreed ? "border-taupe bg-surface-2" : "border-line bg-surface"
+        }`}
+      >
+        <input
+          id={checkboxId}
+          type="checkbox"
+          checked={agreed}
+          onChange={(e) => onToggleAgree(e.target.checked)}
+          className="sr-only"
+        />
+        <span
+          aria-hidden
+          className={`mt-px grid h-[22px] w-[22px] shrink-0 place-items-center rounded-[7px] border-[1.5px] transition-all ${
+            agreed ? "border-taupe bg-taupe text-white" : "border-line-strong text-transparent"
+          }`}
+        >
+          <Check size={14} />
+        </span>
+        <span className="font-body text-[13px] leading-[1.5] text-ink">
+          {t("terms_agree_label")}
+        </span>
+      </label>
+
+      <button
+        type="button"
+        onClick={onAccept}
+        disabled={!agreed}
+        className="mt-4 flex h-12 w-full items-center justify-center gap-2.5 rounded-lune-sm bg-ink font-body text-base font-semibold text-cream shadow-lift transition-transform active:scale-[0.985] disabled:bg-cream-2 disabled:text-muted disabled:shadow-none"
+      >
+        {t("terms_accept_continue")}
+        <ArrowRight size={18} />
+      </button>
+      <button
+        type="button"
+        onClick={onDecline}
+        className="mt-2 h-11 w-full font-body text-[13.5px] font-semibold text-muted"
+      >
+        {t("terms_decline")}
+      </button>
+
+      {/* the version the customer is accepting — the studio records this exact id */}
+      <p className="mt-2 text-center font-body text-[11px] text-muted">
+        {t("terms_version_label").replace("{version}", String(terms.version))}
+      </p>
     </div>
   );
 }

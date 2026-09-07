@@ -14,7 +14,7 @@ import Link from "next/link";
 import type { CatalogCategory } from "@/lib/catalog/packages";
 import { useCustomerLang } from "./customer-context";
 import { ChevronLeft } from "./icons";
-import { CheckoutPanel } from "./checkout-panel";
+import { CheckoutPanel, type CustomerTerms } from "./checkout-panel";
 import { LangToggle } from "./header";
 import { formatStudioDate } from "@/lib/time";
 
@@ -28,9 +28,18 @@ export interface BuyViewProps {
   isMember: boolean;
   /** The member's house number, for the perk badge (display only). */
   house: string;
+  /** The active Terms & Conditions the customer must accept before paying. */
+  terms: CustomerTerms;
 }
 
-export function BuyView({ catalog, hours, nearestExpiryIso, isMember, house }: BuyViewProps) {
+export function BuyView({
+  catalog,
+  hours,
+  nearestExpiryIso,
+  isMember,
+  house,
+  terms,
+}: BuyViewProps) {
   const { t, lang } = useCustomerLang();
   const hoursLabel = hours === 1 ? t("hour") : t("hours");
   const expiryLabel = nearestExpiryIso
@@ -83,7 +92,7 @@ export function BuyView({ catalog, hours, nearestExpiryIso, isMember, house }: B
         </div>
 
         {/* tabs + cards + promo + perk + sticky bar + checkout sheet */}
-        <CheckoutPanel catalog={catalog} isMember={isMember} house={house} />
+        <CheckoutPanel catalog={catalog} isMember={isMember} house={house} terms={terms} />
       </div>
     </div>
   );

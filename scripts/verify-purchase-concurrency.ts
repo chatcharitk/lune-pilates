@@ -22,6 +22,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { createCheckout, confirmPayment, uploadPaymentSlip } from "@/app/actions/purchase";
 import { approveSlip } from "@/app/actions/admin-payments";
 import { charges, creditLedger, packages, paymentSlips } from "@/lib/db/schema";
+import { loadActiveTerms } from "@/lib/settings/terms";
 
 const db = getDb();
 const PARALLEL = 8; // racers approving the one charge at once
@@ -40,7 +41,13 @@ function check(label: string, pass: boolean, detail: string) {
 async function scenarioApproveIdempotency() {
   // 1) One checkout → one charge intent bound server-side to the session member.
   const viewer = await getCurrentUser();
-  const checkout = await createCheckout({ packageId: ITEM_ID });
+  // createCheckout now requires the T&C version the customer accepted; this script
+  // exercises the money path, so it accepts whatever is currently active.
+  const activeTerms = await loadActiveTerms();
+  const checkout = await createCheckout({
+    packageId: ITEM_ID,
+    termsVersionId: activeTerms.id,
+  });
   if (!checkout.ok) {
     check("checkout opens", false, `createCheckout failed: ${checkout.code}`);
     return;

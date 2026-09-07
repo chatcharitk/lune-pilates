@@ -13,6 +13,7 @@
 import { listPackageCatalog } from "@/lib/catalog/packages";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getCreditOverview } from "@/lib/credits/selectPackage";
+import { loadActiveTerms } from "@/lib/settings/terms";
 import { BuyView } from "@/components/customer/buy-view";
 
 // Reads the live per-user pool for the recap — never static.
@@ -25,6 +26,10 @@ export default async function BuyCreditsPage() {
   // member/household status gates the sharing perk.
   const overview = await getCreditOverview(viewer);
   const isMember = viewer.tier === "member" && viewer.householdId !== null;
+  // The T&C the customer must read + tick before a charge is opened. Fetched here
+  // (server-side) so the panel renders the studio's CURRENT terms; createCheckout
+  // re-checks the accepted version and refuses a stale one (TERMS_OUTDATED).
+  const terms = await loadActiveTerms();
 
   return (
     <BuyView
@@ -33,6 +38,11 @@ export default async function BuyCreditsPage() {
       nearestExpiryIso={overview.nearestExpiry ? overview.nearestExpiry.toISOString() : null}
       isMember={isMember}
       house={viewer.houseNumber ?? ""}
+      terms={{
+        id: terms.id,
+        version: terms.version,
+        body: { en: terms.bodyEn, th: terms.bodyTh },
+      }}
     />
   );
 }

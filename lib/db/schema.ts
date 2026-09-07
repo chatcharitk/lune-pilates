@@ -168,6 +168,58 @@ export const visibilityWindows = pgTable(
   ],
 );
 
+// ───────────────────────── terms & conditions (append-only versions) ─────────────────────────
+// The studio's purchase Terms & Conditions, which every customer must tick to accept
+// before a charge is opened (app/actions/purchase.ts → createCheckout).
+//
+// APPEND-ONLY BY DESIGN — this is the whole point of the table. An owner "editing"
+// the T&C PUBLISHES A NEW ROW; existing rows are never updated or deleted. A charge
+// stores the id of the exact version its customer ticked (charges.terms_version_id),
+// so months later the studio can prove verbatim what that customer agreed to. If
+// rows were mutable, an edit would retroactively rewrite the terms of every past
+// purchase — the same hazard the charge terms-snapshot columns above exist to
+// prevent, but for the legal text rather than the hours/price.
+//
+// The ACTIVE version is simply the highest `version`. SEED_TERMS
+// (lib/settings/terms.ts) is the empty-table/no-DB fallback, mirroring the
+// catalog_items / visibility_windows pattern.
+export const termsVersions = pgTable("terms_versions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  // Monotonic, human-facing version number ("v3"). UNIQUE so two concurrent
+  // publishes can never mint the same version — the loser retries.
+  version: integer("version").notNull().unique(),
+  bodyEn: text("body_en").notNull(),
+  bodyTh: text("body_th").notNull(),
+  // The owner who published it (free-text staff id, mirrors payment_slips'
+  // reviewed_by_admin_id). Null for the seeded/imported first version.
+  publishedByAdminId: text("published_by_admin_id"),
+  publishedAt: timestamp("published_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ───────────────────────── studio info (single row) ─────────────────────────
+// Owner-editable studio identity shown to customers (address, phone, hours). A
+// SINGLE row pinned to id='default' — the CHECK constraint makes a second row
+// impossible, so reads never have to pick between rows. SEED_STUDIO_INFO
+// (lib/settings/studio.ts) is the empty-table/no-DB fallback.
+export const studioSettings = pgTable(
+  "studio_settings",
+  {
+    id: text("id").primaryKey().default("default"),
+    nameEn: text("name_en").notNull(),
+    nameTh: text("name_th").notNull(),
+    addressEn: text("address_en").notNull(),
+    addressTh: text("address_th").notNull(),
+    phone: text("phone").notNull(),
+    // A maps deep-link the customer app can open. Free-text; validated as an
+    // http(s) URL server-side before it is ever stored (never rendered raw).
+    mapUrl: text("map_url"),
+    hoursEn: text("hours_en").notNull(),
+    hoursTh: text("hours_th").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [check("studio_settings_single_row", sql`${t.id} = 'default'`)],
+);
+
 // ───────────────────────── charges (purchase intent) ─────────────────────────
 // Server-side binding of a PromptPay charge → exactly what it pays for. Written at
 // createCheckout time from the catalog item + session user (never the client), and
@@ -209,6 +261,19 @@ export const charges = pgTable("charges", {
   validityAmount: integer("validity_amount"),
   validityUnit: text("validity_unit"), // 'day' | 'month'
   category: packageCategory("category"),
+  // ── T&C CONSENT (2026-09-07) ──
+  // The exact Terms & Conditions version the customer ticked to accept before this
+  // charge was opened, and when. Written server-side at createCheckout time from the
+  // ACTIVE version (the client sends which version it displayed; the server rejects
+  // it as TERMS_OUTDATED if the owner published a newer one mid-flow, so a customer
+  // can never be bound to text they did not see). Because terms_versions is
+  // append-only, this reference is a permanent, verbatim record of what they agreed
+  // to — it survives every later T&C edit.
+  //
+  // NULLABLE by design: charges opened BEFORE this column existed have no consent
+  // record, and admin POS (front-desk, in-person) sales do not collect one.
+  termsVersionId: uuid("terms_version_id").references(() => termsVersions.id),
+  termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
   // Opaque reference tying charge → user + item + instant (audit / provider match).
   reference: text("reference").notNull(),
   // How the sale was tendered: "promptpay" (QR, the default — customer self-serve
