@@ -58,7 +58,7 @@ export const SEED_TERMS: TermsVersion = {
   publishedByAdminId: null,
   bodyEn: [
     "1. Credits and validity",
-    "Hours purchased are credited to your account once the studio has verified your payment. Each package is valid for the period stated at purchase, counted from the date the credit is added. Unused hours expire at the end of that period.",
+    "Hours purchased are credited to your account once the studio has verified your payment. Each package is valid for the period stated at purchase, counted from the day the credit is added, and stays usable for the whole of its final day. For example, a 15-day package credited on 1 September can be used up to and including 16 September. Unused hours expire at the end of that day.",
     "",
     "2. No refunds, no exchanges, no extensions",
     "All purchases are final. A package cannot be returned or refunded, in whole or in part, and cannot be exchanged for a different package, for another service, or for cash. Package expiry cannot be extended under any circumstances — including illness, injury, pregnancy, travel, or any other reason — and unused hours are forfeited when the package expires.",
@@ -86,7 +86,7 @@ export const SEED_TERMS: TermsVersion = {
   ].join("\n"),
   bodyTh: [
     "1. ชั่วโมงเรียนและอายุการใช้งาน",
-    "ชั่วโมงที่ซื้อจะถูกเพิ่มเข้าบัญชีของคุณเมื่อสตูดิโอตรวจสอบการชำระเงินเรียบร้อยแล้ว แต่ละแพ็กเกจมีอายุการใช้งานตามที่ระบุไว้ตอนซื้อ โดยเริ่มนับจากวันที่ได้รับชั่วโมง ชั่วโมงที่ไม่ได้ใช้จะหมดอายุเมื่อครบกำหนด",
+    "ชั่วโมงที่ซื้อจะถูกเพิ่มเข้าบัญชีของคุณเมื่อสตูดิโอตรวจสอบการชำระเงินเรียบร้อยแล้ว แต่ละแพ็กเกจมีอายุการใช้งานตามที่ระบุไว้ตอนซื้อ โดยเริ่มนับจากวันที่ได้รับชั่วโมง และสามารถใช้ได้ตลอดทั้งวันสุดท้าย ตัวอย่างเช่น แพ็กเกจอายุ 15 วัน ที่ได้รับชั่วโมงวันที่ 1 กันยายน จะใช้ได้ถึงวันที่ 16 กันยายน (รวมวันที่ 16 ด้วย) ชั่วโมงที่ไม่ได้ใช้จะหมดอายุเมื่อสิ้นสุดวันดังกล่าว",
     "",
     "2. ไม่รับคืน ไม่เปลี่ยน และไม่ขยายอายุ",
     "การซื้อทุกกรณีถือเป็นที่สิ้นสุด แพ็กเกจไม่สามารถขอคืนหรือขอคืนเงินได้ ไม่ว่าทั้งหมดหรือบางส่วน และไม่สามารถเปลี่ยนเป็นแพ็กเกจอื่น บริการอื่น หรือเงินสดได้ อายุการใช้งานของแพ็กเกจไม่สามารถขยายได้ไม่ว่ากรณีใด ๆ ทั้งสิ้น รวมถึงกรณีเจ็บป่วย บาดเจ็บ ตั้งครรภ์ เดินทาง หรือเหตุผลอื่นใด และชั่วโมงที่ไม่ได้ใช้จะถือเป็นการสละสิทธิ์เมื่อแพ็กเกจหมดอายุ",

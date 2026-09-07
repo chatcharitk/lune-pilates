@@ -8,25 +8,72 @@ import {
   type CatalogItem,
 } from "@/lib/catalog/packages";
 import { expiryFromValidity } from "@/lib/catalog/validity";
+import { studioInstant, studioParts } from "@/lib/time";
 
 // ───────────────────────── validity → expiry ─────────────────────────
 
-describe("expiryFromValidity (structured amount + unit)", () => {
+describe("expiryFromValidity — inclusive whole Bangkok day (owner's rule, 2026-09-07)", () => {
+  // 18 Jun 2026, 16:30 Bangkok (09:30 UTC).
   const now = new Date("2026-06-18T09:30:00Z");
 
-  it("adds whole months (the old single_visit/one_month = +1 month)", () => {
-    expect(expiryFromValidity(1, "month", now).toISOString()).toBe("2026-07-18T09:30:00.000Z");
-  });
-  it("adds +2 months (old two_months)", () => {
-    expect(expiryFromValidity(2, "month", now).toISOString()).toBe("2026-08-18T09:30:00.000Z");
-  });
-  it("adds +3 months (old three_months)", () => {
-    expect(expiryFromValidity(3, "month", now).toISOString()).toBe("2026-09-18T09:30:00.000Z");
+  /** The Bangkok calendar date of an instant, as "YYYY-MM-DD". */
+  function bkkDate(d: Date): string {
+    const { year, month0, day } = studioParts(d);
+    return `${year}-${String(month0 + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+
+  it("THE OWNER'S EXAMPLE: bought 1 Sep with 15 days expires on the 16th, and the whole 16th is still valid", () => {
+    // Bought at 10:00 Bangkok on 1 September.
+    const boughtSep1 = studioInstant(2026, 8, 1, 10, 0);
+    const exp = expiryFromValidity(15, "day", boughtSep1);
+
+    expect(bkkDate(exp)).toBe("2026-09-16");
+
+    // Still usable at the very last minute of the 16th …
+    const lateOnThe16th = studioInstant(2026, 8, 16, 23, 59);
+    expect(exp.getTime()).toBeGreaterThan(lateOnThe16th.getTime());
+
+    // … and no longer usable once the 17th begins.
+    const startOfThe17th = studioInstant(2026, 8, 17, 0, 0);
+    expect(exp.getTime()).toBeLessThan(startOfThe17th.getTime());
   });
 
-  it("adds exact 24h multiples for days", () => {
-    expect(expiryFromValidity(1, "day", now).toISOString()).toBe("2026-06-19T09:30:00.000Z");
-    expect(expiryFromValidity(45, "day", now).toISOString()).toBe("2026-08-02T09:30:00.000Z");
+  it("expires at the last millisecond of the Bangkok day (23:59:59.999 +07 = 16:59:59.999Z)", () => {
+    const exp = expiryFromValidity(15, "day", studioInstant(2026, 8, 1, 10, 0));
+    expect(exp.toISOString()).toBe("2026-09-16T16:59:59.999Z");
+  });
+
+  it("ignores the time of day bought: 08:00 and 23:50 on the same day expire together", () => {
+    const early = expiryFromValidity(15, "day", studioInstant(2026, 8, 1, 8, 0));
+    const late = expiryFromValidity(15, "day", studioInstant(2026, 8, 1, 23, 50));
+    expect(early.toISOString()).toBe(late.toISOString());
+  });
+
+  it("a purchase late on a Bangkok evening still counts that day as day zero", () => {
+    // 23:50 Bangkok on 1 Sep is 16:50 UTC on 1 Sep — the UTC date happens to agree
+    // here, but the rule must follow the BANGKOK day either way.
+    const exp = expiryFromValidity(1, "day", studioInstant(2026, 8, 1, 23, 50));
+    expect(bkkDate(exp)).toBe("2026-09-02");
+  });
+
+  it("a purchase just after Bangkok midnight belongs to the NEW day, not the UTC one", () => {
+    // 00:30 Bangkok on 2 Sep is 17:30 UTC on 1 Sep — a naive UTC reading would
+    // anchor this to the 1st and expire the package a day early.
+    const exp = expiryFromValidity(15, "day", studioInstant(2026, 8, 2, 0, 30));
+    expect(bkkDate(exp)).toBe("2026-09-17");
+  });
+
+  it("applies the same inclusive-day rule to months", () => {
+    const exp = expiryFromValidity(1, "month", studioInstant(2026, 8, 1, 10, 0));
+    expect(bkkDate(exp)).toBe("2026-10-01");
+    expect(exp.getTime()).toBeGreaterThan(studioInstant(2026, 9, 1, 23, 59).getTime());
+    expect(exp.getTime()).toBeLessThan(studioInstant(2026, 9, 2, 0, 0).getTime());
+  });
+
+  it("month expiries land on the same day-of-month, Bangkok", () => {
+    expect(bkkDate(expiryFromValidity(1, "month", now))).toBe("2026-07-18");
+    expect(bkkDate(expiryFromValidity(2, "month", now))).toBe("2026-08-18");
+    expect(bkkDate(expiryFromValidity(3, "month", now))).toBe("2026-09-18");
   });
 
   it("is pure: does not mutate the passed `now`", () => {
@@ -48,26 +95,43 @@ describe("expiryFromValidity (structured amount + unit)", () => {
     }
   });
 
+  it("never SHORTENS a package vs the old purchase-time-of-day rule", () => {
+    // The inclusive-day rule must only ever extend, never cut short — otherwise
+    // shipping it would retroactively disadvantage a customer mid-package.
+    for (const [amount, unit] of [
+      [1, "month"],
+      [3, "month"],
+      [1, "day"],
+      [15, "day"],
+      [90, "day"],
+    ] as const) {
+      const oldRule =
+        unit === "day"
+          ? new Date(now.getTime() + amount * 24 * 3_600_000)
+          : (() => {
+              const d = new Date(now.getTime());
+              d.setUTCMonth(d.getUTCMonth() + amount);
+              return d;
+            })();
+      expect(expiryFromValidity(amount, unit, now).getTime()).toBeGreaterThanOrEqual(
+        oldRule.getTime(),
+      );
+    }
+  });
+
   it("rolls month overflow forward, never shortening the window (Jan 31 + 1mo)", () => {
     // 2025 is not a leap year: Jan 31 + 1 month normalises into early March, not Feb.
-    const jan31 = new Date("2025-01-31T00:00:00Z");
+    const jan31 = studioInstant(2025, 0, 31, 12, 0);
     const exp = expiryFromValidity(1, "month", jan31);
     expect(exp.getTime()).toBeGreaterThan(jan31.getTime());
-    expect(exp.getUTCMonth()).toBe(2); // March (0-indexed)
+    expect(studioParts(exp).month0).toBe(2); // March (0-indexed)
   });
 
   it("crosses a year boundary correctly (Dec + 2mo → Feb next year)", () => {
-    const dec = new Date("2026-12-10T00:00:00Z");
+    const dec = studioInstant(2026, 11, 10, 12, 0);
     const exp = expiryFromValidity(2, "month", dec);
-    expect(exp.getUTCFullYear()).toBe(2027);
-    expect(exp.getUTCMonth()).toBe(1); // February
-  });
-
-  it("SEED expiries are byte-for-byte unchanged vs the old fixed enum", () => {
-    // The seed still maps single_visit/one_month→1mo, two_months→2mo, three_months→3mo.
-    expect(expiryFromValidity(1, "month", now).toISOString()).toBe("2026-07-18T09:30:00.000Z");
-    expect(expiryFromValidity(2, "month", now).toISOString()).toBe("2026-08-18T09:30:00.000Z");
-    expect(expiryFromValidity(3, "month", now).toISOString()).toBe("2026-09-18T09:30:00.000Z");
+    expect(studioParts(exp).year).toBe(2027);
+    expect(studioParts(exp).month0).toBe(1); // February
   });
 });
 
