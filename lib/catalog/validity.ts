@@ -29,6 +29,26 @@ import { addDays, studioEndOfDay, studioInstant, studioParts, studioStartOfDay }
 import type { ValidityUnit } from "./packages";
 
 /**
+ * The largest validity the owner may set, PER UNIT. One shared cap for both units
+ * was wrong: 60 is a sane ceiling in months (5 years) but absurdly tight in days —
+ * it rejected an ordinary 90-day package, and the editor blamed the hours/price
+ * fields for it (2026-09-07).
+ *
+ * These are guard rails against a typo (a stray zero), not policy: 730 days and 60
+ * months both far exceed any package the studio would really sell. Client and
+ * server both check against THIS map so the two can never disagree again.
+ */
+export const MAX_VALIDITY_AMOUNT: Record<ValidityUnit, number> = {
+  day: 730,
+  month: 60,
+};
+
+/** Whether `amount` is a usable validity for `unit` (whole, positive, within cap). */
+export function isValidityAmountInRange(amount: number, unit: ValidityUnit): boolean {
+  return Number.isSafeInteger(amount) && amount > 0 && amount <= MAX_VALIDITY_AMOUNT[unit];
+}
+
+/**
  * The `expires_at` a package bought at `now` should carry, given its validity —
  * the last millisecond of the Bangkok day the package runs out on.
  *

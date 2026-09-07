@@ -378,3 +378,66 @@ describe("listCatalogForAdmin", () => {
     }
   });
 });
+
+// ───────────────────────── validity range, per unit ─────────────────────────
+// Regression: a single flat max(60) was applied to BOTH units, so an ordinary
+// 90-DAY package was rejected — and the editor blamed the hours/price fields for it
+// (reported by the studio owner, 2026-09-07). The ceiling is now per-unit and shared
+// with the editor via lib/catalog/validity.ts.
+
+describe("validity amount is capped PER UNIT", () => {
+  it("accepts the 90-day package that used to be refused", async () => {
+    // Valid input in mock mode reaches the no-DB boundary; INVALID_INPUT would mean
+    // it was rejected by validation, which is the bug this pins.
+    const res = await updateCatalogItem({
+      ...VALID_UPDATE,
+      validityAmount: 90,
+      validityUnit: "day",
+    });
+    expect(res).toEqual({ ok: false, code: "MOCK_NO_DB" });
+  });
+
+  it.each([1, 60, 90, 180, 365, 730])("accepts %i days", async (validityAmount) => {
+    const res = await createCatalogItem({
+      ...VALID_CREATE,
+      validityAmount,
+      validityUnit: "day",
+    });
+    expect(res).toEqual({ ok: false, code: "MOCK_NO_DB" });
+  });
+
+  it("still rejects a day amount beyond the ceiling (typo guard)", async () => {
+    const res = await createCatalogItem({
+      ...VALID_CREATE,
+      validityAmount: 731,
+      validityUnit: "day",
+    });
+    expect(res).toEqual({ ok: false, code: "INVALID_INPUT" });
+  });
+
+  it("keeps the tighter ceiling for MONTHS (60 months, not 730)", async () => {
+    const ok = await createCatalogItem({
+      ...VALID_CREATE,
+      validityAmount: 60,
+      validityUnit: "month",
+    });
+    expect(ok).toEqual({ ok: false, code: "MOCK_NO_DB" });
+
+    // 90 is fine as days but nonsense as months — the per-unit rule must catch it.
+    const tooMany = await createCatalogItem({
+      ...VALID_CREATE,
+      validityAmount: 90,
+      validityUnit: "month",
+    });
+    expect(tooMany).toEqual({ ok: false, code: "INVALID_INPUT" });
+  });
+
+  it.each([0, -1, 1.5])("rejects a non-positive/fractional amount: %s", async (validityAmount) => {
+    const res = await createCatalogItem({
+      ...VALID_CREATE,
+      validityAmount,
+      validityUnit: "day",
+    });
+    expect(res).toEqual({ ok: false, code: "INVALID_INPUT" });
+  });
+});

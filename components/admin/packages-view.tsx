@@ -45,6 +45,9 @@ import {
 } from "@/app/actions/admin-catalog";
 import type { AdminCatalogItem, CatalogTag, ValidityUnit } from "@/lib/catalog/packages";
 import { VALIDITY_UNITS } from "@/lib/catalog/packages";
+// Type-only import of the catalog module above keeps the DB client out of this
+// bundle; validity.ts itself is pure (time maths + the shared per-unit caps).
+import { isValidityAmountInRange, MAX_VALIDITY_AMOUNT } from "@/lib/catalog/validity";
 import type { PackageCategory } from "@/lib/domain/types";
 import { thb, type StrKey } from "@/lib/i18n";
 
@@ -534,14 +537,19 @@ function ItemFormDrawer({
   const hoursNum = Number.parseInt(hours, 10);
   const priceNum = Number.parseInt(price, 10);
   const validityAmountNum = Number.parseInt(validityAmount, 10);
+  // Hours/price and validity are checked SEPARATELY so the owner is told which field
+  // is actually wrong. They used to share one flag under the hours/price message, so
+  // an out-of-range validity (e.g. 90 days, which was also wrongly capped at 60)
+  // reported "hours must be a whole number above zero" — pointing at two fields that
+  // were perfectly fine (2026-09-07).
   const numbersOk =
     Number.isSafeInteger(hoursNum) &&
     hoursNum > 0 &&
     Number.isSafeInteger(priceNum) &&
-    priceNum >= 0 &&
-    Number.isSafeInteger(validityAmountNum) &&
-    validityAmountNum > 0 &&
-    validityAmountNum <= 60;
+    priceNum >= 0;
+  // The per-unit ceiling is shared with the server (lib/catalog/validity.ts), so the
+  // editor can never disagree with what the action will accept.
+  const validityOk = isValidityAmountInRange(validityAmountNum, validityUnit);
   // Typing aid only — the authoritative perHour is derived server-side on read.
   const perHour = numbersOk ? Math.round(priceNum / hoursNum) : null;
 
@@ -560,6 +568,10 @@ function ItemFormDrawer({
     }
     if (!numbersOk) {
       setErrorKey("err_cat_numbers");
+      return;
+    }
+    if (!validityOk) {
+      setErrorKey("err_cat_validity_range");
       return;
     }
 
@@ -650,7 +662,9 @@ function ItemFormDrawer({
           role="alert"
           className="mb-4 rounded-xl bg-rose/15 px-3.5 py-2.5 font-body text-[13px] font-medium text-[#a56a52]"
         >
-          {t(errorKey)}
+          {/* {max} is the ceiling for the unit currently selected, so the message
+              names a real number the owner can act on rather than a generic range. */}
+          {t(errorKey).replace("{max}", String(MAX_VALIDITY_AMOUNT[validityUnit]))}
         </div>
       )}
 

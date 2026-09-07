@@ -1172,6 +1172,11 @@ export const STR = {
     en: "Hours must be a whole number above zero, and price a whole number.",
     th: "ชั่วโมงต้องเป็นจำนวนเต็มมากกว่าศูนย์ และราคาต้องเป็นจำนวนเต็ม",
   },
+  // {max} → the ceiling for the CURRENTLY SELECTED unit (days vs months differ).
+  err_cat_validity_range: {
+    en: "Validity must be a whole number between 1 and {max} for the unit you picked.",
+    th: "อายุการใช้งานต้องเป็นจำนวนเต็มระหว่าง 1 ถึง {max} ตามหน่วยที่เลือก",
+  },
   err_cat_category_immutable: {
     en: "The credit type can’t be changed after a package is created.",
     th: "เปลี่ยนประเภทเครดิตหลังสร้างแพ็กเกจแล้วไม่ได้",

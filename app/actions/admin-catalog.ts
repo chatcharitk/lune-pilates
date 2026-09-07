@@ -49,6 +49,11 @@ import {
   type CatalogTag,
   type Validity,
 } from "@/lib/catalog/packages";
+import {
+  isValidityAmountInRange,
+  MAX_VALIDITY_AMOUNT,
+} from "@/lib/catalog/validity";
+import type { ValidityUnit } from "@/lib/catalog/packages";
 import { requireOwner } from "@/lib/auth/admin";
 import { mockDataMode } from "@/lib/mock-mode";
 
@@ -59,8 +64,29 @@ const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 const CATEGORY = z.enum(["group", "private", "rental"]);
 // Structured validity (2026-07-23): a positive whole amount of days or months.
-const VALIDITY_AMOUNT = z.number().int().positive().max(60);
+// The per-unit ceiling lives in lib/catalog/validity.ts (MAX_VALIDITY_AMOUNT) and is
+// applied by `withValidityInRange` below — a single flat max(60) used to be applied
+// to both units, which rejected an ordinary 90-DAY package (2026-09-07).
+const VALIDITY_AMOUNT = z
+  .number()
+  .int()
+  .positive()
+  .max(Math.max(...Object.values(MAX_VALIDITY_AMOUNT)));
 const VALIDITY_UNIT = z.enum(["day", "month"]);
+
+/**
+ * Apply the PER-UNIT validity ceiling to a parsed input object. Cross-field, so it
+ * cannot live on the `validityAmount` field itself. Shares the exact predicate the
+ * editor uses, so client and server can never drift apart on what is acceptable.
+ */
+function withValidityInRange<T extends z.ZodType<{ validityAmount: number; validityUnit: ValidityUnit }>>(
+  schema: T,
+) {
+  return schema.refine((v) => isValidityAmountInRange(v.validityAmount, v.validityUnit), {
+    path: ["validityAmount"],
+    message: "validity amount out of range for its unit",
+  });
+}
 const TAG = z.enum(["popular", "best_value"]);
 
 /** Whole credits, strictly positive — matches the catalog_item_hours_positive CHECK. */
@@ -82,6 +108,7 @@ const createInput = z.object({
   labelTh: labelField,
   sortOrder: z.number().int().min(0).max(10_000).optional(),
 });
+const createInputChecked = withValidityInRange(createInput);
 export type CreateCatalogItemInput = z.infer<typeof createInput>;
 
 // `id` is absent by design (immutable — it is the KEY, passed separately).
@@ -99,6 +126,7 @@ const updateInput = z.object({
   labelTh: labelField,
   sortOrder: z.number().int().min(0).max(10_000).optional(),
 });
+const updateInputChecked = withValidityInRange(updateInput);
 export type UpdateCatalogItemInput = z.infer<typeof updateInput>;
 
 const idInput = z.object({ id: z.string().trim().min(1).max(40) });
@@ -188,7 +216,7 @@ export async function createCatalogItem(
 ): Promise<CreateCatalogItemResult> {
   if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
 
-  const parsed = createInput.safeParse(raw);
+  const parsed = createInputChecked.safeParse(raw);
   if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
   const input = parsed.data;
 
@@ -258,7 +286,7 @@ export async function updateCatalogItem(
 ): Promise<UpdateCatalogItemResult> {
   if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
 
-  const parsed = updateInput.safeParse(raw);
+  const parsed = updateInputChecked.safeParse(raw);
   if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
   const input = parsed.data;
 
