@@ -1,5 +1,5 @@
 import { getCurrentUser } from "@/lib/auth/session";
-import { getCreditOverview } from "@/lib/credits/selectPackage";
+import { getCreditBalances, getCreditOverview } from "@/lib/credits/selectPackage";
 import { getNextBooking } from "@/lib/bookings/queries";
 import { listBookableClasses } from "@/lib/schedule/queries";
 import { listMyWaitlist } from "@/lib/waitlist/queries";
@@ -35,8 +35,11 @@ export default async function HomePage() {
   // - weekAll: real bookable classes this week — same query/visibility the
   //   Schedule screen uses (DB path filtered server-side; mock path gated
   //   behind DATABASE_URL).
-  const [overview, next, myWaitlist, weekAll] = await Promise.all([
+  const [overview, balances, next, myWaitlist, weekAll] = await Promise.all([
     getCreditOverview(viewer),
+    // Per-format balances: Group / 1:1 / Duo / Trio / Rental are separate pools that
+    // can only book their own format, so Home lists them rather than totalling them.
+    getCreditBalances(viewer, now),
     getNextBooking(viewer, now),
     listMyWaitlist(viewer),
     listBookableClasses({
@@ -60,11 +63,12 @@ export default async function HomePage() {
         houseNumber: viewer.houseNumber,
         avatarUrl: viewer.avatarUrl ?? null,
       }}
-      overview={{
-        hours: overview.hours,
-        nearestExpiryIso: overview.nearestExpiry ? overview.nearestExpiry.toISOString() : null,
-        isHouseholdPool: overview.isHouseholdPool,
-      }}
+      balances={balances.map((b) => ({
+        category: b.category,
+        classes: b.classes,
+        nearestExpiryIso: b.nearestExpiry ? b.nearestExpiry.toISOString() : null,
+      }))}
+      isHouseholdPool={overview.isHouseholdPool}
       next={next}
       hasOffer={hasOffer}
       week={week}

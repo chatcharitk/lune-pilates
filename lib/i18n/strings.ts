@@ -356,7 +356,11 @@ export const STR = {
 
   // package category tabs (mirror PACKAGE_CATS labels from the catalog contract)
   cat_group: { en: "Group", th: "กลุ่ม" },
-  cat_private: { en: "Private", th: "ส่วนตัว" },
+  // Each of these is now its OWN credit pool (2026-09-08), so the buy screen and the
+  // home balances name the formats separately rather than lumping them as "Private".
+  cat_private: { en: "1:1", th: "1:1" },
+  cat_duo: { en: "Duo", th: "ดูโอ" },
+  cat_trio: { en: "Trio", th: "ทรีโอ" },
   cat_rental: { en: "Rental", th: "เช่าสตูดิโอ" },
 
   // trial promo (group only)
@@ -1177,6 +1181,23 @@ export const STR = {
     en: "Validity must be a whole number between 1 and {max} for the unit you picked.",
     th: "อายุการใช้งานต้องเป็นจำนวนเต็มระหว่าง 1 ถึง {max} ตามหน่วยที่เลือก",
   },
+  // ───────── customer: per-format class balances (2026-09-08) ─────────
+  // Each class format has its OWN balance and they are not interchangeable, so Home
+  // lists them separately rather than showing one misleading total.
+  balances_title: { en: "Your classes", th: "คลาสของคุณ" },
+  balances_note: {
+    en: "Each type is used only for its own classes.",
+    th: "แต่ละประเภทใช้ได้เฉพาะคลาสประเภทนั้น",
+  },
+  balances_empty_title: { en: "No classes yet", th: "ยังไม่มีคลาส" },
+  balances_empty_body: {
+    en: "Buy a package to start booking.",
+    th: "ซื้อแพ็กเกจเพื่อเริ่มจองคลาส",
+  },
+  // {date} → the soonest expiry among that format's packages.
+  balance_expires: { en: "Use by {date}", th: "ใช้ได้ถึง {date}" },
+  balance_pool_shared: { en: "Shared with your house", th: "แบ่งปันในบ้านเดียวกัน" },
+
   // ───────── admin: bundle components (2026-09-08) ─────────
   cat_bundle_title: { en: "What this package grants", th: "สิ่งที่แพ็กเกจนี้ให้" },
   cat_bundle_desc: {

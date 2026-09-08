@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isFull, packageDebitBlock, seatsLeft } from "@/lib/credits/guards";
 import { creditCostForClassType } from "@/lib/credits/cost";
+import { packageCategoryForClassType } from "@/lib/credits/selectPackage";
 import { evaluateCancellation } from "@/lib/credits/policy";
 import { promoBonusHours } from "@/lib/credits/creditPackage";
 
@@ -103,5 +104,38 @@ describe("promoBonusHours (1+1 trial promo — DISABLED, owner decision 2026-07-
       expect(promoBonusHours(id, false)).toBe(0);
       expect(promoBonusHours(id, true)).toBe(0);
     }
+  });
+});
+
+// ───────────────────────── per-format balances (2026-09-08) ─────────────────────────
+// Group, 1:1, Duo, Trio and Rental are SEPARATE pools: a balance can only book the
+// format it was sold for. Home lists them individually rather than showing a total,
+// because a customer with 5 group and 2 duo classes has no "7" they can spend.
+
+describe("credit pools are per class format", () => {
+  it("routes each class type to its own pool", () => {
+    expect(packageCategoryForClassType("group")).toBe("group");
+    expect(packageCategoryForClassType("private")).toBe("private");
+    expect(packageCategoryForClassType("duo")).toBe("duo");
+    expect(packageCategoryForClassType("trio")).toBe("trio");
+    expect(packageCategoryForClassType("rental")).toBe("rental");
+  });
+
+  it("never lets one format settle against another's pool", () => {
+    // The regression this guards: 1:1, Duo and Trio all mapped to "private", so a
+    // ฿1,500/class 1:1 pack could pay for ฿2,000/class Trio classes.
+    const formats = ["group", "private", "duo", "trio", "rental"] as const;
+    for (const a of formats) {
+      for (const b of formats) {
+        if (a === b) continue;
+        expect(packageCategoryForClassType(a)).not.toBe(packageCategoryForClassType(b));
+      }
+    }
+  });
+
+  it("a balance in one pool cannot cover a class of another format", () => {
+    // A Duo-pool package offered against a Trio booking is simply the wrong pool —
+    // selection filters on category, so it is never even a candidate.
+    expect(packageCategoryForClassType("trio")).not.toBe(packageCategoryForClassType("duo"));
   });
 });

@@ -17,7 +17,16 @@ import {
 } from "drizzle-orm/pg-core";
 
 export const userTier = pgEnum("user_tier", ["member", "guest"]);
-export const packageCategory = pgEnum("package_category", ["group", "private", "rental"]);
+// One credit pool per class format (2026-09-08). 1:1, Duo and Trio used to share a
+// single "private" pool, so a ฿1,500/class 1:1 pack could book ฿2,000/class Trio
+// classes; each now has its own balance, usable only for its own class type.
+export const packageCategory = pgEnum("package_category", [
+  "group",
+  "private",
+  "duo",
+  "trio",
+  "rental",
+]);
 export const classType = pgEnum("class_type", ["group", "private", "duo", "trio", "rental"]);
 export const classStatus = pgEnum("class_status", ["draft", "published", "cancelled"]);
 export const bookingStatus = pgEnum("booking_status", ["booked", "cancelled"]);

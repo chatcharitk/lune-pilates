@@ -169,9 +169,14 @@ describe("getCatalogItem (server-side price/hours source of truth)", () => {
     expect(item?.validity).toEqual({ amount: 2, unit: "month" });
   });
 
-  it("maps duo/trio packs to the private category (they debit the private pool)", async () => {
-    expect((await getCatalogItem("duo8"))?.category).toBe("private");
-    expect((await getCatalogItem("trio8"))?.category).toBe("private");
+  it("gives Duo and Trio packs their OWN pools, separate from 1:1", async () => {
+    // These used to all settle against a single "private" pool, which let a
+    // ฿1,500/class 1:1 pack pay for ฿2,000/class Trio classes (2026-09-08).
+    expect((await getCatalogItem("pv8"))?.category).toBe("private");
+    expect((await getCatalogItem("duo8"))?.category).toBe("duo");
+    expect((await getCatalogItem("trio8"))?.category).toBe("trio");
+    expect((await getCatalogItem("duo-drop"))?.category).toBe("duo");
+    expect((await getCatalogItem("trio-drop"))?.category).toBe("trio");
   });
 
   it("returns the rental category for rental items", async () => {
@@ -202,14 +207,14 @@ describe("getCatalogItem (server-side price/hours source of truth)", () => {
 });
 
 describe("listPackageCatalog", () => {
-  it("groups items under the visible categories in display order (rental un-hidden)", async () => {
+  it("groups items under the visible categories in display order (one tab per pool)", async () => {
     const cats = await listPackageCatalog();
-    expect(cats.map((c) => c.id)).toEqual(["group", "private", "rental"]);
+    expect(cats.map((c) => c.id)).toEqual(["group", "private", "duo", "trio", "rental"]);
   });
 
   it("every item's id resolves back through getCatalogItem to an equal item", async () => {
     const all = (await listPackageCatalog()).flatMap((c) => c.items);
-    expect(all.length).toBe(13); // 4 group + 6 private + 3 rental (rental un-hidden 2026-07-23)
+    expect(all.length).toBe(13); // 4 group + 2 1:1 + 2 duo + 2 trio + 3 rental
     for (const item of all) {
       expect(await getCatalogItem(item.id)).toEqual(item);
     }

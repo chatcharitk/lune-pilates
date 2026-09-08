@@ -56,15 +56,20 @@ function activeByNow(now: Date) {
  * place that mapping lives.
  */
 export function packageCategoryForClassType(classType: ClassType): PackageCategory {
+  // One pool per format (2026-09-08). This used to fold private/duo/trio into a
+  // single "private" pool; they are separate balances now, so a pack bought for one
+  // format can never be spent on another that the studio prices differently.
   switch (classType) {
     case "group":
       return "group";
     case "rental":
       return "rental";
     case "private":
-    case "duo":
-    case "trio":
       return "private";
+    case "duo":
+      return "duo";
+    case "trio":
+      return "trio";
   }
 }
 
@@ -289,12 +294,29 @@ export async function getPoolBalance(
 
 /** Headline credit summary for the Home screen: the shared group hour-credit pool. */
 export interface CreditOverview {
-  /** Total usable hours in the group pool (the sharable hour-credits). */
+  /**
+   * Usable classes in the GROUP pool only.
+   *
+   * Kept as-is for the surfaces that show a single headline figure (the Buy screen's
+   * recap, the profile summary). It is deliberately NOT a grand total: the pools are
+   * not interchangeable, so summing them would state a number the customer cannot
+   * actually spend on any one class. Home lists each pool separately — see
+   * `getCreditBalances`.
+   */
   hours: number;
   /** Soonest expiry among the pool's packages, or null when the pool is empty. */
   nearestExpiry: Date | null;
   /** true when this pool is a shared household pool (member) vs a personal one. */
   isHouseholdPool: boolean;
+}
+
+/** One class format's usable balance. */
+export interface CreditBalance {
+  category: PackageCategory;
+  /** Usable classes in this pool (whole credits; one credit = one class). */
+  classes: number;
+  /** Soonest expiry among this pool's packages, or null when it holds none. */
+  nearestExpiry: Date | null;
 }
 
 /**
@@ -327,3 +349,89 @@ export async function getCreditOverview(
   const hours = rows.reduce((total, r) => total + r.hoursLeft, 0);
   return { hours, nearestExpiry: rows[0]?.expiresAt ?? null, isHouseholdPool };
 }
+
+/**
+ * Every class format the viewer holds usable classes in, biggest balance first.
+ *
+ * WHY PER FORMAT. A balance can only book the format it was sold for
+ * (`packageCategoryForClassType`), so one combined number would be misleading — a
+ * customer with 5 group classes and 2 Duo classes has no single "7" they can spend.
+ * Home therefore lists them separately.
+ *
+ * Empty pools are OMITTED rather than returned as zeros: the caller renders only
+ * what the customer actually has, and shows a "buy a package" prompt when the list
+ * is empty. Dormant bundle components (null expiry — clock not started) are excluded
+ * by the same `expires_at > now()` filter every other bookable query uses, so an
+ * un-unlocked free class never inflates a balance.
+ */
+export async function getCreditBalances(
+  viewer: SessionUser,
+  now: Date = new Date(),
+): Promise<CreditBalance[]> {
+  if (mockDataMode()) {
+    // Demo mode has no packages table, so hand back a representative spread across
+    // several pools — the whole point of this screen is that formats are separate,
+    // and a single-pool mock would never exercise that.
+    const mock = getMockSession();
+    if (mock.credits <= 0) return [];
+    const day = 24 * 3_600_000;
+    return [
+      { category: "group", classes: mock.credits, nearestExpiry: new Date(now.getTime() + 40 * day) },
+      { category: "private", classes: 2, nearestExpiry: new Date(now.getTime() + 12 * day) },
+      { category: "duo", classes: 1, nearestExpiry: new Date(now.getTime() + 5 * day) },
+    ];
+  }
+
+  const db = getDb();
+  const rows = await db
+    .select({
+      category: packages.category,
+      hoursLeft: packages.hoursLeft,
+      expiresAt: packages.expiresAt,
+    })
+    .from(packages)
+    .where(
+      and(
+        ownerWhere(viewer),
+        gt(packages.hoursLeft, 0),
+        gt(packages.expiresAt, now),
+        activeByNow(now),
+      ),
+    )
+    .orderBy(asc(packages.expiresAt));
+
+  const byCategory = new Map<PackageCategory, CreditBalance>();
+  for (const r of rows) {
+    const current = byCategory.get(r.category);
+    if (current) {
+      current.classes += r.hoursLeft;
+      // Rows arrive expiry-ascending, so the first one seen is already the soonest.
+    } else {
+      byCategory.set(r.category, {
+        category: r.category,
+        classes: r.hoursLeft,
+        nearestExpiry: r.expiresAt,
+      });
+    }
+  }
+
+  // Largest balance first, then soonest expiry, then a stable category order — so
+  // the list never reshuffles between visits for equal balances.
+  const order = CATEGORY_SORT;
+  return [...byCategory.values()].sort((a, b) => {
+    if (b.classes !== a.classes) return b.classes - a.classes;
+    const ae = a.nearestExpiry?.getTime() ?? Infinity;
+    const be = b.nearestExpiry?.getTime() ?? Infinity;
+    if (ae !== be) return ae - be;
+    return order.indexOf(a.category) - order.indexOf(b.category);
+  });
+}
+
+/** Stable tie-break order, matching the Buy screen's tab order. */
+const CATEGORY_SORT: readonly PackageCategory[] = [
+  "group",
+  "private",
+  "duo",
+  "trio",
+  "rental",
+] as const;

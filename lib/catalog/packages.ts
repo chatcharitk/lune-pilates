@@ -241,10 +241,10 @@ export const SEED_CATALOG: readonly CatalogSeedItem[] = [
   // private & semi
   { id: "pv-drop", category: "private", hours: 1, price: 1700, validity: V1M, label: fmtPlanLabel("solo", "drop"), sortOrder: 0 },
   { id: "pv8", category: "private", hours: 8, price: 12000, validity: V2M, tag: "best_value", label: fmtPlanLabel("solo", "pack8"), sortOrder: 10 },
-  { id: "duo-drop", category: "private", hours: 1, price: 2000, validity: V1M, label: fmtPlanLabel("duo", "drop"), sortOrder: 20 },
-  { id: "duo8", category: "private", hours: 8, price: 14400, validity: V2M, label: fmtPlanLabel("duo", "pack8"), sortOrder: 30 },
-  { id: "trio-drop", category: "private", hours: 1, price: 2200, validity: V1M, label: fmtPlanLabel("trio", "drop"), sortOrder: 40 },
-  { id: "trio8", category: "private", hours: 8, price: 16000, validity: V2M, label: fmtPlanLabel("trio", "pack8"), sortOrder: 50 },
+  { id: "duo-drop", category: "duo", hours: 1, price: 2000, validity: V1M, label: fmtPlanLabel("duo", "drop"), sortOrder: 20 },
+  { id: "duo8", category: "duo", hours: 8, price: 14400, validity: V2M, label: fmtPlanLabel("duo", "pack8"), sortOrder: 30 },
+  { id: "trio-drop", category: "trio", hours: 1, price: 2200, validity: V1M, label: fmtPlanLabel("trio", "drop"), sortOrder: 40 },
+  { id: "trio8", category: "trio", hours: 8, price: 16000, validity: V2M, label: fmtPlanLabel("trio", "pack8"), sortOrder: 50 },
   // studio rental
   { id: "r-solo", category: "rental", hours: 1, price: 600, validity: V1M, label: fmtPlanLabel("solo", "rental"), sortOrder: 0 },
   { id: "r-duo", category: "rental", hours: 1, price: 800, validity: V1M, label: fmtPlanLabel("duo", "rental"), sortOrder: 10 },
@@ -261,11 +261,19 @@ export const CATEGORY_META: Record<PackageCategory, { label: Bilingual; note: Bi
     note: { en: "Class credits · sharable for members", th: "เครดิตคลาส · สมาชิกแบ่งปันได้" },
   },
   private: {
-    label: { en: "Private & Semi", th: "ส่วนตัว & กลุ่มเล็ก" },
+    label: { en: "1:1 Private", th: "ส่วนตัว 1:1" },
     note: {
-      en: "Choose your instructor · 8-class packs valid 2 months",
-      th: "เลือกผู้สอน · แพ็ก 8 คลาส ใช้ได้ 2 เดือน",
+      en: "One-to-one with your instructor",
+      th: "เรียนตัวต่อตัวกับผู้สอน",
     },
+  },
+  duo: {
+    label: { en: "Duo", th: "ดูโอ" },
+    note: { en: "Two of you, one instructor", th: "เรียนคู่ กับผู้สอนหนึ่งท่าน" },
+  },
+  trio: {
+    label: { en: "Trio", th: "ทรีโอ" },
+    note: { en: "Three of you, one instructor", th: "เรียนสามคน กับผู้สอนหนึ่งท่าน" },
   },
   rental: {
     label: { en: "Studio Rental", th: "เช่าสตูดิโอ" },
@@ -274,7 +282,13 @@ export const CATEGORY_META: Record<PackageCategory, { label: Bilingual; note: Bi
 };
 
 /** Display order of the categories (the tab order). */
-const CATEGORY_ORDER: readonly PackageCategory[] = ["group", "private", "rental"] as const;
+const CATEGORY_ORDER: readonly PackageCategory[] = [
+  "group",
+  "private",
+  "duo",
+  "trio",
+  "rental",
+] as const;
 
 /**
  * Categories hidden from the buy + POS UIs. Studio rental was un-hidden 2026-07-23

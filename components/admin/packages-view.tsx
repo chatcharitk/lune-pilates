@@ -58,12 +58,20 @@ import { thb, type StrKey } from "@/lib/i18n";
 // ───────────────────────── constants ─────────────────────────
 
 /** Display order of the credit types. Rental is hidden from /buy, never from here. */
-const CATEGORIES: readonly PackageCategory[] = ["group", "private", "rental"] as const;
+const CATEGORIES: readonly PackageCategory[] = [
+  "group",
+  "private",
+  "duo",
+  "trio",
+  "rental",
+] as const;
 
 /** Section heading key per category (reuses the existing cat_group/private/rental). */
 const CATEGORY_KEY: Record<PackageCategory, StrKey> = {
   group: "cat_group",
   private: "cat_private",
+  duo: "cat_duo",
+  trio: "cat_trio",
   rental: "cat_rental",
 };
 

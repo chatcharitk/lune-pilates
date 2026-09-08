@@ -31,12 +31,21 @@ describe("positionsForCapacity", () => {
 });
 
 describe("packageCategoryForClassType", () => {
-  it("routes class types to the settling package category", () => {
+  it("routes every class type to its OWN settling pool", () => {
+    // One pool per format (2026-09-08): duo and trio no longer fold into "private",
+    // so a pack bought for one format can never be spent on another.
     expect(packageCategoryForClassType("group")).toBe("group");
     expect(packageCategoryForClassType("rental")).toBe("rental");
     expect(packageCategoryForClassType("private")).toBe("private");
-    expect(packageCategoryForClassType("duo")).toBe("private");
-    expect(packageCategoryForClassType("trio")).toBe("private");
+    expect(packageCategoryForClassType("duo")).toBe("duo");
+    expect(packageCategoryForClassType("trio")).toBe("trio");
+  });
+
+  it("gives each class type a DISTINCT pool — no two formats share one", () => {
+    const pools = (["group", "private", "duo", "trio", "rental"] as const).map(
+      packageCategoryForClassType,
+    );
+    expect(new Set(pools).size).toBe(pools.length);
   });
 });
 

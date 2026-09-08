@@ -18,7 +18,8 @@
 import Link from "next/link";
 import type { MyBooking } from "@/lib/bookings/queries";
 import type { BookableClass } from "@/lib/schedule/queries";
-import { STR } from "@/lib/i18n";
+import { STR, type StrKey } from "@/lib/i18n";
+import type { PackageCategory } from "@/lib/domain/types";
 import { useCustomerLang } from "./customer-context";
 import {
   classDateLabel,
@@ -36,8 +37,14 @@ import { studioImage } from "@/lib/studio-images";
 export interface HomeViewProps {
   /** Viewer identity (display only — server-resolved). */
   viewer: { name: string; tier: "member" | "guest"; houseNumber: string | null; avatarUrl: string | null };
-  /** Server-resolved pool summary. `nearestExpiryIso` null when the pool is empty. */
-  overview: { hours: number; nearestExpiryIso: string | null; isHouseholdPool: boolean };
+  /**
+   * The viewer's usable balance PER CLASS FORMAT, biggest first, server-resolved.
+   * Only formats they actually hold appear — a balance can only book its own format
+   * (they are not interchangeable), so there is deliberately no combined total.
+   */
+  balances: { category: PackageCategory; classes: number; nearestExpiryIso: string | null }[];
+  /** true when these balances are the shared household pool rather than personal. */
+  isHouseholdPool: boolean;
   /** The viewer's soonest upcoming booking, or null to hide the card. */
   next: MyBooking | null;
   /** Whether the viewer holds a live (`offered`) waitlist hold right now. */
@@ -46,17 +53,31 @@ export interface HomeViewProps {
   week: BookableClass[];
 }
 
-export function HomeView({ viewer, overview, next, hasOffer, week }: HomeViewProps) {
+/** Class format → its i18n label key (mirrors the Buy screen's tab labels). */
+const CATEGORY_KEY: Record<PackageCategory, StrKey> = {
+  group: "cat_group",
+  private: "cat_private",
+  duo: "cat_duo",
+  trio: "cat_trio",
+  rental: "cat_rental",
+};
+
+export function HomeView({
+  viewer,
+  balances,
+  isHouseholdPool,
+  next,
+  hasOffer,
+  week,
+}: HomeViewProps) {
   const { t, tt, lang } = useCustomerLang();
-  const hoursLabel = overview.hours === 1 ? t("hour") : t("hours");
   const avatarInitial = viewer.name.trim().charAt(0).toUpperCase() || "·";
-  const expiryLabel = overview.nearestExpiryIso
-    ? formatStudioDate(new Date(overview.nearestExpiryIso), lang, {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      })
-    : null;
+
+  function expiryLabelFor(iso: string | null): string | null {
+    return iso
+      ? formatStudioDate(new Date(iso), lang, { day: "numeric", month: "short", year: "numeric" })
+      : null;
+  }
 
   return (
     <div className="px-[18px] pt-1.5">
@@ -98,6 +119,11 @@ export function HomeView({ viewer, overview, next, hasOffer, week }: HomeViewPro
 
       {/* balance hero — warm cream gradient + sparkle motif; tappable to /buy.
           Same treatment as the Profile screen so the two stay consistent. */}
+      {/* CLASS BALANCES — one per format the viewer holds (2026-09-08).
+          Group, 1:1, Duo, Trio and Rental classes are separate balances that can
+          only book their own format, so this deliberately shows NO combined total:
+          a customer with 5 group and 2 duo classes has no "7" they can spend on
+          anything. Empty formats are omitted rather than shown as zeros. */}
       <Link
         href="/buy"
         aria-label={t("buy_credits")}
@@ -111,7 +137,7 @@ export function HomeView({ viewer, overview, next, hasOffer, week }: HomeViewPro
         />
         <div className="relative flex items-start justify-between">
           <span className="font-body text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
-            {t("credits_remaining")}
+            {balances.length > 0 ? t("balances_title") : t("credits_remaining")}
           </span>
           {viewer.tier === "member" && (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-cream-2 px-[11px] py-[5px] font-body text-[11.5px] font-semibold tracking-[0.02em] text-taupe-deep">
@@ -121,28 +147,63 @@ export function HomeView({ viewer, overview, next, hasOffer, week }: HomeViewPro
           )}
         </div>
 
-        <div className="mb-0.5 mt-1.5 flex items-baseline gap-2">
-          <span className="font-head text-[48px] font-semibold leading-none text-ink">{overview.hours}</span>
-          <span className="font-body text-base font-medium text-taupe">{hoursLabel}</span>
-        </div>
+        {balances.length === 0 ? (
+          /* Nothing to show — say so plainly and point at the shop, rather than a
+             row of zeros for formats they have never bought. */
+          <div className="relative mt-2">
+            <p className="m-0 font-head text-[26px] font-semibold leading-tight text-ink">
+              {t("balances_empty_title")}
+            </p>
+            <p className="m-0 mt-1 font-body text-[13px] text-ink-soft">
+              {t("balances_empty_body")}
+            </p>
+          </div>
+        ) : (
+          <ul className="relative mt-3 flex flex-col">
+            {balances.map((b, i) => {
+              const expiry = expiryLabelFor(b.nearestExpiryIso);
+              return (
+                <li
+                  key={b.category}
+                  className={`flex items-baseline justify-between gap-3 py-2.5 ${
+                    i > 0 ? "border-t border-line" : "pt-0"
+                  }`}
+                >
+                  <span className="min-w-0">
+                    <span className="block font-head text-[15px] font-semibold leading-tight text-ink">
+                      {t(CATEGORY_KEY[b.category])}
+                    </span>
+                    {expiry && (
+                      <span className="mt-0.5 block font-body text-[11.5px] leading-tight text-muted">
+                        {t("balance_expires").replace("{date}", expiry)}
+                      </span>
+                    )}
+                  </span>
+                  <span className="flex shrink-0 items-baseline gap-1.5">
+                    <span className="font-head text-[30px] font-semibold leading-none text-ink tabular-nums">
+                      {b.classes}
+                    </span>
+                    <span className="font-body text-[13px] font-medium text-taupe">
+                      {b.classes === 1 ? t("hour") : t("hours")}
+                    </span>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
 
-        <div className="mt-2.5 flex items-center justify-between gap-4 border-t border-line pt-3">
-          <span className="min-w-0 font-body text-[13px] text-ink-soft">
-            {overview.isHouseholdPool && viewer.houseNumber ? (
-              <>
-                {t("shared_pool")}
-                {expiryLabel && (
-                  <>
-                    {" · "}
-                    {t("valid_until")} <strong className="font-semibold text-ink">{expiryLabel}</strong>
-                  </>
-                )}
-              </>
-            ) : expiryLabel ? (
-              <>
-                {t("valid_until")} <strong className="font-semibold text-ink">{expiryLabel}</strong>
-              </>
-            ) : null}
+        <div className="relative mt-2.5 flex items-center justify-between gap-4 border-t border-line pt-3">
+          <span className="min-w-0 font-body text-[12.5px] text-ink-soft">
+            {/* Nothing to caption when they hold nothing — "shared with your house"
+                over an empty balance reads as a bug. */}
+            {balances.length === 0
+              ? null
+              : balances.length > 1
+                ? t("balances_note")
+                : isHouseholdPool && viewer.houseNumber
+                  ? t("balance_pool_shared")
+                  : null}
           </span>
           <span className="inline-flex shrink-0 items-center gap-1 font-body text-[13.5px] font-semibold text-taupe-deep">
             {t("buy_credits")}

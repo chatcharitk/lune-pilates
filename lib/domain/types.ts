@@ -3,7 +3,15 @@
 // and lune-pilates/project/lune-data.jsx.
 
 export type UserTier = "member" | "guest";
-export type PackageCategory = "group" | "private" | "rental";
+/**
+ * Which credit pool a package holds — ONE PER CLASS FORMAT (2026-09-08).
+ *
+ * 1:1, Duo and Trio used to share a single "private" pool. Since the studio prices
+ * them differently (฿1,500–฿2,000 per class), that let a customer buy the cheapest
+ * pack and spend it on the dearest format. A balance is now usable only for the
+ * format it was sold for; `packageCategoryForClassType` is the mapping.
+ */
+export type PackageCategory = "group" | "private" | "duo" | "trio" | "rental";
 export type ClassType = "group" | "private" | "duo" | "trio" | "rental";
 export type ClassStatus = "draft" | "published" | "cancelled";
 export type BookingStatus = "booked" | "cancelled";

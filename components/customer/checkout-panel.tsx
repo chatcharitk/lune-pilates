@@ -72,6 +72,8 @@ const TAG_KEY: Record<CatalogTag, StrKey> = {
 const CAT_TAB_KEY: Record<PackageCategory, StrKey> = {
   group: "cat_group",
   private: "cat_private",
+  duo: "cat_duo",
+  trio: "cat_trio",
   rental: "cat_rental",
 };
 

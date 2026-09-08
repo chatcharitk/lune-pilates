@@ -61,6 +61,7 @@ import {
   type ComponentSetProblem,
 } from "@/lib/catalog/components";
 import type { ValidityUnit } from "@/lib/catalog/packages";
+import type { PackageCategory } from "@/lib/domain/types";
 import { requireOwner } from "@/lib/auth/admin";
 import { mockDataMode } from "@/lib/mock-mode";
 
@@ -69,7 +70,7 @@ import { mockDataMode } from "@/lib/mock-mode";
 /** URL-safe slug: lowercase alphanumerics separated by single hyphens. */
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-const CATEGORY = z.enum(["group", "private", "rental"]);
+const CATEGORY = z.enum(["group", "private", "duo", "trio", "rental"]);
 // Structured validity (2026-07-23): a positive whole amount of days or months.
 // The per-unit ceiling lives in lib/catalog/validity.ts (MAX_VALIDITY_AMOUNT) and is
 // applied by `withValidityInRange` below — a single flat max(60) used to be applied
@@ -525,7 +526,7 @@ export async function reorderCatalog(raw: ReorderCatalogInput): Promise<ReorderC
  * ordering was meaningless as well as illegal. COALESCE keeps the empty-category
  * case (no rows → max is NULL) inside SQL rather than relying on the driver's null.
  */
-async function nextSortOrder(category: "group" | "private" | "rental"): Promise<number> {
+async function nextSortOrder(category: PackageCategory): Promise<number> {
   const db = getDb();
   const [row] = await db
     .select({ next: sql<number>`coalesce(max(${catalogItems.sortOrder}), -10) + 10` })
@@ -538,7 +539,7 @@ async function nextSortOrder(category: "group" | "private" | "rental"): Promise<
 function synthesizeItem(
   input: {
     id: string;
-    category: "group" | "private" | "rental";
+    category: PackageCategory;
     hours: number;
     price: number;
     validityAmount: number;
