@@ -176,17 +176,18 @@ const FMT_LABEL = {
 
 const PLAN_LABEL = {
   drop: { en: "Drop-in", th: "ดรอปอิน" },
-  pack8: { en: "8-hour pack", th: "แพ็ก 8 ชม." },
+  pack8: { en: "8-class pack", th: "แพ็ก 8 คลาส" },
   rental: { en: "Full apparatus", th: "อุปกรณ์ครบชุด" },
 } as const;
 
 type Fmt = keyof typeof FMT_LABEL;
 type Plan = keyof typeof PLAN_LABEL;
 
-function hoursLabel(hours: number): Bilingual {
+/** "N classes" label for a plain package (one credit = one class). */
+function classesLabel(hours: number): Bilingual {
   return hours === 1
-    ? { en: "1 hour", th: "1 ชั่วโมง" }
-    : { en: `${hours} hours`, th: `${hours} ชั่วโมง` };
+    ? { en: "1 class", th: "1 คลาส" }
+    : { en: `${hours} classes`, th: `${hours} คลาส` };
 }
 
 /** "1:1 · 8-hour pack" — joins a format with a plan for non-group items. */
@@ -233,10 +234,10 @@ const V3M: Validity = { amount: 3, unit: "month" };
 
 export const SEED_CATALOG: readonly CatalogSeedItem[] = [
   // group
-  { id: "drop", category: "group", hours: 1, price: 650, validity: V1M, label: hoursLabel(1), sortOrder: 0 },
-  { id: "p5", category: "group", hours: 5, price: 2950, validity: V1M, label: hoursLabel(5), sortOrder: 10 },
-  { id: "p10", category: "group", hours: 10, price: 5500, validity: V2M, tag: "popular", label: hoursLabel(10), sortOrder: 20 },
-  { id: "p15", category: "group", hours: 20, price: 10000, validity: V3M, tag: "best_value", label: hoursLabel(20), sortOrder: 30 },
+  { id: "drop", category: "group", hours: 1, price: 650, validity: V1M, label: classesLabel(1), sortOrder: 0 },
+  { id: "p5", category: "group", hours: 5, price: 2950, validity: V1M, label: classesLabel(5), sortOrder: 10 },
+  { id: "p10", category: "group", hours: 10, price: 5500, validity: V2M, tag: "popular", label: classesLabel(10), sortOrder: 20 },
+  { id: "p15", category: "group", hours: 20, price: 10000, validity: V3M, tag: "best_value", label: classesLabel(20), sortOrder: 30 },
   // private & semi
   { id: "pv-drop", category: "private", hours: 1, price: 1700, validity: V1M, label: fmtPlanLabel("solo", "drop"), sortOrder: 0 },
   { id: "pv8", category: "private", hours: 8, price: 12000, validity: V2M, tag: "best_value", label: fmtPlanLabel("solo", "pack8"), sortOrder: 10 },
@@ -257,18 +258,18 @@ export const SEED_CATALOG: readonly CatalogSeedItem[] = [
 export const CATEGORY_META: Record<PackageCategory, { label: Bilingual; note: Bilingual }> = {
   group: {
     label: { en: "Group Class", th: "คลาสกลุ่ม" },
-    note: { en: "Hour credits · sharable for members", th: "เครดิตชั่วโมง · สมาชิกแบ่งปันได้" },
+    note: { en: "Class credits · sharable for members", th: "เครดิตคลาส · สมาชิกแบ่งปันได้" },
   },
   private: {
     label: { en: "Private & Semi", th: "ส่วนตัว & กลุ่มเล็ก" },
     note: {
-      en: "Choose your instructor · 8-hr packs valid 2 months",
-      th: "เลือกผู้สอน · แพ็ก 8 ชม. ใช้ได้ 2 เดือน",
+      en: "Choose your instructor · 8-class packs valid 2 months",
+      th: "เลือกผู้สอน · แพ็ก 8 คลาส ใช้ได้ 2 เดือน",
     },
   },
   rental: {
     label: { en: "Studio Rental", th: "เช่าสตูดิโอ" },
-    note: { en: "Full apparatus · per hour", th: "อุปกรณ์ครบชุด · ต่อชั่วโมง" },
+    note: { en: "Full apparatus · per class", th: "อุปกรณ์ครบชุด · ต่อคลาส" },
   },
 };
 

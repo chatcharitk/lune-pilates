@@ -22,8 +22,8 @@ export const STR = {
   liff_open_in_line_button: { en: "Open in LINE", th: "เปิดใน LINE" },
   liff_phone_title: { en: "Confirm your phone number", th: "ยืนยันเบอร์โทรศัพท์" },
   liff_phone_body: {
-    en: "Enter the phone number you registered with the studio to link your account and see your hours.",
-    th: "กรอกเบอร์โทรที่ลงทะเบียนกับสตูดิโอ เพื่อเชื่อมบัญชีและดูชั่วโมงของคุณ",
+    en: "Enter the phone number you registered with the studio to link your account and see your classes.",
+    th: "กรอกเบอร์โทรที่ลงทะเบียนกับสตูดิโอ เพื่อเชื่อมบัญชีและดูคลาสของคุณ",
   },
   liff_phone_label: { en: "Phone number", th: "เบอร์โทรศัพท์" },
   liff_phone_placeholder: { en: "08XXXXXXXX", th: "08XXXXXXXX" },
@@ -45,14 +45,14 @@ export const STR = {
   greet_evening: { en: "Good evening", th: "สวัสดีตอนเย็น" },
 
   // home
-  credits_remaining: { en: "Hours remaining", th: "ชั่วโมงคงเหลือ" },
-  hours: { en: "hours", th: "ชั่วโมง" },
-  hour: { en: "hour", th: "ชั่วโมง" },
+  credits_remaining: { en: "Classes remaining", th: "คลาสคงเหลือ" },
+  hours: { en: "classes", th: "คลาส" },
+  hour: { en: "class", th: "คลาส" },
   valid_until: { en: "Valid until", th: "หมดอายุ" },
   member: { en: "Member", th: "สมาชิก" },
   household: { en: "Household", th: "ครัวเรือน" },
-  shared_pool: { en: "Shared pool", th: "ชั่วโมงรวมของบ้าน" },
-  buy_credits: { en: "Buy hours", th: "ซื้อชั่วโมง" },
+  shared_pool: { en: "Shared pool", th: "คลาสรวมของบ้าน" },
+  buy_credits: { en: "Buy classes", th: "ซื้อคลาส" },
   book_a_class: { en: "Book a class", th: "จองคลาส" },
   next_class: { en: "Your next class", th: "คลาสถัดไปของคุณ" },
   this_week: { en: "This week", th: "สัปดาห์นี้" },
@@ -156,8 +156,8 @@ export const STR = {
     th: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
   },
   err_no_package: {
-    en: "You have no active hours for this class. Buy a package to book.",
-    th: "คุณไม่มีชั่วโมงที่ใช้ได้สำหรับคลาสนี้ กรุณาซื้อแพ็กเกจก่อนจอง",
+    en: "You have no active classes for this class type. Buy a package to book.",
+    th: "คุณไม่มีคลาสที่ใช้ได้สำหรับคลาสนี้ กรุณาซื้อแพ็กเกจก่อนจอง",
   },
   err_full: {
     en: "This class just filled up. Try joining the waitlist.",
@@ -227,13 +227,13 @@ export const STR = {
   coming_soon: { en: "Coming soon", th: "เร็ว ๆ นี้" },
   // guest (no household) non-sharing state on Profile
   guest_no_household: {
-    en: "Guest account — hours are personal and can’t be shared.",
-    th: "บัญชีทั่วไป — ชั่วโมงเป็นของคุณคนเดียว แบ่งปันไม่ได้",
+    en: "Guest account — classes are personal and can’t be shared.",
+    th: "บัญชีทั่วไป — คลาสเป็นของคุณคนเดียว แบ่งปันไม่ได้",
   },
   // empty package-history state on Profile
   no_purchases: {
-    en: "No packages yet. Buy hours to get started.",
-    th: "ยังไม่มีแพ็กเกจ ซื้อชั่วโมงเพื่อเริ่มต้นได้เลย",
+    en: "No packages yet. Buy classes to get started.",
+    th: "ยังไม่มีแพ็กเกจ ซื้อคลาสเพื่อเริ่มต้นได้เลย",
   },
 
   // bookings list (My Bookings — lune-extra.jsx)
@@ -273,8 +273,8 @@ export const STR = {
     th: "ที่นั่งนั้นเพิ่งถูกจองไป หากมีที่ว่างอีกเราจะแจ้งให้ทราบ",
   },
   err_offer_no_credits: {
-    en: "You have no active hours to confirm this spot.",
-    th: "คุณไม่มีชั่วโมงที่ใช้ได้สำหรับยืนยันที่นั่งนี้",
+    en: "You have no active classes to confirm this spot.",
+    th: "คุณไม่มีคลาสที่ใช้ได้สำหรับยืนยันที่นั่งนี้",
   },
 
   // cancel (seeded from lune-data.jsx STR). Self-cancel is allowed ONLY ≥6h before
@@ -283,7 +283,7 @@ export const STR = {
   cancel_title: { en: "Cancel this class?", th: "ยกเลิกคลาสนี้?" },
   keep_booking: { en: "Keep my booking", th: "เก็บการจองไว้" },
   free_cancel: { en: "Free cancellation", th: "ยกเลิกได้ฟรี" },
-  // {cost} is the booking's exact credit cost (e.g. "2 hours"), refunded in full
+  // {cost} is the booking's exact credit cost (e.g. "1 class"), refunded in full
   // on a free cancel (always, since self-cancel only happens ≥6h before class).
   free_cancel_sub: {
     en: "You’re more than 6 hours before class — your {cost} will be refunded to your balance.",
@@ -330,7 +330,7 @@ export const STR = {
   // credits / packages (buy-credits screen) — seeded from lune-data.jsx STR
   packages: { en: "Packages", th: "แพ็กเกจ" },
   choose_package: { en: "Choose a package", th: "เลือกแพ็กเกจที่เหมาะกับคุณ" },
-  per_hour: { en: "/hr", th: "/ชม." },
+  per_hour: { en: "/class", th: "/คลาส" },
   valid_for: { en: "Valid for", th: "ใช้ได้" },
   one_month: { en: "1 month", th: "1 เดือน" },
   two_months: { en: "2 months", th: "2 เดือน" },
@@ -341,15 +341,15 @@ export const STR = {
   non_transfer: { en: "Non-transferable", th: "โอนสิทธิ์ไม่ได้" },
   non_transfer_note: {
     en: "Hours are non-transferable",
-    th: "ชั่วโมงในแพ็กเกจโอนสิทธิ์ไม่ได้",
+    th: "คลาสในแพ็กเกจโอนสิทธิ์ไม่ได้",
   },
   member_perk_title: {
-    en: "Member benefit · Sharable hours",
-    th: "สิทธิสมาชิก · แบ่งปันชั่วโมงได้",
+    en: "Member benefit · Sharable classes",
+    th: "สิทธิสมาชิก · แบ่งปันคลาสได้",
   },
   member_perk_body: {
-    en: "Members can share unlimited hours with others at the same house number. Non-member packages cannot be shared.",
-    th: "สมาชิกสามารถแบ่งปันชั่วโมงได้ไม่จำกัดกับผู้ที่อยู่บ้านเลขที่เดียวกัน แพ็กเกจทั่วไปไม่สามารถแบ่งปันได้",
+    en: "Members can share unlimited classes with others at the same house number. Non-member packages cannot be shared.",
+    th: "สมาชิกสามารถแบ่งปันคลาสได้ไม่จำกัดกับผู้ที่อยู่บ้านเลขที่เดียวกัน แพ็กเกจทั่วไปไม่สามารถแบ่งปันได้",
   },
   house_label: { en: "House", th: "บ้านเลขที่" },
   select: { en: "Select", th: "เลือก" },
@@ -387,24 +387,24 @@ export const STR = {
   ive_paid: { en: "I’ve paid", th: "ชำระเงินแล้ว" },
   payment_done: { en: "Payment received", th: "รับชำระเงินแล้ว" },
   payment_sub: {
-    en: "Your hours have been added to your account.",
-    th: "เพิ่มชั่วโมงเข้าบัญชีของคุณเรียบร้อยแล้ว",
+    en: "Your classes have been added to your account.",
+    th: "เพิ่มคลาสเข้าบัญชีของคุณเรียบร้อยแล้ว",
   },
 
   // PromptPay slip upload (Feature 3) — credit is granted only after the front desk
   // verifies the transfer slip, so the customer attaches a slip then waits for review.
   slip_attach: { en: "I’ve transferred — attach slip", th: "โอนแล้ว — แนบสลิป" },
   slip_upload_hint: {
-    en: "Attach a screenshot of your transfer slip. We’ll verify it and add your hours.",
-    th: "แนบภาพสลิปการโอนเงินของคุณ เราจะตรวจสอบและเพิ่มชั่วโมงให้",
+    en: "Attach a screenshot of your transfer slip. We’ll verify it and add your classes.",
+    th: "แนบภาพสลิปการโอนเงินของคุณ เราจะตรวจสอบและเพิ่มคลาสให้",
   },
   slip_choose_image: { en: "Choose slip image", th: "เลือกภาพสลิป" },
   slip_change_image: { en: "Choose a different image", th: "เลือกภาพอื่น" },
   slip_submit: { en: "Submit for verification", th: "ส่งเพื่อตรวจสอบ" },
   slip_submitted_title: { en: "Slip received", th: "ได้รับสลิปแล้ว" },
   slip_submitted_sub: {
-    en: "We’ve received your slip — we’ll confirm shortly and add your hours.",
-    th: "เราได้รับสลิปของคุณแล้ว จะยืนยันในไม่ช้าและเพิ่มชั่วโมงให้คุณ",
+    en: "We’ve received your slip — we’ll confirm shortly and add your classes.",
+    th: "เราได้รับสลิปของคุณแล้ว จะยืนยันในไม่ช้าและเพิ่มคลาสให้คุณ",
   },
   // under-review / rejected surfacing on the Buy screen (so a customer can re-upload).
   slip_under_review: {
@@ -506,8 +506,8 @@ export const STR = {
   b1g1_note: { en: "Buy 1 Get 1 → paying member", th: "ซื้อ 1 แถม 1 → สมาชิกจ่ายเงิน" },
   trial_of: { en: "of", th: "จาก" },
   trials_converted: { en: "trials converted this month", th: "รายที่แปลงเดือนนี้" },
-  package_liability: { en: "Package liability", th: "ชั่วโมงคงค้าง" },
-  liability_note: { en: "Unredeemed hours on the books", th: "ชั่วโมงที่ยังไม่ใช้คงค้าง" },
+  package_liability: { en: "Package liability", th: "คลาสคงค้าง" },
+  liability_note: { en: "Unredeemed classes on the books", th: "คลาสที่ยังไม่ใช้คงค้าง" },
   hours_outstanding: { en: "outstanding", th: "คงค้าง" },
   pct_of_sold: { en: "of all sold", th: "ของที่ขายทั้งหมด" },
   revenue_per_instructor: { en: "Revenue per instructor", th: "รายได้ต่อผู้สอน" },
@@ -596,12 +596,12 @@ export const STR = {
   cancel_sale: { en: "Cancel sale", th: "ยกเลิกการขาย" },
   cancel_sale_confirm_title: { en: "Cancel this sale?", th: "ยกเลิกการขายนี้?" },
   cancel_sale_confirm_body: {
-    en: "The sale will be voided. Any unused hours from this purchase will be removed.",
-    th: "รายการขายจะถูกยกเลิก และชั่วโมงที่ยังไม่ได้ใช้จากการซื้อนี้จะถูกดึงคืน",
+    en: "The sale will be voided. Any unused classes from this purchase will be removed.",
+    th: "รายการขายจะถูกยกเลิก และคลาสที่ยังไม่ได้ใช้จากการซื้อนี้จะถูกดึงคืน",
   },
   cancel_sale_spent_warning: {
-    en: "Some hours from this sale have already been used and will stay. Only unused hours are removed.",
-    th: "ชั่วโมงบางส่วนจากการขายนี้ถูกใช้ไปแล้วและจะยังอยู่ ระบบจะดึงคืนเฉพาะชั่วโมงที่ยังไม่ได้ใช้",
+    en: "Some classes from this sale have already been used and will stay. Only unused classes are removed.",
+    th: "คลาสบางส่วนจากการขายนี้ถูกใช้ไปแล้วและจะยังอยู่ ระบบจะดึงคืนเฉพาะคลาสที่ยังไม่ได้ใช้",
   },
   cancel_sale_reason_label: { en: "Reason (optional)", th: "เหตุผล (ไม่บังคับ)" },
   cancel_sale_reason_ph: { en: "e.g. duplicate, entered by mistake", th: "เช่น รายการซ้ำ, บันทึกผิด" },
@@ -613,8 +613,8 @@ export const STR = {
   no_slip: { en: "No slip uploaded", th: "ยังไม่มีสลิป" },
   keep: { en: "Keep", th: "เก็บไว้" },
   err_position_taken: { en: "That position is taken.", th: "ตำแหน่งนี้ถูกจองแล้ว" },
-  booking_cancelled_refunded: { en: "Cancelled · hour refunded", th: "ยกเลิกแล้ว · คืนชั่วโมง" },
-  booking_cancelled_kept: { en: "Cancelled · no refund", th: "ยกเลิกแล้ว · ไม่คืนชั่วโมง" },
+  booking_cancelled_refunded: { en: "Cancelled · class refunded", th: "ยกเลิกแล้ว · คืนคลาส" },
+  booking_cancelled_kept: { en: "Cancelled · no refund", th: "ยกเลิกแล้ว · ไม่คืนคลาส" },
 
   // admin Schedule management
   edit: { en: "Edit", th: "แก้ไข" },
@@ -630,10 +630,10 @@ export const STR = {
   delete_class: { en: "Delete class", th: "ลบคลาส" },
   // cancel_class { en:"Cancel class", th:"ยกเลิกคลาส" } already exists in the customer section above.
   cancel_class_confirm: {
-    en: "Cancel this class? Everyone booked gets their hour back.",
-    th: "ยกเลิกคลาสนี้? ผู้จองทุกคนจะได้รับชั่วโมงคืน",
+    en: "Cancel this class? Everyone booked gets their class back.",
+    th: "ยกเลิกคลาสนี้? ผู้จองทุกคนจะได้รับคลาสคืน",
   },
-  class_cancelled_toast: { en: "Class cancelled · {n} refunded", th: "ยกเลิกคลาสแล้ว · คืนชั่วโมง {n} คน" },
+  class_cancelled_toast: { en: "Class cancelled · {n} refunded", th: "ยกเลิกคลาสแล้ว · คืนคลาส {n} คน" },
   people_max_reformers: { en: "people · max 3 reformers", th: "คน · สูงสุด 3 เครื่อง" },
   booked_label: { en: "booked", th: "จองแล้ว" },
   cls_short: { en: "cls", th: "คลาส" },
@@ -761,7 +761,7 @@ export const STR = {
   booking_detail: { en: "Booking", th: "การจอง" },
   customer: { en: "Customer", th: "ลูกค้า" },
   class_label: { en: "Class", th: "คลาส" },
-  credit_cost: { en: "Hour cost", th: "ชั่วโมงที่ใช้" },
+  credit_cost: { en: "Class cost", th: "คลาสที่ใช้" },
   checked_in_label: { en: "Checked in", th: "เช็คอินแล้ว" },
   not_checked_in: { en: "Not checked in", th: "ยังไม่เช็คอิน" },
   cancel_booking: { en: "Cancel booking", th: "ยกเลิกการจอง" },
@@ -769,17 +769,17 @@ export const STR = {
   // {cost} = the credits returned/kept). free → refunds; otherwise kept.
   cancel_free_note: {
     en: "Within the free window — cancelling returns {cost} to the pool.",
-    th: "อยู่ในช่วงยกเลิกฟรี — ยกเลิกแล้วคืน {cost} เข้าชั่วโมงรวม",
+    th: "อยู่ในช่วงยกเลิกฟรี — ยกเลิกแล้วคืน {cost} เข้าคลาสรวม",
   },
   cancel_keep_note: {
-    en: "Past the {hours} window — the {cost} hour cost is kept.",
-    th: "เลยช่วง {hours} แล้ว — ชั่วโมง {cost} จะถูกหัก",
+    en: "Past the {hours} window — the {cost} class cost is kept.",
+    th: "เลยช่วง {hours} แล้ว — คลาส {cost} จะถูกหัก",
   },
   // admin refund override toggle (goodwill refund / withhold)
-  refund_override: { en: "Refund hours anyway", th: "คืนชั่วโมงให้แม้เลยกำหนด" },
+  refund_override: { en: "Refund classes anyway", th: "คืนคลาสให้แม้เลยกำหนด" },
   refund_override_hint: {
-    en: "Override the policy and return the hour cost to the customer.",
-    th: "ข้ามนโยบายและคืนชั่วโมงให้ลูกค้า",
+    en: "Override the policy and return the class cost to the customer.",
+    th: "ข้ามนโยบายและคืนคลาสให้ลูกค้า",
   },
 
   // admin reschedule (front desk moves a customer's booking to another time; not
@@ -808,8 +808,8 @@ export const STR = {
     th: "ยกเลิกการจองแล้ว — คืน {cost}",
   },
   toast_cancel_kept: {
-    en: "Booking cancelled — hour kept",
-    th: "ยกเลิกการจองแล้ว — หักชั่วโมง",
+    en: "Booking cancelled — class kept",
+    th: "ยกเลิกการจองแล้ว — หักคลาส",
   },
   toast_cancel_failed: {
     en: "Couldn’t cancel this booking. Please try again.",
@@ -834,12 +834,12 @@ export const STR = {
   // PageTitle sub — {n} interpolated with the customer count.
   total_members: { en: "{n} total members", th: "สมาชิกทั้งหมด {n} คน" },
   // table column headers (member/house/sharing reuse existing keys; credits below)
-  credits: { en: "Hours", th: "ชั่วโมง" },
-  sharing: { en: "Sharing", th: "แบ่งปันชั่วโมง" },
+  credits: { en: "Classes", th: "คลาส" },
+  sharing: { en: "Sharing", th: "แบ่งปันคลาส" },
   active: { en: "Active", th: "ใช้งาน" },
   expiring: { en: "Expiring soon", th: "ใกล้หมดอายุ" },
   // credits cell — "8 hrs", and the expiry sub line "till 24 Jun".
-  hrs: { en: "hrs", th: "ชม." },
+  hrs: { en: "classes", th: "คลาส" },
   expiring_soon: { en: "Expiring soon", th: "ใกล้หมดอายุ" },
   expires_till: { en: "till {date}", th: "ถึง {date}" },
   // detail drawer
@@ -849,11 +849,11 @@ export const STR = {
   this_member: { en: "This member", th: "คนนี้" },
   share_note_member: {
     en: "Hours are shared without limit across this house number.",
-    th: "สมาชิกแบ่งปันชั่วโมงได้ไม่จำกัดกับคนในบ้านเลขที่เดียวกัน",
+    th: "สมาชิกแบ่งปันคลาสได้ไม่จำกัดกับคนในบ้านเลขที่เดียวกัน",
   },
   share_note_guest: {
-    en: "Guest account — hours are non-transferable and cannot be shared.",
-    th: "ลูกค้าทั่วไป — ชั่วโมงโอนหรือแบ่งปันไม่ได้",
+    en: "Guest account — classes are non-transferable and cannot be shared.",
+    th: "ลูกค้าทั่วไป — คลาสโอนหรือแบ่งปันไม่ได้",
   },
   // add-customer form
   add_customer: { en: "Add customer", th: "เพิ่มลูกค้า" },
@@ -877,8 +877,8 @@ export const STR = {
   remove_customer: { en: "Remove customer", th: "ลบลูกค้า" },
   remove_customer_confirm_title: { en: "Remove this customer?", th: "ลบลูกค้ารายนี้?" },
   remove_customer_confirm_body: {
-    en: "Their upcoming bookings will be cancelled and refunded to the pool, their LINE account unlinked, and personal details removed. Payment and hour history is kept for the records. This can't be undone.",
-    th: "การจองที่กำลังจะมาถึงจะถูกยกเลิกและคืนชั่วโมงเข้าพูล บัญชี LINE จะถูกยกเลิกการเชื่อมต่อ และข้อมูลส่วนตัวจะถูกลบ ประวัติการชำระเงินและชั่วโมงจะถูกเก็บไว้สำหรับบัญชี การกระทำนี้ไม่สามารถย้อนกลับได้",
+    en: "Their upcoming bookings will be cancelled and refunded to the pool, their LINE account unlinked, and personal details removed. Payment and class history is kept for the records. This can't be undone.",
+    th: "การจองที่กำลังจะมาถึงจะถูกยกเลิกและคืนคลาสเข้าพูล บัญชี LINE จะถูกยกเลิกการเชื่อมต่อ และข้อมูลส่วนตัวจะถูกลบ ประวัติการชำระเงินและคลาสจะถูกเก็บไว้สำหรับบัญชี การกระทำนี้ไม่สามารถย้อนกลับได้",
   },
   remove_customer_confirm_btn: { en: "Remove customer", th: "ยืนยันลบ" },
   remove_customer_already: { en: "This customer is already removed", th: "ลูกค้ารายนี้ถูกลบไปแล้ว" },
@@ -893,10 +893,10 @@ export const STR = {
 
   // ───────────────────────── admin customer credit-transaction history (Members drawer) ─────────────────────────
   // section heading below the credits + adjust-credits control
-  ledger_title: { en: "Hour transactions", th: "ประวัติชั่วโมง" },
+  ledger_title: { en: "Class transactions", th: "ประวัติคลาส" },
   // reason labels (mirror lib/admin/members.ts LedgerReason)
   ledger_booking: { en: "Class booking", th: "จองคลาส" },
-  ledger_cancel_refund: { en: "Cancellation refund", th: "คืนชั่วโมงจากการยกเลิก" },
+  ledger_cancel_refund: { en: "Cancellation refund", th: "คืนคลาสจากการยกเลิก" },
   ledger_purchase: { en: "Package purchase", th: "ซื้อแพ็กเกจ" },
   ledger_adjustment: { en: "Manual adjustment", th: "ปรับด้วยตนเอง" },
   ledger_promo: { en: "Free trial class (1+1)", th: "คลาสทดลองฟรี (1+1)" },
@@ -932,7 +932,7 @@ export const STR = {
   },
   admin_slip_alt: { en: "Payment slip from {name}", th: "สลิปการชำระเงินจาก {name}" },
   // toasts after an admin review decision
-  admin_slip_approved: { en: "Slip approved — hours added", th: "อนุมัติสลิปแล้ว — เพิ่มชั่วโมงแล้ว" },
+  admin_slip_approved: { en: "Slip approved — classes added", th: "อนุมัติสลิปแล้ว — เพิ่มคลาสแล้ว" },
   admin_slip_rejected: { en: "Slip rejected", th: "ปฏิเสธสลิปแล้ว" },
   admin_slip_review_failed: {
     en: "Couldn’t complete this review. Please try again.",
@@ -950,8 +950,8 @@ export const STR = {
   pos_complete_sale: { en: "Complete sale", th: "ยืนยันการขาย" },
   pos_receipt: { en: "Sale complete", th: "ขายสำเร็จ" },
   pos_sale_done: { en: "Done", th: "เสร็จสิ้น" },
-  // receipt line: "+{hours} hrs → {name}" (credits added to the chosen customer)
-  pos_credited_to: { en: "+{hours} hrs → {name}", th: "+{hours} ชม. → {name}" },
+  // receipt line: "+{hours} classes → {name}" (credits added to the chosen customer)
+  pos_credited_to: { en: "+{hours} classes → {name}", th: "+{hours} คลาส → {name}" },
 
   // POS errors (keyed off the posSellPackage / posConfirmPayment failure codes)
   err_unknown_customer: {
@@ -977,7 +977,7 @@ export const STR = {
   edit_avail: { en: "Edit availability", th: "แก้ไขตารางว่าง" },
   edit_avail_sub: { en: "Weekly availability", th: "ตารางว่างรายสัปดาห์" },
   // editor controls
-  add_hours: { en: "Add hours", th: "เพิ่มช่วงเวลา" },
+  add_hours: { en: "Add time slot", th: "เพิ่มช่วงเวลา" },
   remove_range: { en: "Remove time range", th: "ลบช่วงเวลา" },
   day_on_off: { en: "Toggle {day}", th: "เปิด/ปิด {day}" },
   save: { en: "Save", th: "บันทึก" },
@@ -1068,8 +1068,8 @@ export const STR = {
   range_year: { en: "This year", th: "ปีนี้" },
 
   // ───────────────────────── admin Adjust credits (Group D #8, Owner-only, in the Members drawer) ─────────────────────────
-  adjust_credits: { en: "Adjust hours", th: "ปรับชั่วโมง" },
-  adjust_amount: { en: "Amount (hrs)", th: "จำนวน (ชม.)" },
+  adjust_credits: { en: "Adjust classes", th: "ปรับคลาส" },
+  adjust_amount: { en: "Amount (classes)", th: "จำนวน (คลาส)" },
   adjust_add: { en: "Add", th: "เพิ่ม" },
   adjust_subtract: { en: "Subtract", th: "ลด" },
   adjust_note: { en: "Note", th: "หมายเหตุ" },
@@ -1080,17 +1080,17 @@ export const STR = {
     th: "ลูกค้ารายนี้ไม่มีแพ็กเกจที่ปรับได้",
   },
   adjust_note_ph: {
-    en: "e.g. Goodwill hour for a cancelled class",
-    th: "เช่น ชั่วโมงชดเชยจากคลาสที่ยกเลิก",
+    en: "e.g. Goodwill class for a cancelled class",
+    th: "เช่น คลาสชดเชยจากคลาสที่ยกเลิก",
   },
-  toast_credit_adjusted: { en: "Hours adjusted", th: "ปรับชั่วโมงแล้ว" },
+  toast_credit_adjusted: { en: "Classes adjusted", th: "ปรับคลาสแล้ว" },
   err_negative_balance: {
     en: "That would take the balance below zero.",
-    th: "การปรับนี้จะทำให้ยอดชั่วโมงติดลบ",
+    th: "การปรับนี้จะทำให้ยอดคลาสติดลบ",
   },
   err_adjust_credits: {
-    en: "Couldn’t adjust hours. Please try again.",
-    th: "ปรับชั่วโมงไม่สำเร็จ กรุณาลองใหม่",
+    en: "Couldn’t adjust classes. Please try again.",
+    th: "ปรับคลาสไม่สำเร็จ กรุณาลองใหม่",
   },
 
   // ───────── admin · package catalog management (owner-only CRUD) ─────────
@@ -1117,14 +1117,14 @@ export const STR = {
     en: "Permanent — used by every past purchase. Cannot be changed later.",
     th: "ถาวร — ใช้อ้างอิงการซื้อทั้งหมดที่ผ่านมา แก้ไขภายหลังไม่ได้",
   },
-  cat_category: { en: "Credit type", th: "ประเภทเครดิต" },
+  cat_category: { en: "Class type", th: "ประเภทคลาส" },
   cat_category_hint: {
-    en: "Decides which credit balance this tops up. Cannot be changed later.",
-    th: "กำหนดว่าจะเติมเครดิตประเภทใด แก้ไขภายหลังไม่ได้",
+    en: "Decides which class balance this tops up. Cannot be changed later.",
+    th: "กำหนดว่าจะเติมคลาสประเภทใด แก้ไขภายหลังไม่ได้",
   },
-  cat_hours: { en: "Hours granted", th: "ชั่วโมงที่ได้รับ" },
+  cat_hours: { en: "Classes granted", th: "คลาสที่ได้รับ" },
   cat_price: { en: "Price (THB)", th: "ราคา (บาท)" },
-  cat_per_hour: { en: "Per hour", th: "ต่อชั่วโมง" },
+  cat_per_hour: { en: "Per class", th: "ต่อคลาส" },
   cat_validity: { en: "Validity", th: "อายุการใช้งาน" },
   // Structured-validity unit labels (2026-07-23) for the number + unit picker.
   validity_unit_day: { en: "days", th: "วัน" },
@@ -1136,8 +1136,8 @@ export const STR = {
   cat_label_en: { en: "Name (English)", th: "ชื่อ (อังกฤษ)" },
   cat_label_th: { en: "Name (Thai)", th: "ชื่อ (ไทย)" },
   ph_cat_id: { en: "e.g. p20", th: "เช่น p20" },
-  ph_cat_label_en: { en: "e.g. 20 hours", th: "เช่น 20 hours" },
-  ph_cat_label_th: { en: "e.g. 20 ชั่วโมง", th: "เช่น 20 ชั่วโมง" },
+  ph_cat_label_en: { en: "e.g. 20 classes", th: "เช่น 20 classes" },
+  ph_cat_label_th: { en: "e.g. 20 คลาส", th: "เช่น 20 คลาส" },
   cat_archive_confirm: {
     en: "Archived packages stop being sold, but past purchases keep working.",
     th: "แพ็กเกจที่เก็บถาวรจะหยุดขาย แต่การซื้อที่ผ่านมายังใช้งานได้ตามปกติ",
@@ -1169,8 +1169,8 @@ export const STR = {
     th: "ต้องกรอกชื่อทั้งภาษาอังกฤษและภาษาไทย",
   },
   err_cat_numbers: {
-    en: "Hours must be a whole number above zero, and price a whole number.",
-    th: "ชั่วโมงต้องเป็นจำนวนเต็มมากกว่าศูนย์ และราคาต้องเป็นจำนวนเต็ม",
+    en: "Classes must be a whole number above zero, and price a whole number.",
+    th: "จำนวนคลาสต้องเป็นจำนวนเต็มมากกว่าศูนย์ และราคาต้องเป็นจำนวนเต็ม",
   },
   // {max} → the ceiling for the CURRENTLY SELECTED unit (days vs months differ).
   err_cat_validity_range: {
@@ -1181,7 +1181,7 @@ export const STR = {
   cat_bundle_title: { en: "What this package grants", th: "สิ่งที่แพ็กเกจนี้ให้" },
   cat_bundle_desc: {
     en: "Leave empty for a normal package — one balance, using the credits and validity above. Add parts to grant several balances, each with its own clock (e.g. a 1:1 class valid 14 days, plus a free group class valid 7 days after that class).",
-    th: "เว้นว่างไว้สำหรับแพ็กเกจปกติ — หนึ่งยอด ใช้จำนวนชั่วโมงและอายุการใช้งานด้านบน เพิ่มส่วนย่อยเพื่อให้หลายยอด แต่ละยอดมีอายุของตัวเอง (เช่น คลาส 1:1 ใช้ได้ 14 วัน และคลาสกลุ่มฟรีใช้ได้ 7 วันหลังคลาสนั้น)",
+    th: "เว้นว่างไว้สำหรับแพ็กเกจปกติ — หนึ่งยอด ใช้จำนวนคลาสและอายุการใช้งานด้านบน เพิ่มส่วนย่อยเพื่อให้หลายยอด แต่ละยอดมีอายุของตัวเอง (เช่น คลาส 1:1 ใช้ได้ 14 วัน และคลาสกลุ่มฟรีใช้ได้ 7 วันหลังคลาสนั้น)",
   },
   cat_bundle_none: { en: "Normal package — one balance", th: "แพ็กเกจปกติ — ยอดเดียว" },
   cat_bundle_add: { en: "Add a part", th: "เพิ่มส่วนย่อย" },
@@ -1195,11 +1195,11 @@ export const STR = {
     en: "Lowercase id used to link parts together, e.g. private. Cannot be changed once sold.",
     th: "รหัสตัวพิมพ์เล็กสำหรับเชื่อมส่วนย่อยเข้าด้วยกัน เช่น private เปลี่ยนไม่ได้หลังเริ่มขาย",
   },
-  comp_category: { en: "Credit type", th: "ประเภทเครดิต" },
-  comp_credits: { en: "Credits", th: "เครดิต" },
+  comp_category: { en: "Class type", th: "ประเภทคลาส" },
+  comp_credits: { en: "Classes", th: "จำนวนคลาส" },
   comp_credits_hint: {
-    en: "1 credit = one group class or studio rental. 2 credits = one private, duo, or trio class.",
-    th: "1 เครดิต = คลาสกลุ่มหรือเช่าสตูดิโอ 1 ครั้ง · 2 เครดิต = คลาสส่วนตัว คู่ หรือสามคน 1 ครั้ง",
+    en: "How many classes this part grants. One unit is one class, of any type.",
+    th: "จำนวนคลาสที่ส่วนนี้ให้ · 1 หน่วย = 1 คลาส ไม่ว่าประเภทใด",
   },
   comp_validity: { en: "Valid for", th: "ใช้ได้นาน" },
   comp_starts: { en: "Clock starts", th: "เริ่มนับเมื่อ" },
@@ -1233,11 +1233,11 @@ export const STR = {
   },
   err_bundle_labels: {
     en: "Every part needs a name in both languages, whole credits above zero, and a validity.",
-    th: "ทุกส่วนย่อยต้องมีชื่อทั้งสองภาษา จำนวนเครดิตเต็มมากกว่าศูนย์ และอายุการใช้งาน",
+    th: "ทุกส่วนย่อยต้องมีชื่อทั้งสองภาษา จำนวนคลาสเต็มมากกว่าศูนย์ และอายุการใช้งาน",
   },
   err_cat_category_immutable: {
     en: "The credit type can’t be changed after a package is created.",
-    th: "เปลี่ยนประเภทเครดิตหลังสร้างแพ็กเกจแล้วไม่ได้",
+    th: "เปลี่ยนประเภทคลาสหลังสร้างแพ็กเกจแล้วไม่ได้",
   },
   err_cat_unknown: {
     en: "That package no longer exists.",
@@ -1335,7 +1335,7 @@ export const STR = {
   settings_terms_title: { en: "Terms & Conditions", th: "ข้อกำหนดและเงื่อนไข" },
   settings_terms_desc: {
     en: "The terms every customer must accept before buying credits.",
-    th: "ข้อกำหนดที่ลูกค้าทุกคนต้องยอมรับก่อนซื้อชั่วโมงเรียน",
+    th: "ข้อกำหนดที่ลูกค้าทุกคนต้องยอมรับก่อนซื้อคลาส",
   },
   settings_studio_title: { en: "Studio info", th: "ข้อมูลสตูดิโอ" },
   settings_studio_desc: {
@@ -1347,8 +1347,8 @@ export const STR = {
     th: "ระยะเวลาที่สมาชิกและบุคคลทั่วไปเห็นและจองคลาสแต่ละประเภทได้ล่วงหน้า",
   },
   settings_packages_desc: {
-    en: "Packages, prices, hours, and validity.",
-    th: "แพ็กเกจ ราคา จำนวนชั่วโมง และอายุการใช้งาน",
+    en: "Packages, prices, classes, and validity.",
+    th: "แพ็กเกจ ราคา จำนวนคลาส และอายุการใช้งาน",
   },
 
   // ───────── admin: Terms & Conditions editor ─────────

@@ -8,16 +8,21 @@ const NOW = new Date("2026-06-01T12:00:00Z");
 const future = (h: number) => new Date(NOW.getTime() + h * 3_600_000);
 
 describe("creditCostForClassType", () => {
-  it("charges 1 credit for a group class", () => {
-    expect(creditCostForClassType("group")).toBe(1);
-  });
-  it("charges 2 credits for private, duo and trio", () => {
-    expect(creditCostForClassType("private")).toBe(2);
-    expect(creditCostForClassType("duo")).toBe(2);
-    expect(creditCostForClassType("trio")).toBe(2);
-  });
-  it("charges 1 credit for a rental", () => {
-    expect(creditCostForClassType("rental")).toBe(1);
+  // ONE CREDIT = ONE CLASS, for every type (owner, 2026-09-08). Private/duo/trio
+  // used to cost 2, which made the customer-facing numbers untrue: a "10-hour" 1:1
+  // pack really bought five classes, and the 1:1/Duo/Trio drop-ins granted a single
+  // credit — not enough to book the one class they were sold for.
+  it.each(["group", "private", "duo", "trio", "rental"] as const)(
+    "charges exactly 1 credit for a %s class",
+    (type) => {
+      expect(creditCostForClassType(type)).toBe(1);
+    },
+  );
+
+  it("means a package's size is simply how many classes it buys", () => {
+    const packSize = 10;
+    const classesBookable = packSize / creditCostForClassType("private");
+    expect(classesBookable).toBe(packSize);
   });
 });
 

@@ -112,7 +112,7 @@ describe("packageLabelFor", () => {
   // Pure by construction: the caller loads the catalog ONCE and passes the map in.
   it("resolves a real catalog item's bilingual label", async () => {
     const catalog = await loadCatalogMap();
-    expect(packageLabelFor("p10", catalog)).toEqual({ en: "10 hours", th: "10 ชั่วโมง" });
+    expect(packageLabelFor("p10", catalog)).toEqual({ en: "10 classes", th: "10 คลาส" });
   });
   it("falls back to the raw id when the catalog has drifted", async () => {
     const catalog = await loadCatalogMap();
@@ -169,7 +169,7 @@ describe("listPayments (no-DB mock)", () => {
   it("each row carries a resolved bilingual label + the raw packageId", async () => {
     const rows = await listPayments(now);
     const p15 = rows.find((r) => r.packageId === "p15")!;
-    expect(p15.packageLabel).toEqual({ en: "20 hours", th: "20 ชั่วโมง" });
+    expect(p15.packageLabel).toEqual({ en: "20 classes", th: "20 คลาส" });
     expect(p15.amount).toBe(7500); // amount stamped on the mock charge fixture (pre-repricing)
   });
 

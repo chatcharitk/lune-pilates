@@ -92,7 +92,7 @@ export const SEED_COMPONENTS: Record<string, CatalogComponent[]> = {
     {
       componentKey: "private",
       category: "private",
-      hours: 2, // one 1:1 class costs 2 credits (lib/credits/cost.ts)
+      hours: 1, // one credit = one class (lib/credits/cost.ts)
       validity: { amount: 14, unit: "day" },
       anchorComponentKey: null, // starts at purchase
       sortOrder: 0,
@@ -101,7 +101,7 @@ export const SEED_COMPONENTS: Record<string, CatalogComponent[]> = {
     {
       componentKey: "free_group",
       category: "group",
-      hours: 1, // one group class costs 1 credit
+      hours: 1, // one group class
       validity: { amount: 7, unit: "day" },
       anchorComponentKey: "private", // dormant until the private class is taken
       sortOrder: 1,

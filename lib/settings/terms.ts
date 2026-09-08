@@ -31,7 +31,7 @@ export interface TermsVersion {
 
 /**
  * The seed / no-DB fallback terms. Most of it restates policies already enforced in
- * code (CLAUDE.md §5): whole-hour credit costs, the fixed 5-hour cancellation
+ * code (CLAUDE.md §5): one credit per class, the fixed 6-hour cancellation
  * window, non-transferable guest packages, shared household credits, and package
  * expiry.
  *
@@ -39,7 +39,7 @@ export interface TermsVersion {
  * request (2026-09-07): no refunds, no exchanges, and no expiry extension in any
  * case. It matches what the code actually does today: no action anywhere writes
  * `packages.expiresAt` after a package is created, and there is no money-refund or
- * package-exchange path at all. (The owner CAN still hand back hours as a goodwill
+ * package-exchange path at all. (The owner CAN still hand back classes as a goodwill
  * gesture via adjustCredits — that is a manual ledger adjustment, not a refund or an
  * extension, and it does not contradict this clause.) If an extend-expiry or refund
  * tool is ever built for the front desk, revisit this clause alongside it.
@@ -57,57 +57,57 @@ export const SEED_TERMS: TermsVersion = {
   publishedAt: new Date("2026-01-01T00:00:00Z"),
   publishedByAdminId: null,
   bodyEn: [
-    "1. Credits and validity",
-    "Hours purchased are credited to your account once the studio has verified your payment. Each package is valid for the period stated at purchase, counted from the day the credit is added, and stays usable for the whole of its final day. For example, a 15-day package credited on 1 September can be used up to and including 16 September. Unused hours expire at the end of that day.",
+    "1. Classes and validity",
+    "Classes purchased are credited to your account once the studio has verified your payment. Each package is valid for the period stated at purchase, counted from the day the classes are added, and stays usable for the whole of its final day. For example, a 15-day package credited on 1 September can be used up to and including 16 September. Unused classes expire at the end of that day.",
     "",
     "2. No refunds, no exchanges, no extensions",
-    "All purchases are final. A package cannot be returned or refunded, in whole or in part, and cannot be exchanged for a different package, for another service, or for cash. Package expiry cannot be extended under any circumstances — including illness, injury, pregnancy, travel, or any other reason — and unused hours are forfeited when the package expires.",
+    "All purchases are final. A package cannot be returned or refunded, in whole or in part, and cannot be exchanged for a different package, for another service, or for cash. Package expiry cannot be extended under any circumstances — including illness, injury, pregnancy, travel, or any other reason — and unused classes are forfeited when the package expires.",
     "",
-    "3. Booking and credit cost",
-    "Booking a class deducts whole hours from your balance: 1 hour for a Group class or a Reformer rental, and 2 hours for a Private, Duo, or Trio class. Hours are deducted at the moment the booking is confirmed.",
+    "3. Booking",
+    "Booking a class deducts one class from your balance, whichever type it is. It is deducted at the moment the booking is confirmed.",
     "",
     "4. Sharing",
     "Member packages are shared across everyone registered to the same household and may be used by any of them. Guest packages belong to the individual who purchased them and cannot be transferred, shared, or resold.",
     "",
     "5. Cancellation",
-    "You may cancel a booking yourself up to 5 hours before the class begins, and the hours will be returned to your balance in full. Within 5 hours of the class, bookings can no longer be cancelled online and the hours are forfeited. Please contact the studio directly if you need help with a late change.",
+    "You may cancel a booking yourself up to 6 hours before the class begins, and the class will be returned to your balance in full. Within 6 hours of the class, bookings can no longer be cancelled online and the class is forfeited. Please contact the studio directly if you need help with a late change.",
     "",
     "6. Waitlist",
     "Joining a waitlist is free and does not reserve a place. If a space opens, we will notify you and you will have a short window to book it, but the space remains open to everyone until someone completes a booking.",
     "",
     "7. Classes cancelled by the studio",
-    "If the studio cancels a class, all hours booked for it are returned to your balance in full.",
+    "If the studio cancels a class, it is returned to your balance in full.",
     "",
     "8. Payment",
-    "Payments are made by PromptPay transfer and confirmed by the studio after your transfer slip has been checked. Credits are added only after that check.",
+    "Payments are made by PromptPay transfer and confirmed by the studio after your transfer slip has been checked. Classes are added only after that check.",
     "",
     "9. At the studio",
     "Please arrive a few minutes before your class begins. The studio may decline entry to a class that has already started. Let your instructor know about any injury, medical condition, or pregnancy before class so the session can be adapted safely.",
   ].join("\n"),
   bodyTh: [
-    "1. ชั่วโมงเรียนและอายุการใช้งาน",
-    "ชั่วโมงที่ซื้อจะถูกเพิ่มเข้าบัญชีของคุณเมื่อสตูดิโอตรวจสอบการชำระเงินเรียบร้อยแล้ว แต่ละแพ็กเกจมีอายุการใช้งานตามที่ระบุไว้ตอนซื้อ โดยเริ่มนับจากวันที่ได้รับชั่วโมง และสามารถใช้ได้ตลอดทั้งวันสุดท้าย ตัวอย่างเช่น แพ็กเกจอายุ 15 วัน ที่ได้รับชั่วโมงวันที่ 1 กันยายน จะใช้ได้ถึงวันที่ 16 กันยายน (รวมวันที่ 16 ด้วย) ชั่วโมงที่ไม่ได้ใช้จะหมดอายุเมื่อสิ้นสุดวันดังกล่าว",
+    "1. คลาสและอายุการใช้งาน",
+    "คลาสที่ซื้อจะถูกเพิ่มเข้าบัญชีของคุณเมื่อสตูดิโอตรวจสอบการชำระเงินเรียบร้อยแล้ว แต่ละแพ็กเกจมีอายุการใช้งานตามที่ระบุไว้ตอนซื้อ โดยเริ่มนับจากวันที่ได้รับคลาส และสามารถใช้ได้ตลอดทั้งวันสุดท้าย ตัวอย่างเช่น แพ็กเกจอายุ 15 วัน ที่ได้รับคลาสวันที่ 1 กันยายน จะใช้ได้ถึงวันที่ 16 กันยายน (รวมวันที่ 16 ด้วย) คลาสที่ไม่ได้ใช้จะหมดอายุเมื่อสิ้นสุดวันดังกล่าว",
     "",
     "2. ไม่รับคืน ไม่เปลี่ยน และไม่ขยายอายุ",
-    "การซื้อทุกกรณีถือเป็นที่สิ้นสุด แพ็กเกจไม่สามารถขอคืนหรือขอคืนเงินได้ ไม่ว่าทั้งหมดหรือบางส่วน และไม่สามารถเปลี่ยนเป็นแพ็กเกจอื่น บริการอื่น หรือเงินสดได้ อายุการใช้งานของแพ็กเกจไม่สามารถขยายได้ไม่ว่ากรณีใด ๆ ทั้งสิ้น รวมถึงกรณีเจ็บป่วย บาดเจ็บ ตั้งครรภ์ เดินทาง หรือเหตุผลอื่นใด และชั่วโมงที่ไม่ได้ใช้จะถือเป็นการสละสิทธิ์เมื่อแพ็กเกจหมดอายุ",
+    "การซื้อทุกกรณีถือเป็นที่สิ้นสุด แพ็กเกจไม่สามารถขอคืนหรือขอคืนเงินได้ ไม่ว่าทั้งหมดหรือบางส่วน และไม่สามารถเปลี่ยนเป็นแพ็กเกจอื่น บริการอื่น หรือเงินสดได้ อายุการใช้งานของแพ็กเกจไม่สามารถขยายได้ไม่ว่ากรณีใด ๆ ทั้งสิ้น รวมถึงกรณีเจ็บป่วย บาดเจ็บ ตั้งครรภ์ เดินทาง หรือเหตุผลอื่นใด และคลาสที่ไม่ได้ใช้จะถือเป็นการสละสิทธิ์เมื่อแพ็กเกจหมดอายุ",
     "",
-    "3. การจองและการหักชั่วโมง",
-    "การจองคลาสจะหักชั่วโมงจากยอดคงเหลือของคุณเป็นจำนวนเต็มชั่วโมง ได้แก่ 1 ชั่วโมงสำหรับคลาสกลุ่มและการเช่าเครื่อง Reformer และ 2 ชั่วโมงสำหรับคลาสส่วนตัว คลาสคู่ และคลาสสามคน โดยจะหักทันทีที่การจองสำเร็จ",
+    "3. การจอง",
+    "การจองคลาสจะหัก 1 คลาสจากยอดคงเหลือของคุณ ไม่ว่าจะเป็นคลาสประเภทใด โดยจะหักทันทีที่การจองสำเร็จ",
     "",
     "4. การใช้ร่วมกัน",
     "แพ็กเกจสำหรับสมาชิกสามารถใช้ร่วมกันได้ในกลุ่มบ้านเดียวกันที่ลงทะเบียนไว้ ส่วนแพ็กเกจสำหรับบุคคลทั่วไปเป็นสิทธิ์เฉพาะผู้ซื้อเท่านั้น ไม่สามารถโอน แบ่งใช้ หรือขายต่อได้",
     "",
     "5. การยกเลิก",
-    "คุณสามารถยกเลิกการจองด้วยตนเองได้ก่อนคลาสเริ่มอย่างน้อย 5 ชั่วโมง และจะได้รับชั่วโมงคืนเต็มจำนวน หากเหลือเวลาน้อยกว่า 5 ชั่วโมงก่อนคลาสเริ่ม จะไม่สามารถยกเลิกผ่านแอปได้และถือว่าสละสิทธิ์ชั่วโมงนั้น หากมีเหตุจำเป็นกรุณาติดต่อสตูดิโอโดยตรง",
+    "คุณสามารถยกเลิกการจองด้วยตนเองได้ก่อนคลาสเริ่มอย่างน้อย 6 ชั่วโมง และจะได้รับคลาสคืนเต็มจำนวน หากเหลือเวลาน้อยกว่า 6 ชั่วโมงก่อนคลาสเริ่ม จะไม่สามารถยกเลิกผ่านแอปได้และถือว่าสละสิทธิ์คลาสนั้น หากมีเหตุจำเป็นกรุณาติดต่อสตูดิโอโดยตรง",
     "",
     "6. รายชื่อรอคิว",
     "การเข้าคิวรอไม่มีค่าใช้จ่ายและไม่ถือเป็นการสำรองที่นั่ง หากมีที่ว่าง เราจะแจ้งให้คุณทราบและคุณจะมีเวลาช่วงสั้น ๆ ในการจอง แต่ที่นั่งนั้นยังเปิดให้ทุกคนจองได้จนกว่าจะมีผู้จองสำเร็จ",
     "",
     "7. กรณีสตูดิโอยกเลิกคลาส",
-    "หากสตูดิโอเป็นฝ่ายยกเลิกคลาส ชั่วโมงที่ใช้จองคลาสนั้นจะถูกคืนเข้าบัญชีของคุณเต็มจำนวน",
+    "หากสตูดิโอเป็นฝ่ายยกเลิกคลาส คลาสที่ใช้จองนั้นจะถูกคืนเข้าบัญชีของคุณเต็มจำนวน",
     "",
     "8. การชำระเงิน",
-    "ชำระเงินผ่าน PromptPay และสตูดิโอจะยืนยันหลังจากตรวจสอบสลิปการโอนของคุณแล้ว ชั่วโมงจะถูกเพิ่มเข้าบัญชีหลังการตรวจสอบเท่านั้น",
+    "ชำระเงินผ่าน PromptPay และสตูดิโอจะยืนยันหลังจากตรวจสอบสลิปการโอนของคุณแล้ว คลาสจะถูกเพิ่มเข้าบัญชีหลังการตรวจสอบเท่านั้น",
     "",
     "9. ข้อปฏิบัติที่สตูดิโอ",
     "กรุณามาถึงก่อนคลาสเริ่มเล็กน้อย สตูดิโออาจสงวนสิทธิ์ไม่ให้เข้าคลาสที่เริ่มไปแล้ว และกรุณาแจ้งครูผู้สอนก่อนเริ่มคลาสหากมีอาการบาดเจ็บ โรคประจำตัว หรืออยู่ระหว่างตั้งครรภ์ เพื่อปรับคลาสให้ปลอดภัยกับคุณ",

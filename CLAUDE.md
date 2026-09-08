@@ -110,10 +110,13 @@ Entities (see spec §5): `Household`, `User(tier: member|guest, household_id?)`,
    `expires_at > now()`, insert a `−cost` ledger row stamped with `actor_user_id`, decrement
    `hours_left`, insert the booking — **all or nothing**. No double-debit, no booking without
    debit, no debit without booking. Concurrency-safe (row lock / serializable).
-   **Credit cost per booking (decided 2026-07-04, supersedes 2026-06-17):** WHOLE-INTEGER
-   credits — Group = 1, Rental = 1, Private/Duo/Trio = **2**. Balances/costs are `integer`
-   columns — see §8. A first-ever paid purchase of the 1-hour drop-in grants +1 free trial
-   hour (1+1 promo, ledger reason "promo").
+   **Credit cost per booking (decided 2026-09-08, supersedes 2026-07-04):** ONE CREDIT =
+   ONE CLASS, for every class type — Group, Rental, Private, Duo and Trio all cost **1**.
+   Balances/costs are `integer` columns — see §8. The customer-facing word for a credit is
+   a **"class"** (never "hour"): the earlier 2-credit private cost made the copy untrue in
+   both directions — a "10-hour" 1:1 pack really bought five classes, and the 1:1/Duo/Trio
+   drop-ins granted one credit, not enough to book the single class they were sold for.
+   (The 1+1 promo remains disabled — see `promoBonusHours`.)
 2. **Household pool is shared & consistent.** Every member of a house number reads the same
    balance; one member's booking is immediately visible to the rest. Balance = derivable from
    the ledger (ledger is the truth; `hours_left` is a cache that must always reconcile).
@@ -135,11 +138,12 @@ Entities (see spec §5): `Household`, `User(tier: member|guest, household_id?)`,
    `CLASS_FULL` if a walk-up booked it first. No auto-charge — claiming debits only on confirm.
    Expiry + cascade run via a cron sweep (`/api/cron/waitlist-sweep`), with lazy expiry on read.
 7. **Cancellation policy — FIXED window (decided 2026-06-28, supersedes 2026-06-19).** One
-   fixed free-cancel window for every booking: a customer may cancel **only while ≥ 5h before
+   fixed free-cancel window for every booking: a customer may cancel **only while ≥ 6h before
    class starts**, and that cancel refunds the **exact cost** booked (a `+cost` ledger row) —
-   never a hardcoded 1. **Inside 5h, customer cancellation is blocked entirely** (no
-   deduct-and-cancel path). `free_cancel_hours` is stamped 5 on every booking as an audit
-   field only. **Customer reschedule was removed** (decided 2026-06-28) — all moves go through
+   never a hardcoded 1. **Inside 6h, customer cancellation is blocked entirely** (no
+   deduct-and-cancel path). `free_cancel_hours` is stamped 6 on every booking as an audit
+   field only. (The window is `FREE_CANCEL_HOURS` in lib/domain/types.ts — 6 in code, in the
+   customer copy, and in the owner's published terms; this doc said 5 until 2026-09-08.) **Customer reschedule was removed** (decided 2026-06-28) — all moves go through
    the front desk (`adminReschedule`, Owner-only, may bypass the window). Admin cancels are
    never window-blocked; the window only decides the DEFAULT refund, which the owner can
    override, and a class-level `cancelClass` refunds everyone regardless.
@@ -183,8 +187,8 @@ devs address findings.
 ## 8. House rules
 
 - TypeScript strict; no `any` in domain logic. **Credit balances and costs are whole-INTEGER
-  columns (decided 2026-07-04, supersedes the 2026-06-17 `numeric(4,1)` decision)** — Group/Rental
-  booking = 1, Private/Duo/Trio = 2. Keep all cost/refund math server-side. Never trust
+  columns** — and every class type costs exactly **1** (decided 2026-09-08). A package's size is
+  therefore simply how many classes it buys. Keep all cost/refund math server-side. Never trust
   client-supplied balances or prices — recompute server-side.
 - All business rules (debit, visibility, policy, capacity) enforced **server-side**; the client
   only renders and requests.

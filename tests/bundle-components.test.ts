@@ -64,10 +64,10 @@ describe("the ฿1,800 trial bundle", () => {
     const priv = trial.find((c) => c.componentKey === "private")!;
     const free = trial.find((c) => c.componentKey === "free_group")!;
 
-    // A 1:1 class costs 2 credits, a group class 1 (lib/credits/cost.ts) — so these
-    // are exactly one class each, not "2 private classes".
+    // One credit = one class for every type (lib/credits/cost.ts), so these are
+    // exactly one class each.
     expect(priv.category).toBe("private");
-    expect(priv.hours).toBe(2);
+    expect(priv.hours).toBe(1);
     expect(free.category).toBe("group");
     expect(free.hours).toBe(1);
   });
@@ -87,9 +87,9 @@ describe("the ฿1,800 trial bundle", () => {
     expect(validateComponentSet(trial)).toBeNull();
   });
 
-  it("is a bundle granting 3 credits in total", () => {
+  it("is a bundle granting 2 classes in total — one private, one group", () => {
     expect(isBundle(trial)).toBe(true);
-    expect(totalHours(trial)).toBe(3);
+    expect(totalHours(trial)).toBe(2);
   });
 
   it("dates work out: bought 1 Sep, private runs to the 15th; a private taken on the 10th frees a group class to the 17th", () => {

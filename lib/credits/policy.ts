@@ -1,9 +1,9 @@
 // Cancellation policy (CLAUDE.md §5, invariant 7).
 //
-// The free window is a SINGLE FIXED window (FREE_CANCEL_HOURS = 5) for EVERY
+// The free window is a SINGLE FIXED window (FREE_CANCEL_HOURS = 6) for EVERY
 // booking (decided 2026-06-28). A self-cancel is free (the booking's exact credit
-// cost is refunded) only when made at least 5h before start (inclusive at exactly
-// 5h); within the 5h window the cancel is BLOCKED entirely — there is no customer
+// cost is refunded) only when made at least 6h before start (inclusive at exactly
+// 6h); within the 6h window the cancel is BLOCKED entirely — there is no customer
 // late-cancel-with-deduction path. This helper is pure (no I/O, no booking row);
 // it judges purely on lead time so the same rule is single-sourced.
 
@@ -12,7 +12,7 @@ import { FREE_CANCEL_HOURS } from "@/lib/domain/types";
 export interface CancellationOutcome {
   /** Coarse verdict: "free" ⇒ cancellable & refunded; "too_late" ⇒ blocked. */
   status: "free" | "too_late";
-  /** true ⇒ the booking may be cancelled at all (only ≥5h before start). */
+  /** true ⇒ the booking may be cancelled at all (only ≥6h before start). */
   cancellable: boolean;
   /** true ⇒ within the free window ⇒ the booking's credit cost is refunded. */
   free: boolean;
