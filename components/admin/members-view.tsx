@@ -18,13 +18,15 @@ import { createCustomer, removeCustomer, updateCustomer } from "@/app/actions/ad
 import {
   adjustCredits,
   getAdjustablePackages,
+  updatePackageExpiry,
+  type UpdatePackageExpiryFailureCode,
   getCustomerLedger,
   type AdjustablePackage,
   type AdjustFailureCode,
 } from "@/app/actions/admin-credits";
 import type { AdminCustomer, CustomerLedgerEntry, LedgerReason } from "@/lib/admin/members";
 import type { StrKey } from "@/lib/i18n";
-import { formatStudioDate } from "@/lib/time";
+import { formatStudioDate, studioParts } from "@/lib/time";
 
 
 /** Short localised date for an expiry ("24 Jun" / Thai), in Bangkok time. */
@@ -390,6 +392,8 @@ function EditCustomerControl({
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(customer.name);
   const [phone, setPhone] = useState(customer.phone);
+  const [tier, setTier] = useState<"member" | "guest">(customer.tier);
+  const [house, setHouse] = useState(customer.house ?? "");
   const [pending, startTransition] = useTransition();
   const [errorKey, setErrorKey] = useState<StrKey | null>(null);
 
@@ -397,15 +401,27 @@ function EditCustomerControl({
   useEffect(() => {
     setName(customer.name);
     setPhone(customer.phone);
+    setTier(customer.tier);
+    setHouse(customer.house ?? "");
     setOpen(false);
     setErrorKey(null);
-  }, [customer.id, customer.name, customer.phone]);
+  }, [customer.id, customer.name, customer.phone, customer.tier, customer.house]);
+
+  // Warn only when the change actually affects pool membership — silence otherwise.
+  const poolChanged = tier !== customer.tier || (house.trim() || null) !== (customer.house ?? null);
 
   function save() {
     if (pending) return;
     setErrorKey(null);
     startTransition(async () => {
-      const res = await updateCustomer({ userId: customer.id, name: name.trim(), phone: phone.trim() });
+      const res = await updateCustomer({
+        userId: customer.id,
+        name: name.trim(),
+        phone: phone.trim(),
+        tier,
+        // Guests never join a household (invariant 3); the action drops it anyway.
+        houseNumber: tier === "member" ? house.trim() : "",
+      });
       if (res.ok) {
         router.refresh();
         onEdited();
@@ -451,6 +467,58 @@ function EditCustomerControl({
           className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink placeholder:text-muted disabled:opacity-60"
         />
       </Field>
+      <Field label={t("edit_tier")}>
+        <div role="radiogroup" aria-label={t("edit_tier")} className="flex gap-2">
+          {(["member", "guest"] as const).map((value) => {
+            const on = tier === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                disabled={pending}
+                onClick={() => setTier(value)}
+                className={`inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border font-body text-sm font-semibold transition-colors disabled:opacity-60 ${
+                  on
+                    ? "border-taupe bg-taupe text-white"
+                    : "border-line-strong bg-surface text-ink"
+                }`}
+              >
+                {value === "member" && <Sparkle size={11} />}
+                {t(value === "member" ? "tier_member" : "tier_guest")}
+              </button>
+            );
+          })}
+        </div>
+      </Field>
+
+      {/* House number is a MEMBER concept — a guest's classes are personal and never
+          join a shared pool, so the field is hidden rather than shown-but-ignored. */}
+      {tier === "member" && (
+        <Field label={t("edit_house")}>
+          <input
+            value={house}
+            onChange={(e) => setHouse(e.target.value)}
+            placeholder={t("ph_house_number")}
+            disabled={pending}
+            maxLength={40}
+            className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink placeholder:text-muted disabled:opacity-60"
+          />
+          <p className="mt-1 font-body text-[11.5px] leading-snug text-muted">
+            {t("edit_house_hint")}
+          </p>
+        </Field>
+      )}
+
+      {/* Changing either one moves the PERSON between pools but never their existing
+          classes — say so before saving, not after. */}
+      {poolChanged && (
+        <p className="rounded-xl bg-[rgba(193,160,121,0.18)] px-3.5 py-2.5 font-body text-[12.5px] leading-relaxed text-[#9a7b45]">
+          {t("edit_tier_warning")}
+        </p>
+      )}
+
       {errorKey && <p className="font-body text-[13px] text-rose">{t(errorKey)}</p>}
       <div className="flex gap-2">
         <button
@@ -467,6 +535,8 @@ function EditCustomerControl({
             setOpen(false);
             setName(customer.name);
             setPhone(customer.phone);
+            setTier(customer.tier);
+            setHouse(customer.house ?? "");
             setErrorKey(null);
           }}
           disabled={pending}
@@ -599,6 +669,12 @@ function AdjustCreditsControl({
   // One idempotency token per drawer-open (minted when the control opens), reused
   // across retries so a double-tap / dropped response can't double-apply.
   const [idempotencyKey, setIdempotencyKey] = useState("");
+  // Bumped to re-run the package load after an expiry edit, so the row shows the
+  // new date without closing and reopening the control.
+  const [reloadToken, setReloadToken] = useState(0);
+
+  const selectedPackage = packages.find((p) => p.id === packageId) ?? null;
+  const reload = () => setReloadToken((n) => n + 1);
 
   // Load the customer's adjustable packages whenever the control opens.
   useEffect(() => {
@@ -627,7 +703,7 @@ function AdjustCreditsControl({
     return () => {
       cancelled = true;
     };
-  }, [open, customer.id]);
+  }, [open, customer.id, reloadToken]);
 
   function openControl() {
     setSign(1);
@@ -729,6 +805,11 @@ function AdjustCreditsControl({
               })}
             </div>
           </Field>
+
+          {/* Expiry date of the SELECTED package (owner's request, 2026-09-08).
+              Sits with the balance controls because it is the same question — what
+              this customer still has — just the other half of it. */}
+          {selectedPackage && <ExpiryControl pkg={selectedPackage} onSaved={reload} />}
 
           {/* signed amount: +/- toggle + magnitude */}
           <Field label={t("adjust_amount")}>
@@ -1130,4 +1211,128 @@ function InfoIcon() {
       <path d="M12 16v-4M12 8h.01" />
     </svg>
   );
+}
+
+// ───────────────────────── package expiry editor ─────────────────────────
+
+/**
+ * Set the last day a package can be used (Owner-only). Dates are Bangkok calendar
+ * days and the final day is usable in full, matching every other expiry in the app.
+ *
+ * The warning is not decoration: the studio's published terms say expiry cannot be
+ * extended under any circumstances. This control exists to CORRECT mistakes — a
+ * package credited on the wrong day, a mis-typed validity — and the copy says so, so
+ * nobody uses it to quietly contradict what customers were told they agreed to.
+ */
+function ExpiryControl({
+  pkg,
+  onSaved,
+}: {
+  pkg: AdjustablePackage;
+  onSaved: () => void;
+}) {
+  const { t } = useAdminLang();
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [value, setValue] = useState(() => bangkokYmd(pkg.expiresAt));
+  const [errorKey, setErrorKey] = useState<StrKey | null>(null);
+  const [savedKey, setSavedKey] = useState<StrKey | null>(null);
+
+  // Re-seed the field whenever the selected package or its stored date changes —
+  // including right after a save, when the reloaded row carries the new date.
+  useEffect(() => {
+    setValue(bangkokYmd(pkg.expiresAt));
+    setErrorKey(null);
+  }, [pkg.id, pkg.expiresAt]);
+
+  // Clear the confirmation only when the owner moves to a DIFFERENT package. Tying
+  // it to expiresAt as well wiped the "saved" message the instant the save landed,
+  // which read as nothing having happened.
+  useEffect(() => {
+    setSavedKey(null);
+  }, [pkg.id]);
+
+  // A dormant bundle component has no expiry yet — its clock starts when the paid
+  // class is used. Dating it here would hand over credit early, so the server
+  // refuses and the UI explains rather than offering a dead field.
+  if (pkg.expiresAt === null) {
+    return (
+      <Field label={t("expiry_label")}>
+        <p className="font-body text-[12.5px] leading-relaxed text-muted">
+          {t("expiry_not_activated")}
+        </p>
+      </Field>
+    );
+  }
+
+  const dirty = value !== bangkokYmd(pkg.expiresAt);
+
+  function save() {
+    if (pending || !dirty) return;
+    setErrorKey(null);
+    setSavedKey(null);
+    startTransition(async () => {
+      try {
+        const res = await updatePackageExpiry({ packageId: pkg.id, expiresOn: value });
+        if (res.ok) {
+          setSavedKey("expiry_saved");
+          onSaved();
+          router.refresh();
+        } else {
+          setErrorKey(expiryErrorKey(res.code));
+        }
+      } catch {
+        setErrorKey("err_expiry_save");
+      }
+    });
+  }
+
+  return (
+    <Field label={t("expiry_label")}>
+      <div className="flex gap-2">
+        <input
+          type="date"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          disabled={pending}
+          className="h-11 min-w-0 flex-1 rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink disabled:opacity-60"
+        />
+        <button
+          type="button"
+          onClick={save}
+          disabled={pending || !dirty}
+          className="inline-flex h-11 shrink-0 items-center rounded-xl bg-ink px-4 font-body text-sm font-semibold text-cream disabled:opacity-50"
+        >
+          {t("save")}
+        </button>
+      </div>
+      <p className="mt-1.5 font-body text-[11.5px] leading-snug text-[#9a7b45]">
+        {t("expiry_terms_warning")}
+      </p>
+      {errorKey && <p className="mt-1 font-body text-[12.5px] text-rose">{t(errorKey)}</p>}
+      {savedKey && (
+        <p className="mt-1 font-body text-[12.5px] font-semibold text-sage-deep">{t(savedKey)}</p>
+      )}
+    </Field>
+  );
+}
+
+/** An ISO instant → the Bangkok calendar day it falls on, as the date input's "YYYY-MM-DD". */
+function bangkokYmd(iso: string | null): string {
+  if (!iso) return "";
+  const { year, month0, day } = studioParts(new Date(iso));
+  return `${year}-${String(month0 + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function expiryErrorKey(code: UpdatePackageExpiryFailureCode): StrKey {
+  switch (code) {
+    case "UNAUTHORIZED":
+      return "err_cat_forbidden";
+    case "NOT_ACTIVATED":
+      return "expiry_not_activated";
+    case "MOCK_NO_DB":
+      return "err_cat_mock_no_db";
+    default:
+      return "err_expiry_save";
+  }
 }

@@ -223,6 +223,14 @@ const updateCustomerInput = z.object({
   /** Stored canonical when it's a valid Thai mobile (so LINE phone-matching lines up),
    *  else the trimmed value verbatim. Phone is UNIQUE in the schema. */
   phone: z.string().trim().min(1).max(40),
+  /** member | guest. Optional so an older client that only edits name/phone still works. */
+  tier: z.enum(["member", "guest"]).optional(),
+  /**
+   * House number for a MEMBER — joins (or creates) that household's shared pool.
+   * Empty string clears it. Ignored for guests, who never join a household
+   * (CLAUDE.md §5 invariant 3).
+   */
+  houseNumber: z.string().trim().max(40).optional(),
 });
 export type UpdateCustomerInput = z.infer<typeof updateCustomerInput>;
 
@@ -236,11 +244,26 @@ export type UpdateCustomerFailureCode =
 export type UpdateCustomerResult = { ok: true } | { ok: false; code: UpdateCustomerFailureCode };
 
 /**
- * Edit a customer's display name and phone number (Owner-only). The phone is
+ * Edit a customer's name, phone, TIER and HOUSEHOLD (Owner-only). The phone is
  * canonicalised to 0XXXXXXXXX when it's a valid Thai mobile (so the LINE-login
  * phone match keeps working), otherwise stored trimmed. Uniqueness is enforced both
  * with a pre-check and by catching the unique-violation on write. No-DB dev path
  * echoes success so the drawer works on mock data.
+ *
+ * WHAT CHANGING TIER / HOUSE DOES **NOT** DO — deliberately. Only the user row moves.
+ * Existing PACKAGES keep the owner they were bought under:
+ *
+ *   - A guest's packages are owned by the USER (`owner_user_id`) and are
+ *     non-transferable by construction (CLAUDE.md §5 invariant 3). Promoting them to
+ *     member does NOT pour those classes into the household pool — the studio sold
+ *     them as personal, and silently making them sharable would hand the rest of the
+ *     house free classes.
+ *   - A member's packages are owned by the HOUSEHOLD. Demoting them to guest, or
+ *     moving them to another house, therefore LOSES them access to that pool — the
+ *     classes stay with the house they were bought for.
+ *
+ * Both directions are one-way-ish and visible to the customer immediately, so the
+ * admin UI says so before saving rather than letting the owner discover it after.
  */
 export async function updateCustomer(raw: UpdateCustomerInput): Promise<UpdateCustomerResult> {
   if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
@@ -250,8 +273,11 @@ export async function updateCustomer(raw: UpdateCustomerInput): Promise<UpdateCu
 
   if (mockDataMode()) return { ok: true };
 
-  const { userId, name } = parsed.data;
+  const { userId, name, tier } = parsed.data;
   const phone = normalizeThaiPhone(parsed.data.phone) ?? parsed.data.phone.trim();
+  // A guest never joins a household — drop any supplied house up front (invariant 3).
+  const houseNumber =
+    tier === "member" ? (parsed.data.houseNumber?.trim() || null) : tier === "guest" ? null : undefined;
 
   const db = getDb();
   const [existing] = await db
@@ -271,7 +297,51 @@ export async function updateCustomer(raw: UpdateCustomerInput): Promise<UpdateCu
   if (clash) return { ok: false, code: "PHONE_TAKEN" };
 
   try {
-    await db.update(users).set({ name, phone }).where(eq(users.id, userId));
+    await db.transaction(async (tx) => {
+      // Resolve the household FIRST so the user update can reference it. Same
+      // create-or-join-with-race-tolerance shape as createCustomer.
+      let householdId: string | null | undefined = undefined;
+      if (houseNumber === null) {
+        householdId = null; // guest, or a member with the house cleared
+      } else if (houseNumber) {
+        const [found] = await tx
+          .select({ id: households.id })
+          .from(households)
+          .where(eq(households.houseNumber, houseNumber))
+          .limit(1);
+        if (found) {
+          householdId = found.id;
+        } else {
+          const [made] = await tx
+            .insert(households)
+            .values({ houseNumber })
+            .onConflictDoNothing()
+            .returning({ id: households.id });
+          if (made) {
+            householdId = made.id;
+          } else {
+            const [raced] = await tx
+              .select({ id: households.id })
+              .from(households)
+              .where(eq(households.houseNumber, houseNumber))
+              .limit(1);
+            householdId = raced!.id;
+          }
+        }
+      }
+
+      await tx
+        .update(users)
+        .set({
+          name,
+          phone,
+          // Only write tier/household when the caller actually supplied a tier, so a
+          // name-only edit can never silently re-tier someone.
+          ...(tier ? { tier } : {}),
+          ...(householdId !== undefined ? { householdId } : {}),
+        })
+        .where(eq(users.id, userId));
+    });
   } catch (err) {
     if (isUniquePhoneViolation(err)) return { ok: false, code: "PHONE_TAKEN" };
     throw err;

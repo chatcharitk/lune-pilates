@@ -7,7 +7,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { AdminLangProvider, useAdminLang } from "./admin-context";
 import { BrandLogo } from "@/components/brand";
 import type { AdminRole } from "@/lib/auth/admin";
@@ -267,6 +267,67 @@ function LangToggle() {
   );
 }
 
+/**
+ * Re-fetch the current admin screen's server data in place.
+ *
+ * `router.refresh()` re-runs the server components and swaps in fresh data WITHOUT
+ * a full page load, so scroll position, open drawers and form state survive — unlike
+ * a browser reload, which would throw away whatever the owner was in the middle of.
+ * The icon spins while the transition is pending so a slow network still looks alive.
+ */
+function RefreshButton() {
+  const { t } = useAdminLang();
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [justRefreshed, setJustRefreshed] = useState(false);
+
+  function refresh() {
+    if (pending) return;
+    setJustRefreshed(false);
+    startTransition(() => {
+      router.refresh();
+    });
+  }
+
+  // Briefly confirm, so a refresh that changes nothing visible still feels answered.
+  useEffect(() => {
+    if (pending) return;
+    if (!justRefreshed) return;
+    const id = window.setTimeout(() => setJustRefreshed(false), 1600);
+    return () => window.clearTimeout(id);
+  }, [pending, justRefreshed]);
+
+  useEffect(() => {
+    if (pending) setJustRefreshed(true);
+  }, [pending]);
+
+  return (
+    <button
+      type="button"
+      onClick={refresh}
+      disabled={pending}
+      aria-label={t("admin_refresh")}
+      title={t("admin_refresh")}
+      className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface-2 text-ink-soft disabled:opacity-60"
+    >
+      <span className={pending ? "animate-spin" : undefined}>
+        <NavIcon
+          size={17}
+          icon={
+            <>
+              <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+              <path d="M21 3v6h-6" />
+            </>
+          }
+        />
+      </span>
+      <span className="sr-only" role="status">
+        {pending ? t("admin_refresh") : justRefreshed ? t("admin_refreshed") : ""}
+      </span>
+    </button>
+  );
+}
+
 function Topbar() {
   const { t } = useAdminLang();
   return (
@@ -275,6 +336,11 @@ function Topbar() {
         <Brand />
       </div>
       <div className="ml-auto flex items-center gap-2.5">
+        {/* Global refresh — every admin page is force-dynamic, so re-running the
+            server render is all that is needed to pick up changes made elsewhere
+            (another device, the front desk, a customer booking). Sits in the top bar
+            rather than per-screen so it is in the same place on every menu. */}
+        <RefreshButton />
         <button
           type="button"
           aria-label={t("aria_notifications")}

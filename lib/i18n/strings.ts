@@ -877,7 +877,9 @@ export const STR = {
   toast_customer_added: { en: "Customer added", th: "เพิ่มลูกค้าแล้ว" },
   toast_customer_removed: { en: "Customer removed", th: "ลบลูกค้าแล้ว" },
   toast_customer_updated: { en: "Customer updated", th: "บันทึกข้อมูลลูกค้าแล้ว" },
-  edit_customer: { en: "Edit name / phone", th: "แก้ไขชื่อ / เบอร์โทร" },
+  // Covers name, phone, customer type and house number (2026-09-08) — the label
+  // used to name only the first two.
+  edit_customer: { en: "Edit customer details", th: "แก้ไขข้อมูลลูกค้า" },
   remove_customer: { en: "Remove customer", th: "ลบลูกค้า" },
   remove_customer_confirm_title: { en: "Remove this customer?", th: "ลบลูกค้ารายนี้?" },
   remove_customer_confirm_body: {
@@ -1181,6 +1183,38 @@ export const STR = {
     en: "Validity must be a whole number between 1 and {max} for the unit you picked.",
     th: "อายุการใช้งานต้องเป็นจำนวนเต็มระหว่าง 1 ถึง {max} ตามหน่วยที่เลือก",
   },
+  // ───────── admin: customer edit — tier, household, expiry (2026-09-08) ─────────
+  edit_tier: { en: "Customer type", th: "ประเภทลูกค้า" },
+  edit_house: { en: "House number", th: "บ้านเลขที่" },
+  edit_house_hint: {
+    en: "Members with the same house number share their classes.",
+    th: "สมาชิกที่ใช้บ้านเลขที่เดียวกันจะแบ่งปันคลาสร่วมกัน",
+  },
+  // Shown when the owner is about to change tier or house — the consequence is not
+  // obvious and is immediately visible to the customer.
+  edit_tier_warning: {
+    en: "Classes already bought do not move. A guest's classes stay personal, and a member's stay with their house — so changing this can cut someone off from a pool they were using.",
+    th: "คลาสที่ซื้อไปแล้วจะไม่ถูกย้าย คลาสของลูกค้าทั่วไปยังเป็นสิทธิ์ส่วนตัว และคลาสของสมาชิกยังผูกกับบ้านเดิม การเปลี่ยนค่านี้อาจทำให้บางคนใช้คลาสที่เคยใช้อยู่ไม่ได้",
+  },
+  expiry_edit: { en: "Change expiry", th: "แก้ไขวันหมดอายุ" },
+  expiry_label: { en: "Last day it can be used", th: "วันสุดท้ายที่ใช้ได้" },
+  expiry_saved: { en: "Expiry updated", th: "อัปเดตวันหมดอายุแล้ว" },
+  expiry_terms_warning: {
+    en: "The published terms say expiry can’t be extended. Use this to correct a mistake, or update the terms first.",
+    th: "ข้อกำหนดที่เผยแพร่ระบุว่าไม่ขยายอายุการใช้งาน ใช้ปุ่มนี้เพื่อแก้ไขข้อผิดพลาด หรือแก้ข้อกำหนดก่อน",
+  },
+  expiry_not_activated: {
+    en: "This part hasn’t started yet — its clock begins when the paid class is used.",
+    th: "ส่วนนี้ยังไม่เริ่มนับ — จะเริ่มเมื่อใช้คลาสที่ชำระเงินแล้ว",
+  },
+  err_expiry_save: {
+    en: "Couldn’t update the expiry. Please try again.",
+    th: "อัปเดตวันหมดอายุไม่สำเร็จ กรุณาลองใหม่",
+  },
+  // Global refresh in the admin top bar.
+  admin_refresh: { en: "Refresh", th: "รีเฟรช" },
+  admin_refreshed: { en: "Updated", th: "อัปเดตแล้ว" },
+
   // ───────── customer: per-format class balances (2026-09-08) ─────────
   // Each class format has its OWN balance and they are not interchangeable, so Home
   // lists them separately rather than showing one misleading total.

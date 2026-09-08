@@ -23,6 +23,7 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireOwner } from "@/lib/auth/admin";
+import { studioEndOfDay, studioInstant, studioParts } from "@/lib/time";
 import { getDb } from "@/lib/db/client";
 import { creditLedger, packages } from "@/lib/db/schema";
 import { loadPoolOwner } from "@/lib/credits/selectPackage";
@@ -377,4 +378,85 @@ function mockAdjustCredits(input: z.infer<typeof adjustInput>): AdjustCreditsRes
   const next = MOCK_PKG[idx]!.hoursLeft + input.deltaHours;
   if (next < 0) return { ok: false, code: "NEGATIVE_BALANCE" };
   return { ok: true, outcome: { packageId: input.packageId, deltaHours: input.deltaHours, hoursLeft: next } };
+}
+
+// ───────────────────────── change a package's expiry date ─────────────────────────
+//
+// Front-desk correction tool (Owner-only): set the date a customer's package runs
+// out. Added at the owner's request (2026-09-08).
+//
+// ⚠️ READ THIS BEFORE USING IT. The studio's published Terms & Conditions say
+// package expiry "cannot be extended under any circumstances — including illness,
+// injury, pregnancy, travel, or any other reason". This action makes extending
+// mechanically possible; it does not change that promise. Use it to CORRECT a
+// mistake (a package credited on the wrong day, a mis-typed validity), not to grant
+// the extensions the terms rule out — or reword clause 2 of the terms first, so what
+// the studio does and what it published stay in step.
+
+const updateExpiryInput = z.object({
+  packageId: z.string().uuid(),
+  /** The last day the package may be used, as a Bangkok calendar date "YYYY-MM-DD". */
+  expiresOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+export type UpdatePackageExpiryInput = z.infer<typeof updateExpiryInput>;
+
+export type UpdatePackageExpiryFailureCode =
+  | "UNAUTHORIZED"
+  | "INVALID_INPUT"
+  | "NOT_FOUND"
+  // The package is a DORMANT bundle component whose clock has not started (its free
+  // class unlocks when the paid one is used). Dating it here would activate it early
+  // and hand over credit the customer has not earned yet.
+  | "NOT_ACTIVATED"
+  // Demo mode (no DATABASE_URL): validated, but nothing to persist to.
+  | "MOCK_NO_DB";
+
+export type UpdatePackageExpiryResult =
+  | { ok: true; expiresAtIso: string }
+  | { ok: false; code: UpdatePackageExpiryFailureCode };
+
+/**
+ * Set a package's expiry to the END of the given Bangkok day — the same inclusive
+ * whole-day rule every other expiry uses (lib/catalog/validity.ts), so a package
+ * dated the 16th is usable for all of the 16th.
+ *
+ * Refuses to touch a dormant bundle component: those have no expiry precisely
+ * because their clock has not started, and stamping one is how they ACTIVATE.
+ * Activation belongs to the booking that earns it (lib/credits/activation.ts), not
+ * to a date picker.
+ */
+export async function updatePackageExpiry(
+  raw: UpdatePackageExpiryInput,
+): Promise<UpdatePackageExpiryResult> {
+  if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
+
+  const parsed = updateExpiryInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
+  const { packageId, expiresOn } = parsed.data;
+
+  // Reject an impossible calendar date ("2026-02-31") that the regex lets through.
+  const [y, m, d] = expiresOn.split("-").map(Number) as [number, number, number];
+  const dayStart = studioInstant(y, m - 1, d, 0, 0);
+  const parts = studioParts(dayStart);
+  if (parts.year !== y || parts.month0 !== m - 1 || parts.day !== d) {
+    return { ok: false, code: "INVALID_INPUT" };
+  }
+
+  if (mockDataMode()) return { ok: false, code: "MOCK_NO_DB" };
+
+  const db = getDb();
+  const [pkg] = await db
+    .select({ id: packages.id, expiresAt: packages.expiresAt })
+    .from(packages)
+    .where(eq(packages.id, packageId))
+    .limit(1);
+  if (!pkg) return { ok: false, code: "NOT_FOUND" };
+  if (pkg.expiresAt === null) return { ok: false, code: "NOT_ACTIVATED" };
+
+  // Last millisecond of that Bangkok day — the final day is usable in full.
+  const expiresAt = new Date(studioEndOfDay(dayStart).getTime() - 1);
+  await db.update(packages).set({ expiresAt }).where(eq(packages.id, packageId));
+
+  revalidatePath("/admin/members");
+  return { ok: true, expiresAtIso: expiresAt.toISOString() };
 }
