@@ -31,11 +31,17 @@
 // CLAUDE.md §5 inv 1/2), and the bonus is its own `+1` ledger row (reason "promo") so
 // the ledger stays the source of truth: sum of the package's deltas == hours_total.
 
-import { and, eq, ne } from "drizzle-orm";
+import { and, asc, eq, ne } from "drizzle-orm";
 import { getDb, type Database } from "@/lib/db/client";
 import { charges, creditLedger, packages } from "@/lib/db/schema";
 import type { CatalogItem } from "@/lib/catalog/packages";
 import { expiryFromValidity } from "@/lib/catalog/validity";
+import {
+  componentsForItem,
+  topoSortComponents,
+  type CatalogComponent,
+} from "@/lib/catalog/components";
+import { parseComponentsSnapshot } from "@/lib/catalog/componentsSnapshot";
 
 /** Where the credited balance lands: a household pool (member) XOR a user (guest). */
 export interface CreditOwner {
@@ -146,16 +152,52 @@ type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
  * + any promo bonus; never mutated afterwards) — so idempotent replays can report a
  * truthful `hoursAdded` instead of recomputing item.hours and under-reporting a promo.
  */
+/**
+ * The components THIS charge was bought against.
+ *
+ * Prefers the snapshot frozen on the charge at checkout: components are
+ * owner-editable and a charge can sit in `awaiting_review` for days, so re-resolving
+ * them live at approval time would let an edit change what an already-paid purchase
+ * grants — exactly the hazard the hours/validity snapshot columns exist to prevent.
+ *
+ * Falls back to live resolution when there is no snapshot: charges opened before
+ * bundles existed, and plain single-balance items (which have nothing to freeze and
+ * resolve to their implicit "main" component either way).
+ */
+async function resolveChargeComponents(
+  tx: Tx,
+  chargeId: string,
+  item: CatalogItem,
+): Promise<CatalogComponent[]> {
+  const rows = await tx
+    .select({ componentsJson: charges.componentsJson })
+    .from(charges)
+    .where(eq(charges.chargeId, chargeId))
+    .limit(1);
+
+  const snapshot = parseComponentsSnapshot(rows[0]?.componentsJson ?? null);
+  if (snapshot) return snapshot;
+  return componentsForItem(item);
+}
+
 async function findByCharge(
   q: Database | Tx,
   chargeId: string,
 ): Promise<{ id: string; hoursLeft: number; hoursTotal: number } | null> {
+  // A BUNDLE credits one row per component, so this aggregates rather than taking
+  // the first row: `hoursTotal` is the total credit the charge granted (what the
+  // receipt should say), while `id`/`hoursLeft` describe the PRIMARY component —
+  // the purchase-anchored one created first, ordered here by created_at then
+  // component_key so an idempotent replay always reports the same package.
   const rows = await q
     .select({ id: packages.id, hoursLeft: packages.hoursLeft, hoursTotal: packages.hoursTotal })
     .from(packages)
     .where(eq(packages.purchaseChargeId, chargeId))
-    .limit(1);
-  return rows[0] ?? null;
+    .orderBy(asc(packages.createdAt), asc(packages.componentKey));
+  if (rows.length === 0) return null;
+  const primary = rows[0]!;
+  const hoursTotal = rows.reduce((sum, r) => sum + r.hoursTotal, 0);
+  return { id: primary.id, hoursLeft: primary.hoursLeft, hoursTotal };
 }
 
 /**
@@ -216,7 +258,7 @@ export async function creditPackage(params: {
   const db = getDb();
 
   try {
-    return await db.transaction(async (tx) => {
+    return await db.transaction(async (tx): Promise<CreditOutcome> => {
       // Idempotency pre-check: this charge already credited a package? Return it —
       // reporting the REAL total it granted (hours_total covers any promo bonus).
       const existing = await findByCharge(tx, chargeId);
@@ -233,50 +275,108 @@ export async function creditPackage(params: {
       // — see its doc comment for the one-line re-enable). Skip the
       // hasPriorPaidCharge read entirely while disabled; no purchase needs it.
       const bonusHours = promoBonusHours(item.id, false);
-      const hoursGranted = item.hours + bonusHours;
 
-      const expiresAt = expiryFromValidity(item.validity.amount, item.validity.unit, now);
+      // WHAT THIS PURCHASE GRANTS (bundles, 2026-09-08). Most items are a single
+      // balance and resolve to one implicit "main" component — identical to the old
+      // behaviour. A BUNDLE (e.g. the ฿1,800 trial) grants several: a private
+      // balance that starts counting at purchase, and a free group balance that
+      // stays DORMANT until the private class is taken.
+      //
+      // Read from the charge's frozen snapshot when it has one, so an owner editing
+      // the bundle while this charge sat in review cannot change what the customer
+      // actually bought (same guarantee as the hours/validity snapshot).
+      const components = topoSortComponents(await resolveChargeComponents(tx, chargeId, item));
 
-      // hoursTotal == hoursLeft on a fresh purchase (incl. the promo bonus); the
-      // ledger rows below are the source of truth and reconcile to this cached
-      // balance: sum of this package's deltas == hoursGranted.
-      const [pkg] = await tx
-        .insert(packages)
-        .values({
-          type: item.id,
-          category: item.category,
-          hoursTotal: hoursGranted,
-          hoursLeft: hoursGranted,
-          expiresAt,
-          ownerHouseholdId: owner.ownerHouseholdId,
-          ownerUserId: owner.ownerUserId,
-          purchaseChargeId: chargeId,
-        })
-        .returning({ id: packages.id, hoursLeft: packages.hoursLeft });
+      // Insert in topological order so a dependent component always finds its
+      // anchor's package id already created.
+      const packageIdByComponent = new Map<string, string>();
+      let primaryPackageId: string | null = null;
+      let primaryHoursLeft = 0;
+      let hoursGranted = 0;
 
-      await tx.insert(creditLedger).values({
-        packageId: pkg!.id,
-        delta: item.hours,
-        actorUserId,
-        reason: "purchase",
-      });
+      // Indexed rather than for-of purely to keep `isPrimary` independent of the
+      // rows being inserted — deriving it from primaryPackageId made its type
+      // circular (isPrimary → primaryPackageId → the insert → grant → isPrimary).
+      for (let i = 0; i < components.length; i++) {
+        const c = components[i]!;
+        // The promo bonus (when re-enabled) rides on the FIRST component, so a
+        // bundle grants it once rather than once per balance.
+        const isPrimary = i === 0;
+        const grant = c.hours + (isPrimary ? bonusHours : 0);
+        const anchored = c.anchorComponentKey !== null;
 
-      // The promo bonus is its OWN ledger row so the paid purchase and the free
-      // grant stay separately auditable (and the ledger still sums to hours_total).
-      if (bonusHours > 0) {
+        // Purchase-anchored → stamp the expiry now. Anchored to a sibling → DORMANT:
+        // no expiry (so it is invisible to every bookable/balance query and cannot
+        // be spent), carrying the window to apply once its anchor is used.
+        const expiresAt = anchored
+          ? null
+          : expiryFromValidity(c.validity.amount, c.validity.unit, now);
+
+        const [pkg] = await tx
+          .insert(packages)
+          .values({
+            type: item.id,
+            componentKey: c.componentKey,
+            category: c.category,
+            hoursTotal: grant,
+            hoursLeft: grant,
+            expiresAt,
+            activationAnchorPackageId: anchored
+              ? (packageIdByComponent.get(c.anchorComponentKey!) ?? null)
+              : null,
+            activationAmount: anchored ? c.validity.amount : null,
+            activationUnit: anchored ? c.validity.unit : null,
+            ownerHouseholdId: owner.ownerHouseholdId,
+            ownerUserId: owner.ownerUserId,
+            purchaseChargeId: chargeId,
+          })
+          .returning({ id: packages.id, hoursLeft: packages.hoursLeft });
+
+        // hoursTotal == hoursLeft on a fresh purchase; the ledger rows are the
+        // source of truth and reconcile to it (sum of deltas == hours_total).
         await tx.insert(creditLedger).values({
           packageId: pkg!.id,
-          delta: bonusHours,
+          delta: c.hours,
           actorUserId,
-          reason: "promo",
+          reason: "purchase",
         });
+
+        // The promo bonus is its OWN ledger row so the paid purchase and the free
+        // grant stay separately auditable.
+        if (isPrimary && bonusHours > 0) {
+          await tx.insert(creditLedger).values({
+            packageId: pkg!.id,
+            delta: bonusHours,
+            actorUserId,
+            reason: "promo",
+          });
+        }
+
+        packageIdByComponent.set(c.componentKey, pkg!.id);
+        hoursGranted += grant;
+        if (isPrimary) {
+          primaryPackageId = pkg!.id;
+          primaryHoursLeft = pkg!.hoursLeft;
+        }
+      }
+
+      // validateComponentSet guarantees at least one component, and componentsForItem
+      // never returns an empty list — but crediting nothing would silently swallow a
+      // paid purchase, so fail loudly rather than commit a no-op.
+      if (primaryPackageId === null) {
+        throw new Error(`creditPackage: item ${item.id} resolved to no components`);
       }
 
       // Flip the intent to "paid" in the same transaction so the charge lifecycle
-      // reconciles with the credit it produced (all-or-nothing with the package).
+      // reconciles with the credit it produced (all-or-nothing with the packages).
       await tx.update(charges).set({ status: "paid" }).where(eq(charges.chargeId, chargeId));
 
-      return { packageId: pkg!.id, hoursAdded: hoursGranted, hoursLeft: pkg!.hoursLeft, created: true };
+      return {
+        packageId: primaryPackageId,
+        hoursAdded: hoursGranted,
+        hoursLeft: primaryHoursLeft,
+        created: true,
+      };
     });
   } catch (err) {
     // Racing duplicate credit: a unique violation rejected the second insert. On ANY

@@ -62,8 +62,13 @@ export interface AdjustablePackage {
   label: Bilingual;
   /** Current usable balance on this package, in whole credits (the cache). */
   hoursLeft: number;
-  /** Soonest expiry (ISO 8601). */
-  expiresAt: string;
+  /**
+   * Expiry (ISO 8601), or null for a DORMANT bundle component whose clock has not
+   * started yet — e.g. the trial's free group class before the private is taken.
+   * This listing is deliberately unfiltered (the owner adjusts any balance they
+   * own), so unlike the bookable queries it really can contain a dormant row.
+   */
+  expiresAt: string | null;
 }
 
 export type GetAdjustablePackagesResult =
@@ -171,7 +176,7 @@ export async function getAdjustablePackages(
       category: r.category,
       label: packageLabelFor(r.type, catalog),
       hoursLeft: r.hoursLeft,
-      expiresAt: r.expiresAt.toISOString(),
+      expiresAt: r.expiresAt?.toISOString() ?? null,
     })),
   };
 }

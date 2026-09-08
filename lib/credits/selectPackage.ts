@@ -14,7 +14,7 @@
 //   - When several qualify, debit the one expiring soonest first (use-it-or-lose-it),
 //     so credits are never silently wasted.
 
-import { and, asc, eq, gt, gte, isNull, type SQL } from "drizzle-orm";
+import { and, asc, eq, gt, gte, isNull, lte, or, type SQL } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { packages, users } from "@/lib/db/schema";
 import type { ClassType, PackageCategory } from "@/lib/domain/types";
@@ -33,6 +33,20 @@ function ownerWhere(viewer: SessionUser): SQL {
   return sharesHousehold
     ? (and(eq(packages.ownerHouseholdId, viewer.householdId!), isNull(packages.ownerUserId)) as SQL)
     : (and(eq(packages.ownerUserId, viewer.id), isNull(packages.ownerHouseholdId)) as SQL);
+}
+
+/**
+ * The near edge of a package's usable window: it is spendable only once
+ * `activates_at` has passed (null = no delayed start, the ordinary case).
+ *
+ * Pairs with the `expires_at > now` filter every caller already applies. A DORMANT
+ * bundle component — the trial's free group class before the private is taken — has
+ * a NULL expiry and is excluded by that filter alone; this handles the state AFTER
+ * unlocking, where the class has been booked but has not started yet, so the free
+ * credit must still not be spendable.
+ */
+function activeByNow(now: Date) {
+  return or(isNull(packages.activatesAt), lte(packages.activatesAt, now));
 }
 
 /**
@@ -91,6 +105,7 @@ export async function selectUsablePackageRow(
         // credits elsewhere. (Cross-package splitting is a deliberate v1 non-goal.)
         minHours > 0 ? gte(packages.hoursLeft, minHours) : gt(packages.hoursLeft, 0),
         gt(packages.expiresAt, now),
+        activeByNow(now),
       ),
     )
     .orderBy(asc(packages.expiresAt))
@@ -150,6 +165,7 @@ export async function selectPackageForReschedule(
         ownerWhere(viewer),
         eq(packages.category, category),
         gt(packages.expiresAt, now),
+        activeByNow(now),
       ),
     )
     .limit(1);
@@ -264,6 +280,7 @@ export async function getPoolBalance(
         eq(packages.category, packageCategoryForClassType(classType)),
         gt(packages.hoursLeft, 0),
         gt(packages.expiresAt, now),
+        activeByNow(now),
       ),
     );
   // Sum in JS over whole integer credits — exactly representable, never drifts.
@@ -303,6 +320,7 @@ export async function getCreditOverview(
         eq(packages.category, "group"),
         gt(packages.hoursLeft, 0),
         gt(packages.expiresAt, now),
+        activeByNow(now),
       ),
     )
     .orderBy(asc(packages.expiresAt));

@@ -39,7 +39,7 @@ import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getDb } from "@/lib/db/client";
-import { catalogItems, charges, packages } from "@/lib/db/schema";
+import { catalogItemComponents, catalogItems, charges, packages } from "@/lib/db/schema";
 import {
   legacyValidityText,
   listAllCatalogItems,
@@ -53,6 +53,13 @@ import {
   isValidityAmountInRange,
   MAX_VALIDITY_AMOUNT,
 } from "@/lib/catalog/validity";
+import {
+  loadComponentsMap,
+  sortComponents,
+  validateComponentSet,
+  type CatalogComponent,
+  type ComponentSetProblem,
+} from "@/lib/catalog/components";
 import type { ValidityUnit } from "@/lib/catalog/packages";
 import { requireOwner } from "@/lib/auth/admin";
 import { mockDataMode } from "@/lib/mock-mode";
@@ -106,6 +113,8 @@ const createInput = z.object({
   tag: TAG.nullable().optional(),
   labelEn: labelField,
   labelTh: labelField,
+  // Trial offer: only buyable by a customer with no prior paid purchase.
+  firstPurchaseOnly: z.boolean().optional(),
   sortOrder: z.number().int().min(0).max(10_000).optional(),
 });
 const createInputChecked = withValidityInRange(createInput);
@@ -124,6 +133,7 @@ const updateInput = z.object({
   tag: TAG.nullable().optional(),
   labelEn: labelField,
   labelTh: labelField,
+  firstPurchaseOnly: z.boolean().optional(),
   sortOrder: z.number().int().min(0).max(10_000).optional(),
 });
 const updateInputChecked = withValidityInRange(updateInput);
@@ -253,6 +263,7 @@ export async function createCatalogItem(
         tag: input.tag ?? null,
         labelEn: input.labelEn,
         labelTh: input.labelTh,
+        firstPurchaseOnly: input.firstPurchaseOnly ?? false,
         active: true,
         sortOrder,
       })
@@ -333,6 +344,7 @@ export async function updateCatalogItem(
       tag: input.tag ?? null,
       labelEn: input.labelEn,
       labelTh: input.labelTh,
+      firstPurchaseOnly: input.firstPurchaseOnly ?? false,
       sortOrder,
     })
     .where(eq(catalogItems.id, input.id));
@@ -559,4 +571,145 @@ function revalidateCatalog(): void {
   revalidatePath("/admin/packages");
   revalidatePath("/admin/payments");
   revalidatePath("/buy");
+}
+
+// ───────────────────────── bundle components (owner-configurable) ─────────────────────────
+//
+// Lets the owner build a package that grants SEVERAL balances, each with its own
+// credit category and its own expiry clock — the model behind the ฿1,800 trial
+// (one private class valid 14 days from payment, plus a free group class valid 7
+// days from that private class). See lib/catalog/components.ts.
+//
+// Components are replaced as a SET rather than edited row by row: the rules only
+// make sense together (an anchor must name a sibling that exists, and the graph must
+// be acyclic), so validating and writing them atomically is the only way to
+// guarantee the stored set is always coherent. A half-applied edit could leave a
+// customer holding credit that can never activate.
+
+const componentInput = z.object({
+  componentKey: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .min(2)
+    .max(40)
+    .regex(/^[a-z0-9]+(?:[_-][a-z0-9]+)*$/),
+  category: CATEGORY,
+  hours: z.number().int().positive().max(500),
+  validityAmount: VALIDITY_AMOUNT,
+  validityUnit: VALIDITY_UNIT,
+  anchorComponentKey: z.string().trim().toLowerCase().max(40).nullable(),
+  sortOrder: z.number().int().min(0).max(10_000),
+  labelEn: labelField,
+  labelTh: labelField,
+});
+
+const setComponentsInput = z.object({
+  itemId: z.string().trim().min(1).max(40),
+  // An EMPTY list is meaningful: it clears the bundle, returning the item to an
+  // ordinary single-balance package built from its own category/hours/validity.
+  components: z.array(componentInput).max(10),
+});
+export type SetItemComponentsInput = z.infer<typeof setComponentsInput>;
+
+export type SetItemComponentsFailureCode =
+  | "UNAUTHORIZED"
+  | "INVALID_INPUT"
+  | "UNKNOWN_ITEM"
+  // The set is structurally unusable — see ComponentSetProblem for which way.
+  | "INVALID_COMPONENT_SET"
+  | "VALIDITY_OUT_OF_RANGE"
+  | MockNoDbCode;
+
+export type SetItemComponentsResult =
+  | { ok: true; components: CatalogComponent[] }
+  | { ok: false; code: SetItemComponentsFailureCode; problem?: ComponentSetProblem };
+
+/**
+ * Replace an item's components wholesale. Validates the set as a whole (anchors
+ * resolve, no cycles, at least one component starting at purchase) BEFORE writing,
+ * then swaps it inside one transaction.
+ *
+ * Existing PACKAGES are untouched: a customer who already bought this bundle keeps
+ * the balances they were granted, on the clocks they were granted with — the charge
+ * froze its own copy of the components (charges.components_json). Editing here only
+ * changes what FUTURE purchases grant.
+ */
+export async function setItemComponents(
+  raw: SetItemComponentsInput,
+): Promise<SetItemComponentsResult> {
+  if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
+
+  const parsed = setComponentsInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
+  const input = parsed.data;
+
+  // Per-unit validity ceilings, same rule the item's own validity obeys.
+  for (const c of input.components) {
+    if (!isValidityAmountInRange(c.validityAmount, c.validityUnit)) {
+      return { ok: false, code: "VALIDITY_OUT_OF_RANGE" };
+    }
+  }
+
+  const components: CatalogComponent[] = input.components.map((c) => ({
+    componentKey: c.componentKey,
+    category: c.category,
+    hours: c.hours,
+    validity: { amount: c.validityAmount, unit: c.validityUnit },
+    anchorComponentKey: c.anchorComponentKey === "" ? null : c.anchorComponentKey,
+    sortOrder: c.sortOrder,
+    label: { en: c.labelEn, th: c.labelTh },
+  }));
+
+  // An empty set is allowed (clears the bundle); a non-empty one must be coherent.
+  if (components.length > 0) {
+    const problem = validateComponentSet(components);
+    if (problem) return { ok: false, code: "INVALID_COMPONENT_SET", problem };
+  }
+
+  if (mockDataMode()) return { ok: false, code: "MOCK_NO_DB" };
+
+  const db = getDb();
+  const [item] = await db
+    .select({ id: catalogItems.id })
+    .from(catalogItems)
+    .where(eq(catalogItems.id, input.itemId))
+    .limit(1);
+  if (!item) return { ok: false, code: "UNKNOWN_ITEM" };
+
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(catalogItemComponents)
+      .where(eq(catalogItemComponents.itemId, input.itemId));
+    if (components.length > 0) {
+      await tx.insert(catalogItemComponents).values(
+        components.map((c) => ({
+          itemId: input.itemId,
+          componentKey: c.componentKey,
+          category: c.category,
+          hours: c.hours,
+          validityAmount: c.validity.amount,
+          validityUnit: c.validity.unit,
+          anchorComponentKey: c.anchorComponentKey,
+          sortOrder: c.sortOrder,
+          labelEn: c.label.en,
+          labelTh: c.label.th,
+        })),
+      );
+    }
+  });
+
+  revalidateCatalog();
+  return { ok: true, components: sortComponents(components) };
+}
+
+export type ListItemComponentsResult =
+  | { ok: true; components: CatalogComponent[] }
+  | { ok: false; code: "UNAUTHORIZED" };
+
+/** An item's configured components (empty when it is a plain single-balance item). */
+export async function listItemComponents(itemId: string): Promise<ListItemComponentsResult> {
+  if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
+  const map = await loadComponentsMap([itemId]);
+  return { ok: true, components: sortComponents(map.get(itemId) ?? []) };
 }

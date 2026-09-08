@@ -665,7 +665,11 @@ async function buildRetentionSection(now: Date): Promise<RetentionSection> {
       .where(sql`${users.householdId} is not null`),
   ]);
 
-  const expiringSoon = expRows.map((r) => {
+  const expiringSoon = expRows
+    // Dormant bundle components (null expiry) are not "expiring" — they have not
+    // started. The SQL window filter already excludes them; this narrows the type.
+    .filter((r): r is typeof r & { expiresAt: Date } => r.expiresAt !== null)
+    .map((r) => {
     const isGuest = r.ownerUserId !== null;
     const exp = r.expiresAt;
     return {

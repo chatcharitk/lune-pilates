@@ -9,6 +9,7 @@ import {
   integer,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -59,14 +60,44 @@ export const packages = pgTable(
     // Credit balances are whole integer credits (1 group/rental, 2 private/duo/trio).
     hoursTotal: integer("hours_total").notNull(),
     hoursLeft: integer("hours_left").notNull(),
-    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    // NULLABLE = DORMANT (bundles, 2026-09-08). A package whose clock has not
+    // started yet has NO expiry: the free group class in the trial bundle only
+    // begins its 7 days once the paid private class has been taken.
+    //
+    // Null is deliberately chosen as the dormant marker because every existing
+    // bookable/balance query filters `expires_at > now()`, and SQL comparisons
+    // against NULL are never true — so a dormant package is invisible to the
+    // booking engine, the balance, and the pool total with NO query changes and
+    // no chance of a missed gate. It FAILS CLOSED.
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    // Usable FROM this instant (null = usable as soon as it has an expiry). Set
+    // when a dormant component activates: the sibling's class start time. Gates
+    // the window's near edge the way expires_at gates the far edge.
+    activatesAt: timestamp("activates_at", { withTimezone: true }),
+    // ── bundle wiring (see catalog_item_components) ──
+    // Which component of the catalog item this row was created from. 'main' for an
+    // ordinary single-balance package, so the composite UNIQUE below still dedupes
+    // them (a NULL would not — Postgres treats NULLs as distinct).
+    componentKey: text("component_key").notNull().default("main"),
+    // The sibling package whose consumption starts THIS package's clock. Null for
+    // anything that starts counting at purchase.
+    activationAnchorPackageId: uuid("activation_anchor_package_id"),
+    // How long this package lasts ONCE ACTIVATED (amount + 'day'|'month'). Only set
+    // on a dormant/anchored package; a purchase-anchored one had its expiry stamped
+    // at credit time and needs no window to apply later.
+    activationAmount: integer("activation_amount"),
+    activationUnit: text("activation_unit"),
+    // The booking that actually started this package's clock. Kept so cancelling
+    // that booking can put the package BACK to dormant — otherwise a customer could
+    // book the anchor class to unlock the free one, then cancel the anchor and keep
+    // the unlocked credit. Null while dormant and for everything non-anchored.
+    activationBookingId: uuid("activation_booking_id"),
     ownerHouseholdId: uuid("owner_household_id").references(() => households.id),
     ownerUserId: uuid("owner_user_id").references(() => users.id),
-    // The PromptPay charge this package was credited from. UNIQUE so confirming
-    // the same charge twice can never create a second package / double-credit
-    // (purchase idempotency — see app/actions/purchase.ts). Nullable: admin/POS
-    // or seeded packages may have no associated charge.
-    purchaseChargeId: text("purchase_charge_id").unique(),
+    // The PromptPay charge this package was credited from. Nullable: admin/POS or
+    // seeded packages may have no associated charge. UNIQUE per (charge, component)
+    // — see the constraint below.
+    purchaseChargeId: text("purchase_charge_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -75,6 +106,12 @@ export const packages = pgTable(
       sql`(${t.ownerHouseholdId} is not null) <> (${t.ownerUserId} is not null)`,
     ),
     check("package_hours_left_nonneg", sql`${t.hoursLeft} >= 0`),
+    // Purchase idempotency: confirming the same charge twice must never create a
+    // second balance. A BUNDLE legitimately creates one row per component, so the
+    // key is (charge, component) rather than the charge alone — 'main' being the
+    // component of an ordinary package keeps single-balance items deduped exactly
+    // as the old single-column UNIQUE did.
+    uniqueIndex("packages_charge_component_key").on(t.purchaseChargeId, t.componentKey),
   ],
 );
 
@@ -112,6 +149,10 @@ export const catalogItems = pgTable(
     labelEn: text("label_en").notNull(),
     labelTh: text("label_th").notNull(),
     active: boolean("active").notNull().default(true),
+    // TRIAL OFFERS (2026-09-08): only purchasable by a customer with no prior paid
+    // purchase. Enforced server-side in createCheckout, and such items are hidden
+    // from the buy screen for anyone who no longer qualifies.
+    firstPurchaseOnly: boolean("first_purchase_only").notNull().default(false),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -127,6 +168,65 @@ export const catalogItems = pgTable(
     check(
       "catalog_item_validity_unit_valid",
       sql`${t.validityUnit} is null or ${t.validityUnit} in ('day','month')`,
+    ),
+  ],
+);
+
+// ───────────────────────── catalog item components (BUNDLES) ─────────────────────────
+// Lets one purchasable catalog item grant SEVERAL separate balances, each with its
+// own credit category and its own expiry clock (owner's request, 2026-09-08).
+//
+// The motivating offer: a ฿1,800 trial = one private (1:1) class usable within 14
+// days of payment, PLUS one free group class usable within 7 days of that private
+// class. Neither half fits the plain model — a purchase used to grant exactly one
+// balance in one category with one expiry stamped at payment time.
+//
+// A component is one of those balances:
+//   - `category` + `hours`  → which credit bucket, and how many whole credits.
+//   - `validity_amount/unit` → how long it lasts ONCE ITS CLOCK STARTS.
+//   - `anchor_component_key` → WHEN the clock starts. NULL means "at purchase"
+//     (the ordinary case). Otherwise it names a SIBLING component; this component
+//     stays DORMANT (packages.expires_at IS NULL — unusable and invisible to the
+//     booking engine) until that sibling is spent on a class, and then runs its
+//     window from that class's start time.
+//
+// An item with NO rows here behaves exactly as before: one implicit "main"
+// component built from the item's own category/hours/validity. Every existing
+// package is therefore untouched, and this table is purely additive.
+export const catalogItemComponents = pgTable(
+  "catalog_item_components",
+  {
+    itemId: text("item_id")
+      .notNull()
+      .references(() => catalogItems.id),
+    // Stable slug, unique within the item (e.g. "private", "free_group"). Written
+    // onto every package this component creates, so a granted balance can always be
+    // traced back to the rule that made it — and so bundle purchases stay idempotent.
+    componentKey: text("component_key").notNull(),
+    category: packageCategory("category").notNull(),
+    hours: integer("hours").notNull(),
+    validityAmount: integer("validity_amount").notNull(),
+    validityUnit: text("validity_unit").notNull(), // 'day' | 'month'
+    // NULL → the clock starts at purchase. Otherwise the sibling component whose
+    // use starts it. A cycle here would leave both halves permanently dormant, so
+    // the admin action rejects one (app/actions/admin-catalog.ts).
+    anchorComponentKey: text("anchor_component_key"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    labelEn: text("label_en").notNull(),
+    labelTh: text("label_th").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.itemId, t.componentKey] }),
+    check("catalog_component_hours_positive", sql`${t.hours} > 0`),
+    check("catalog_component_validity_positive", sql`${t.validityAmount} > 0`),
+    check(
+      "catalog_component_validity_unit_valid",
+      sql`${t.validityUnit} in ('day','month')`,
+    ),
+    // A component anchored to ITSELF could never activate.
+    check(
+      "catalog_component_anchor_not_self",
+      sql`${t.anchorComponentKey} is null or ${t.anchorComponentKey} <> ${t.componentKey}`,
     ),
   ],
 );
@@ -274,6 +374,14 @@ export const charges = pgTable("charges", {
   // record, and admin POS (front-desk, in-person) sales do not collect one.
   termsVersionId: uuid("terms_version_id").references(() => termsVersions.id),
   termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
+  // BUNDLE COMPONENTS SNAPSHOT (2026-09-08). JSON array of the components this
+  // charge was opened against, frozen at checkout for exactly the reason the
+  // hours/validity columns above are frozen: components are owner-editable at
+  // runtime, and a charge can sit in `awaiting_review` for days. Re-resolving them
+  // live at approval time would let an edit change what an already-paid purchase
+  // grants. NULL for a plain single-balance item (nothing to freeze) and for
+  // charges opened before bundles existed — both fall back to the live resolution.
+  componentsJson: text("components_json"),
   // Opaque reference tying charge → user + item + instant (audit / provider match).
   reference: text("reference").notNull(),
   // How the sale was tendered: "promptpay" (QR, the default — customer self-serve

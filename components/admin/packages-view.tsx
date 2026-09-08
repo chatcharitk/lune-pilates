@@ -42,7 +42,11 @@ import {
   type ArchiveCatalogItemFailureCode,
   type DeleteCatalogItemFailureCode,
   type ReorderCatalogFailureCode,
+  listItemComponents,
+  setItemComponents,
+  type SetItemComponentsFailureCode,
 } from "@/app/actions/admin-catalog";
+import type { CatalogComponent, ComponentSetProblem } from "@/lib/catalog/components";
 import type { AdminCatalogItem, CatalogTag, ValidityUnit } from "@/lib/catalog/packages";
 import { VALIDITY_UNITS } from "@/lib/catalog/packages";
 // Type-only import of the catalog module above keeps the DB client out of this
@@ -512,6 +516,7 @@ function ItemFormDrawer({
   const [validityAmount, setValidityAmount] = useState("1");
   const [validityUnit, setValidityUnit] = useState<ValidityUnit>("month");
   const [tag, setTag] = useState<CatalogTag | "none">("none");
+  const [firstPurchaseOnly, setFirstPurchaseOnly] = useState(false);
   const [labelEn, setLabelEn] = useState("");
   const [labelTh, setLabelTh] = useState("");
   const [errorKey, setErrorKey] = useState<StrKey | null>(null);
@@ -528,6 +533,7 @@ function ItemFormDrawer({
     setValidityAmount(String(item?.validity.amount ?? 1));
     setValidityUnit(item?.validity.unit ?? "month");
     setTag(item?.tag ?? "none");
+    setFirstPurchaseOnly(item?.firstPurchaseOnly ?? false);
     setLabelEn(item?.label.en ?? "");
     setLabelTh(item?.label.th ?? "");
     setErrorKey(null);
@@ -583,6 +589,7 @@ function ItemFormDrawer({
       tag: tag === "none" ? null : tag,
       labelEn: labelEn.trim(),
       labelTh: labelTh.trim(),
+      firstPurchaseOnly,
     };
 
     startTransition(async () => {
@@ -838,6 +845,30 @@ function ItemFormDrawer({
         )}
       </Field>
 
+      {/* Trial offers: hidden from anyone who has bought before, and refused
+          server-side for them too (app/actions/purchase.ts). */}
+      <label className="mt-1 flex cursor-pointer items-start gap-3 rounded-xl border border-line-strong bg-surface px-3.5 py-3">
+        <input
+          type="checkbox"
+          checked={firstPurchaseOnly}
+          onChange={(e) => setFirstPurchaseOnly(e.target.checked)}
+          className="mt-0.5 h-4 w-4 shrink-0 accent-[#8C7A63]"
+        />
+        <span className="min-w-0">
+          <span className="block font-body text-sm font-semibold text-ink">
+            {t("cat_first_purchase_only")}
+          </span>
+          <span className="mt-0.5 block font-body text-[12px] leading-snug text-muted">
+            {t("cat_first_purchase_hint")}
+          </span>
+        </span>
+      </label>
+
+      {/* Bundle parts — edit mode only: components hang off an existing item id.
+          Saved by their own action (setItemComponents) because the set is validated
+          and swapped atomically, independently of the item's own fields. */}
+      {isEdit && item && <BundleEditor itemId={item.id} />}
+
       {/* Delete — a DIFFERENT affordance from Archive. Delete removes the package
           entirely when it was never sold; if it has past purchases the server
           archives it instead (and the toast says so). Guarded by an inline confirm. */}
@@ -1091,5 +1122,399 @@ function ChevronDown() {
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="m6 9 6 6 6-6" />
     </svg>
+  );
+}
+
+// ───────────────────────── bundle parts editor ─────────────────────────
+
+/**
+ * The owner's editor for what a package GRANTS. Empty = an ordinary package: one
+ * balance, from the item's own credit type / credits / validity above. Add parts and
+ * the package grants several balances, each with its own credit type and its own
+ * clock — the model behind the ฿1,800 trial (a 1:1 class valid 14 days from payment,
+ * plus a free group class valid 7 days after that class is taken).
+ *
+ * Parts are saved as a SET by their own action: the rules only make sense together
+ * (a part that waits on another must name one that exists, and they must not wait on
+ * each other in a loop), so the server validates and swaps them atomically. Editing
+ * here never touches balances already sold — each purchase froze its own copy.
+ */
+function BundleEditor({ itemId }: { itemId: string }) {
+  const { t } = useAdminLang();
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [rows, setRows] = useState<ComponentDraft[] | null>(null);
+  const [errorKey, setErrorKey] = useState<StrKey | null>(null);
+  const [savedKey, setSavedKey] = useState<StrKey | null>(null);
+
+  // Load the item's current parts when the drawer opens on it.
+  useEffect(() => {
+    let cancelled = false;
+    setRows(null);
+    setErrorKey(null);
+    setSavedKey(null);
+    listItemComponents(itemId)
+      .then((res) => {
+        if (cancelled) return;
+        setRows(res.ok ? res.components.map(toDraft) : []);
+      })
+      .catch(() => {
+        if (!cancelled) setRows([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [itemId]);
+
+  function update(index: number, patch: Partial<ComponentDraft>) {
+    setRows((prev) =>
+      prev ? prev.map((r, i) => (i === index ? { ...r, ...patch } : r)) : prev,
+    );
+  }
+
+  function add() {
+    setRows((prev) => [
+      ...(prev ?? []),
+      {
+        componentKey: "",
+        category: "group",
+        hours: "1",
+        validityAmount: "7",
+        validityUnit: "day",
+        anchorComponentKey: "",
+        labelEn: "",
+        labelTh: "",
+      },
+    ]);
+  }
+
+  function remove(index: number) {
+    setRows((prev) => {
+      if (!prev) return prev;
+      const next = prev.filter((_, i) => i !== index);
+      // Any part that waited on the removed one falls back to starting at payment,
+      // so the set never ends up naming a part that no longer exists.
+      const goneKey = prev[index]?.componentKey;
+      return next.map((r) =>
+        r.anchorComponentKey === goneKey ? { ...r, anchorComponentKey: "" } : r,
+      );
+    });
+  }
+
+  function save() {
+    if (!rows) return;
+    setErrorKey(null);
+    setSavedKey(null);
+
+    // Client-side shape check purely for a fast, specific message; the server
+    // re-validates everything and is the authority (CLAUDE.md §8).
+    for (const r of rows) {
+      const hours = Number.parseInt(r.hours, 10);
+      const amount = Number.parseInt(r.validityAmount, 10);
+      if (
+        r.componentKey.trim() === "" ||
+        r.labelEn.trim() === "" ||
+        r.labelTh.trim() === "" ||
+        !Number.isSafeInteger(hours) ||
+        hours <= 0 ||
+        !isValidityAmountInRange(amount, r.validityUnit)
+      ) {
+        setErrorKey("err_bundle_labels");
+        return;
+      }
+    }
+
+    startTransition(async () => {
+      try {
+        const res = await setItemComponents({
+          itemId,
+          components: rows.map((r, i) => ({
+            componentKey: r.componentKey.trim().toLowerCase(),
+            category: r.category,
+            hours: Number.parseInt(r.hours, 10),
+            validityAmount: Number.parseInt(r.validityAmount, 10),
+            validityUnit: r.validityUnit,
+            anchorComponentKey:
+              r.anchorComponentKey.trim() === "" ? null : r.anchorComponentKey.trim(),
+            sortOrder: i,
+            labelEn: r.labelEn.trim(),
+            labelTh: r.labelTh.trim(),
+          })),
+        });
+        if (res.ok) {
+          setRows(res.components.map(toDraft));
+          setSavedKey("cat_bundle_saved");
+          router.refresh();
+        } else {
+          setErrorKey(bundleErrorKey(res.code, res.problem));
+        }
+      } catch {
+        setErrorKey("err_bundle_set");
+      }
+    });
+  }
+
+  return (
+    <div className="mt-2 border-t border-dashed border-line-strong pt-4">
+      <p className="m-0 font-body text-sm font-semibold text-ink">{t("cat_bundle_title")}</p>
+      <p className="m-0 mt-1 font-body text-[12px] leading-relaxed text-muted">
+        {t("cat_bundle_desc")}
+      </p>
+
+      {rows === null ? (
+        <p className="mt-3 font-body text-[13px] text-muted">…</p>
+      ) : rows.length === 0 ? (
+        <p className="mt-3 rounded-xl bg-cream-2 px-3.5 py-2.5 font-body text-[13px] text-ink-soft">
+          {t("cat_bundle_none")}
+        </p>
+      ) : (
+        <ul className="mt-3 flex flex-col gap-3">
+          {rows.map((r, i) => (
+            <li key={i} className="rounded-xl border border-line-strong bg-surface p-3.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-body text-[12px] font-semibold uppercase tracking-[0.08em] text-muted">
+                  {i + 1}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => remove(i)}
+                  className="font-body text-[12.5px] font-semibold text-[#a56a52]"
+                >
+                  {t("cat_bundle_remove")}
+                </button>
+              </div>
+
+              <div className="mt-2 grid gap-2.5 sm:grid-cols-2">
+                <LabeledInput
+                  label={t("comp_label_en")}
+                  value={r.labelEn}
+                  onChange={(v) => update(i, { labelEn: v })}
+                />
+                <LabeledInput
+                  label={t("comp_label_th")}
+                  value={r.labelTh}
+                  onChange={(v) => update(i, { labelTh: v })}
+                  lang="th"
+                />
+                <LabeledInput
+                  label={t("comp_key")}
+                  hint={t("comp_key_hint")}
+                  value={r.componentKey}
+                  onChange={(v) => update(i, { componentKey: v })}
+                />
+                <LabeledSelect
+                  label={t("comp_category")}
+                  value={r.category}
+                  onChange={(v) => update(i, { category: v as PackageCategory })}
+                  options={CATEGORIES.map((c) => ({ value: c, label: t(CATEGORY_KEY[c]) }))}
+                />
+                <LabeledInput
+                  label={t("comp_credits")}
+                  hint={t("comp_credits_hint")}
+                  value={r.hours}
+                  onChange={(v) => update(i, { hours: v })}
+                  numeric
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <LabeledInput
+                    label={t("comp_validity")}
+                    value={r.validityAmount}
+                    onChange={(v) => update(i, { validityAmount: v })}
+                    numeric
+                  />
+                  <LabeledSelect
+                    label="&nbsp;"
+                    value={r.validityUnit}
+                    onChange={(v) => update(i, { validityUnit: v as ValidityUnit })}
+                    options={VALIDITY_UNITS.map((u) => ({
+                      value: u,
+                      label: t(VALIDITY_UNIT_KEY[u]),
+                    }))}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <LabeledSelect
+                    label={t("comp_starts")}
+                    value={r.anchorComponentKey}
+                    onChange={(v) => update(i, { anchorComponentKey: v })}
+                    options={[
+                      { value: "", label: t("comp_starts_purchase") },
+                      // Only OTHER parts can be waited on; a part waiting on itself
+                      // could never unlock (the DB rejects it too).
+                      ...rows
+                        .filter((o, oi) => oi !== i && o.componentKey.trim() !== "")
+                        .map((o) => ({
+                          value: o.componentKey.trim(),
+                          label: t("comp_starts_after").replace(
+                            "{name}",
+                            o.labelEn.trim() || o.componentKey.trim(),
+                          ),
+                        })),
+                    ]}
+                  />
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {errorKey && (
+        <p role="alert" className="mt-3 font-body text-[12.5px] text-[#a56a52]">
+          {t(errorKey)}
+        </p>
+      )}
+      {savedKey && (
+        <p role="status" className="mt-3 font-body text-[12.5px] font-semibold text-sage-deep">
+          {t(savedKey)}
+        </p>
+      )}
+
+      <div className="mt-3 flex items-center gap-2.5">
+        <button
+          type="button"
+          onClick={add}
+          disabled={pending || rows === null}
+          className="inline-flex h-10 items-center rounded-xl border border-line-strong px-3.5 font-body text-[13.5px] font-semibold text-ink disabled:opacity-50"
+        >
+          {t("cat_bundle_add")}
+        </button>
+        <button
+          type="button"
+          onClick={save}
+          disabled={pending || rows === null}
+          className="inline-flex h-10 items-center rounded-xl bg-ink px-4 font-body text-[13.5px] font-semibold text-cream disabled:opacity-50"
+        >
+          {t("cat_bundle_save")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** One row of the parts editor, as free text while being typed. */
+interface ComponentDraft {
+  componentKey: string;
+  category: PackageCategory;
+  hours: string;
+  validityAmount: string;
+  validityUnit: ValidityUnit;
+  /** "" = starts at payment. */
+  anchorComponentKey: string;
+  labelEn: string;
+  labelTh: string;
+}
+
+function toDraft(c: CatalogComponent): ComponentDraft {
+  return {
+    componentKey: c.componentKey,
+    category: c.category,
+    hours: String(c.hours),
+    validityAmount: String(c.validity.amount),
+    validityUnit: c.validity.unit,
+    anchorComponentKey: c.anchorComponentKey ?? "",
+    labelEn: c.label.en,
+    labelTh: c.label.th,
+  };
+}
+
+function bundleErrorKey(
+  code: SetItemComponentsFailureCode,
+  problem?: ComponentSetProblem,
+): StrKey {
+  if (code === "UNAUTHORIZED") return "err_cat_forbidden";
+  if (code === "MOCK_NO_DB") return "err_cat_mock_no_db";
+  if (code === "UNKNOWN_ITEM") return "err_cat_unknown";
+  if (code === "VALIDITY_OUT_OF_RANGE") return "err_cat_validity_range";
+  if (code === "INVALID_COMPONENT_SET") {
+    switch (problem) {
+      case "NO_PURCHASE_ANCHORED_COMPONENT":
+        return "err_bundle_no_root";
+      case "ANCHOR_CYCLE":
+        return "err_bundle_cycle";
+      case "DUPLICATE_KEY":
+        return "err_bundle_duplicate";
+      case "UNKNOWN_ANCHOR":
+        return "err_bundle_unknown_anchor";
+      default:
+        return "err_bundle_set";
+    }
+  }
+  return "err_bundle_labels";
+}
+
+function LabeledInput({
+  label,
+  hint,
+  value,
+  onChange,
+  numeric,
+  lang,
+}: {
+  label: string;
+  hint?: string;
+  value: string;
+  onChange: (v: string) => void;
+  numeric?: boolean;
+  lang?: string;
+}) {
+  const id = useId();
+  return (
+    <div>
+      <label
+        htmlFor={id}
+        className="mb-1 block font-body text-[11px] font-semibold uppercase tracking-[0.07em] text-muted"
+      >
+        {label}
+      </label>
+      <input
+        id={id}
+        type={numeric ? "number" : "text"}
+        inputMode={numeric ? "numeric" : undefined}
+        min={numeric ? 1 : undefined}
+        value={value}
+        lang={lang}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-10 w-full rounded-lg border border-line-strong bg-surface px-2.5 font-body text-[13.5px] text-ink"
+      />
+      {hint && <p className="mt-1 font-body text-[11px] leading-snug text-muted">{hint}</p>}
+    </div>
+  );
+}
+
+function LabeledSelect({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  const id = useId();
+  return (
+    <div>
+      <label
+        htmlFor={id}
+        className="mb-1 block font-body text-[11px] font-semibold uppercase tracking-[0.07em] text-muted"
+        dangerouslySetInnerHTML={label === "&nbsp;" ? { __html: "&nbsp;" } : undefined}
+      >
+        {label === "&nbsp;" ? undefined : label}
+      </label>
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-10 w-full rounded-lg border border-line-strong bg-surface px-2 font-body text-[13.5px] text-ink"
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }

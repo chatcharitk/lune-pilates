@@ -121,6 +121,12 @@ export interface CatalogItem {
   label: Bilingual;
   /** Bilingual one-line descriptor under the label; DERIVED from `validity`. */
   sublabel: Bilingual;
+  /**
+   * Trial offer: only purchasable by a customer with NO prior paid purchase
+   * (2026-09-08). Enforced server-side in createCheckout; the buy screen also hides
+   * it from anyone who no longer qualifies, so nobody is shown a dead option.
+   */
+  firstPurchaseOnly?: boolean;
 }
 
 /** A display group of items (the prototype's PACKAGE_CATS tabs). */
@@ -312,6 +318,7 @@ interface CatalogRow {
   labelEn: string;
   labelTh: string;
   active: boolean;
+  firstPurchaseOnly: boolean;
   sortOrder: number;
 }
 
@@ -326,7 +333,12 @@ function rowToAdminItem(r: CatalogRow): AdminCatalogItem {
     label: { en: r.labelEn, th: r.labelTh },
     sortOrder: r.sortOrder,
   };
-  return { ...toCatalogItem(seed), active: r.active, sortOrder: r.sortOrder };
+  return {
+    ...toCatalogItem(seed),
+    active: r.active,
+    firstPurchaseOnly: r.firstPurchaseOnly,
+    sortOrder: r.sortOrder,
+  };
 }
 
 /** The seed catalog as admin items (all active), the fallback shape. */
@@ -348,6 +360,7 @@ const SELECT_COLUMNS = {
   labelEn: catalogItems.labelEn,
   labelTh: catalogItems.labelTh,
   active: catalogItems.active,
+  firstPurchaseOnly: catalogItems.firstPurchaseOnly,
   sortOrder: catalogItems.sortOrder,
 };
 
@@ -421,14 +434,25 @@ export async function getCatalogItem(id: string): Promise<CatalogItem | undefine
  * Only ACTIVE items, ordered by sortOrder; hidden categories (rental) are omitted.
  * Empty categories are dropped so the UI never renders a blank tab.
  */
-export async function listPackageCatalog(): Promise<CatalogCategory[]> {
+export async function listPackageCatalog(
+  /**
+   * Purchase history of the viewer, when known. A FIRST-PURCHASE-ONLY item (the
+   * trial) is hidden from anyone who has already bought, so the buy screen never
+   * offers an option that createCheckout would refuse. Defaults to false — no
+   * viewer supplied means show everything, which is what the admin/preview reads
+   * want. Hiding is courtesy; the server-side gate in createCheckout is the rule.
+   */
+  opts: { hasPurchasedBefore?: boolean } = {},
+): Promise<CatalogCategory[]> {
   const all = await listAllCatalogItems();
+  const hasPurchasedBefore = opts.hasPurchasedBefore ?? false;
 
   const groups: CatalogCategory[] = [];
   for (const id of CATEGORY_ORDER) {
     if (HIDDEN_CATEGORIES.includes(id)) continue;
     const items = all
       .filter((i) => i.active && i.category === id)
+      .filter((i) => !i.firstPurchaseOnly || !hasPurchasedBefore)
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map(
         (i): CatalogItem => ({
@@ -441,6 +465,7 @@ export async function listPackageCatalog(): Promise<CatalogCategory[]> {
           ...(i.tag ? { tag: i.tag } : {}),
           label: i.label,
           sublabel: i.sublabel,
+          ...(i.firstPurchaseOnly ? { firstPurchaseOnly: true } : {}),
         }),
       );
     if (items.length === 0) continue;

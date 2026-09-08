@@ -259,6 +259,10 @@ export async function listCustomers(filter: ListCustomersFilter = {}, now: Date 
   const byHousehold = new Map<string, UsablePackageSummary[]>();
   const byUser = new Map<string, UsablePackageSummary[]>();
   for (const p of pkgRows) {
+    // A dormant bundle component (null expiry — its clock has not started) is not
+    // usable credit. The `expires_at > now()` filter above already excludes it in
+    // SQL; restating it here narrows the type without an assertion.
+    if (p.expiresAt === null) continue;
     const summary = { hoursLeft: p.hoursLeft, expiresAt: p.expiresAt };
     if (p.ownerHouseholdId) {
       (byHousehold.get(p.ownerHouseholdId) ?? setGet(byHousehold, p.ownerHouseholdId)).push(summary);
@@ -349,7 +353,11 @@ export async function getCustomerDetail(
           .orderBy(asc(users.name), asc(users.id))
       : Promise.resolve([]),
   ]);
-  const credit = summariseCredits(pkgs, now);
+  // Same narrowing as the pool read above: the SQL already excluded dormant rows.
+  const credit = summariseCredits(
+    pkgs.filter((p): p is { hoursLeft: number; expiresAt: Date } => p.expiresAt !== null),
+    now,
+  );
   const housemates: Housemate[] = housemateRows.map((r) => ({
     id: r.id,
     name: r.name,

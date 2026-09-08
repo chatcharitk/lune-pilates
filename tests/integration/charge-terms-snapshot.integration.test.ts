@@ -230,7 +230,10 @@ describe.skipIf(!HAS_DB)("purchased-terms snapshot (integration · requires DATA
     if (!res.ok) return;
 
     const [pkg] = await getDb().select().from(packages).where(eq(packages.id, res.receipt.packageId));
-    const expiresAt = new Date(pkg!.expiresAt).getTime();
+    // A plain (non-bundle) purchase always stamps an expiry at credit time; only a
+    // dormant bundle component has none, and this item has no components.
+    expect(pkg!.expiresAt).not.toBeNull();
+    const expiresAt = new Date(pkg!.expiresAt!).getTime();
 
     // Two months from approval (the snapshot), NOT three (the edited item). Bracketed
     // by the call window so the assertion doesn't race the clock.

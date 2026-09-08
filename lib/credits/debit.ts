@@ -17,6 +17,7 @@ import { isBookableForViewer } from "@/lib/schedule/visibility";
 import { hasRoomConflict, isRentalBookingOpen } from "@/lib/schedule/rental";
 import { creditCostForClassType } from "./cost";
 import { packageDebitBlock } from "./guards";
+import { activateAnchoredPackages, deactivateAnchoredPackages } from "./activation";
 
 export const bookInput = z.object({
   classInstanceId: z.string().uuid(),
@@ -54,7 +55,10 @@ export type BookFailureCode =
   | "INVALID_POSITION"
   | "PACKAGE_NOT_FOUND"
   | "EXPIRED"
-  | "NO_CREDITS";
+  | "NO_CREDITS"
+  // A bundle component whose clock has not started yet — e.g. the trial's free
+  // group class before the paid private class has been taken (2026-09-08).
+  | "NOT_YET_ACTIVE";
 
 export type BookResult =
   | { ok: true; bookingId: string; hoursLeft: number; freeCancelHours: number }
@@ -266,6 +270,12 @@ export async function bookClassWithDebit(
 
     const hoursLeft = pkg.hoursLeft - cost;
     await tx.update(packages).set({ hoursLeft }).where(eq(packages.id, pkg.id));
+
+    // BUNDLE UNLOCK (2026-09-08). Spending this package may start the clock on a
+    // dormant sibling — the trial's free group class becomes usable for 7 days from
+    // this class's START. In the same transaction as the debit, so the unlock can
+    // never exist without the booking that earned it. A no-op for ordinary packages.
+    await activateAnchoredPackages(tx, pkg.id, cls.startsAt, bk!.id);
 
     return { ok: true, bookingId: bk!.id, hoursLeft, freeCancelHours } as const;
     });
@@ -512,6 +522,13 @@ export async function rescheduleWithinTransaction(
       reason: "booking",
     });
 
+    // 5c) BUNDLE UNLOCK, moved with the booking. The old booking is gone, so any
+    //     sibling it unlocked relocks; the new booking then re-unlocks against the
+    //     new class's start time. Ordered relock-then-unlock so a reschedule of the
+    //     SAME anchor package lands on the new date rather than keeping the old one.
+    await deactivateAnchoredPackages(tx, oldBk.id);
+    await activateAnchoredPackages(tx, newPkg.id, newCls.startsAt, newBk!.id);
+
     // 6) Reconcile the cached balances from the ledger deltas just written. When
     //    both legs hit the SAME package the net is (refund − newCost) on one row;
     //    otherwise each package moves independently. Either way hours_left ends
@@ -610,6 +627,13 @@ export async function cancelBooking(
           .where(eq(packages.id, pkg.id));
       }
     }
+
+    // BUNDLE RELOCK. If this booking unlocked a dormant sibling (the trial's free
+    // group class, unlocked by booking the private), cancelling it puts that sibling
+    // back to dormant — otherwise the customer keeps the unlocked credit for a class
+    // they never took. Runs whether or not the cancel refunds: the unlock was earned
+    // by the booking existing, so it dies with the booking either way.
+    await deactivateAnchoredPackages(tx, bk.id);
 
     return { ok: true, refunded: params.refund } as const;
   });

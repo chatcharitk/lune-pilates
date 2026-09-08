@@ -1177,6 +1177,64 @@ export const STR = {
     en: "Validity must be a whole number between 1 and {max} for the unit you picked.",
     th: "อายุการใช้งานต้องเป็นจำนวนเต็มระหว่าง 1 ถึง {max} ตามหน่วยที่เลือก",
   },
+  // ───────── admin: bundle components (2026-09-08) ─────────
+  cat_bundle_title: { en: "What this package grants", th: "สิ่งที่แพ็กเกจนี้ให้" },
+  cat_bundle_desc: {
+    en: "Leave empty for a normal package — one balance, using the credits and validity above. Add parts to grant several balances, each with its own clock (e.g. a 1:1 class valid 14 days, plus a free group class valid 7 days after that class).",
+    th: "เว้นว่างไว้สำหรับแพ็กเกจปกติ — หนึ่งยอด ใช้จำนวนชั่วโมงและอายุการใช้งานด้านบน เพิ่มส่วนย่อยเพื่อให้หลายยอด แต่ละยอดมีอายุของตัวเอง (เช่น คลาส 1:1 ใช้ได้ 14 วัน และคลาสกลุ่มฟรีใช้ได้ 7 วันหลังคลาสนั้น)",
+  },
+  cat_bundle_none: { en: "Normal package — one balance", th: "แพ็กเกจปกติ — ยอดเดียว" },
+  cat_bundle_add: { en: "Add a part", th: "เพิ่มส่วนย่อย" },
+  cat_bundle_remove: { en: "Remove", th: "ลบ" },
+  cat_bundle_save: { en: "Save parts", th: "บันทึกส่วนย่อย" },
+  cat_bundle_saved: { en: "Parts saved", th: "บันทึกส่วนย่อยแล้ว" },
+  comp_label_en: { en: "Name (English)", th: "ชื่อ (อังกฤษ)" },
+  comp_label_th: { en: "Name (Thai)", th: "ชื่อ (ไทย)" },
+  comp_key: { en: "Reference", th: "รหัสอ้างอิง" },
+  comp_key_hint: {
+    en: "Lowercase id used to link parts together, e.g. private. Cannot be changed once sold.",
+    th: "รหัสตัวพิมพ์เล็กสำหรับเชื่อมส่วนย่อยเข้าด้วยกัน เช่น private เปลี่ยนไม่ได้หลังเริ่มขาย",
+  },
+  comp_category: { en: "Credit type", th: "ประเภทเครดิต" },
+  comp_credits: { en: "Credits", th: "เครดิต" },
+  comp_credits_hint: {
+    en: "1 credit = one group class or studio rental. 2 credits = one private, duo, or trio class.",
+    th: "1 เครดิต = คลาสกลุ่มหรือเช่าสตูดิโอ 1 ครั้ง · 2 เครดิต = คลาสส่วนตัว คู่ หรือสามคน 1 ครั้ง",
+  },
+  comp_validity: { en: "Valid for", th: "ใช้ได้นาน" },
+  comp_starts: { en: "Clock starts", th: "เริ่มนับเมื่อ" },
+  comp_starts_purchase: { en: "At payment", th: "เมื่อชำระเงิน" },
+  // {name} → the name of the part this one waits for.
+  comp_starts_after: { en: "After “{name}” is used", th: "หลังใช้ “{name}”" },
+  cat_first_purchase_only: { en: "First purchase only", th: "เฉพาะการซื้อครั้งแรก" },
+  cat_first_purchase_hint: {
+    en: "A trial offer: only customers who have never bought before can see and buy this.",
+    th: "ข้อเสนอทดลอง: เฉพาะลูกค้าที่ยังไม่เคยซื้อเท่านั้นที่จะเห็นและซื้อได้",
+  },
+  err_bundle_set: {
+    en: "Couldn’t save the parts. Please try again.",
+    th: "บันทึกส่วนย่อยไม่สำเร็จ กรุณาลองใหม่",
+  },
+  err_bundle_no_root: {
+    en: "At least one part must start at payment — otherwise nothing would ever unlock.",
+    th: "ต้องมีอย่างน้อยหนึ่งส่วนที่เริ่มนับเมื่อชำระเงิน มิฉะนั้นจะไม่มีส่วนใดถูกปลดล็อกเลย",
+  },
+  err_bundle_cycle: {
+    en: "These parts wait on each other in a loop, so none could ever unlock.",
+    th: "ส่วนย่อยเหล่านี้รอกันเป็นวงกลม ทำให้ไม่มีส่วนใดถูกปลดล็อกได้",
+  },
+  err_bundle_duplicate: {
+    en: "Two parts share the same reference. Each needs its own.",
+    th: "มีส่วนย่อยที่ใช้รหัสอ้างอิงซ้ำกัน แต่ละส่วนต้องมีรหัสของตัวเอง",
+  },
+  err_bundle_unknown_anchor: {
+    en: "A part waits on something that isn’t in this list.",
+    th: "มีส่วนย่อยที่รอส่วนซึ่งไม่ได้อยู่ในรายการนี้",
+  },
+  err_bundle_labels: {
+    en: "Every part needs a name in both languages, whole credits above zero, and a validity.",
+    th: "ทุกส่วนย่อยต้องมีชื่อทั้งสองภาษา จำนวนเครดิตเต็มมากกว่าศูนย์ และอายุการใช้งาน",
+  },
   err_cat_category_immutable: {
     en: "The credit type can’t be changed after a package is created.",
     th: "เปลี่ยนประเภทเครดิตหลังสร้างแพ็กเกจแล้วไม่ได้",

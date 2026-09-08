@@ -36,6 +36,9 @@ import { getDb } from "@/lib/db/client";
 import { charges, paymentSlips } from "@/lib/db/schema";
 import { getCatalogItem, type CatalogItem } from "@/lib/catalog/packages";
 import { termsSnapshotFor } from "@/lib/catalog/chargeTerms";
+import { componentsForItem, isBundle, totalHours } from "@/lib/catalog/components";
+import { hasEverPurchased, isItemPurchasableBy } from "@/lib/catalog/eligibility";
+import { serializeComponentsSnapshot } from "@/lib/catalog/componentsSnapshot";
 import { loadActiveTerms, SEED_TERMS } from "@/lib/settings/terms";
 import { getPaymentProvider } from "@/lib/payments";
 import { validateSlipDataUrl } from "@/lib/payments/slip";
@@ -81,7 +84,13 @@ export type CreateCheckoutFailureCode =
    * nobody is ever bound to text they did not read; the UI re-fetches and re-shows
    * the current terms for a fresh acceptance.
    */
-  | "TERMS_OUTDATED";
+  | "TERMS_OUTDATED"
+  /**
+   * A first-purchase-only offer (the trial) attempted by a customer who has already
+   * bought before. Server-side rule — the buy screen hides such items, but the gate
+   * here is what actually enforces it (CLAUDE.md §8).
+   */
+  | "NOT_ELIGIBLE";
 
 export interface CheckoutSession {
   chargeId: string;
@@ -129,6 +138,18 @@ export async function createCheckout(raw: CreateCheckoutInput): Promise<CreateCh
 
   const viewer = await getCurrentUser();
 
+  // FIRST-PURCHASE GATE. A trial offer is only for someone who has never bought.
+  // Checked here rather than trusted from the client, which only ever sends an item id.
+  if (item.firstPurchaseOnly && !isItemPurchasableBy(item, await hasEverPurchased(viewer.id))) {
+    return { ok: false, code: "NOT_ELIGIBLE" };
+  }
+
+  // Resolve what this item actually grants. A plain item yields its single implicit
+  // component (nothing to snapshot); a BUNDLE yields several, which are frozen onto
+  // the charge below so a later edit cannot change this purchase.
+  const components = await componentsForItem(item);
+  const bundleComponents = isBundle(components) ? components : null;
+
   // Reference ties the charge to this user + item + an instant, so confirm can be
   // audited and a stray confirm can't credit a different item. Amount comes from
   // the catalog — the client never gets to set what is charged.
@@ -167,6 +188,14 @@ export async function createCheckout(raw: CreateCheckoutInput): Promise<CreateCh
         // publishes their own terms (which is the first thing Settings does).
         termsVersionId: activeTerms.id === SEED_TERMS.id ? null : activeTerms.id,
         termsAcceptedAt,
+        // Freeze the BUNDLE SHAPE too, for the same reason: components are
+        // owner-editable, so re-resolving them at approval time would let an edit
+        // change what an already-paid purchase grants. Null for a plain item —
+        // there is nothing to freeze and crediting resolves its single implicit
+        // component either way.
+        componentsJson: bundleComponents
+          ? serializeComponentsSnapshot(bundleComponents)
+          : null,
         // Freeze the PURCHASED TERMS alongside the price. The catalog is
         // owner-editable at runtime, and this charge may sit in awaiting_review for
         // days — approveSlip credits from this snapshot so an edit to the item can
@@ -186,7 +215,10 @@ export async function createCheckout(raw: CreateCheckoutInput): Promise<CreateCh
       item: {
         id: item.id,
         category: item.category,
-        hours: item.hours,
+        // For a BUNDLE this is the total across every component (the trial grants 2
+        // private credits + 1 group = 3), so the receipt and the "+N hours" line
+        // state what the customer actually receives rather than just the paid half.
+        hours: totalHours(components),
         price: item.price,
         perHour: item.perHour,
         validity: item.validity,
