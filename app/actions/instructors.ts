@@ -25,6 +25,10 @@ import { instructorAvailability, instructors } from "@/lib/db/schema";
 import { WEEKDAYS, type Weekday } from "@/lib/admin/instructors";
 import { slugifyInstructorId } from "@/lib/admin/instructor-id";
 import { requireOwner } from "@/lib/auth/admin";
+import {
+  canonicalAvatarDataUrl,
+  validateAvatarDataUrl,
+} from "@/lib/images/avatarImage";
 import { mockDataMode } from "@/lib/mock-mode";
 
 /** Sentinel to roll the replace transaction back when the instructor is missing/inactive. */
@@ -338,4 +342,68 @@ export async function setInstructorActive(
 
   revalidatePath("/admin/instructors");
   return { ok: true, id, active };
+}
+
+// ───────────────────────── profile photo ─────────────────────────
+
+const setPhotoInput = z.object({
+  id: z.string().min(1),
+  /**
+   * A `data:image/...;base64,…` URL, or null to remove the photo and fall back to
+   * the initial-letter avatar. The browser downscales to a small square first; the
+   * server re-validates and is the authority (CLAUDE.md §8).
+   */
+  photoDataUrl: z.string().min(1).nullable(),
+});
+export type SetInstructorPhotoInput = z.infer<typeof setPhotoInput>;
+
+export type SetInstructorPhotoFailureCode =
+  | InstructorCrudFailureCode
+  // Not a real JPEG/PNG/WEBP once the bytes are sniffed.
+  | "INVALID_FILE"
+  // Bigger than an avatar has any business being, even after downscaling.
+  | "TOO_LARGE";
+
+export type SetInstructorPhotoResult =
+  | { ok: true; id: string; photoUrl: string | null }
+  | { ok: false; code: SetInstructorPhotoFailureCode };
+
+/**
+ * Set (or clear) an instructor's profile photo. Owner-only.
+ *
+ * What is stored is rebuilt from the DECODED bytes and the SNIFFED type, never the
+ * string the client sent — the declared mime in a data URL is caller-controlled, and
+ * this value is written straight into an <img> for every admin afterwards.
+ */
+export async function setInstructorPhoto(
+  raw: SetInstructorPhotoInput,
+): Promise<SetInstructorPhotoResult> {
+  if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
+
+  const parsed = setPhotoInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
+  const { id, photoDataUrl } = parsed.data;
+
+  let stored: string | null = null;
+  if (photoDataUrl !== null) {
+    const validated = validateAvatarDataUrl(photoDataUrl);
+    if (!validated.ok) return { ok: false, code: validated.code };
+    stored = canonicalAvatarDataUrl(validated);
+  }
+
+  if (mockDataMode()) return { ok: true, id, photoUrl: stored };
+
+  const db = getDb();
+  const updated = await db
+    .update(instructors)
+    .set({ photoUrl: stored })
+    .where(eq(instructors.id, id))
+    .returning({ id: instructors.id });
+
+  if (updated.length === 0) return { ok: false, code: "UNKNOWN_INSTRUCTOR" };
+
+  revalidatePath("/admin/instructors");
+  // The photo also fronts the instructor on Today and the schedule roster.
+  revalidatePath("/admin/today");
+  return { ok: true, id, photoUrl: stored };
 }

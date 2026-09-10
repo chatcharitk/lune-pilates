@@ -170,6 +170,7 @@ export function Avatar({
   size = 34,
   checked,
   initials: initialsProp,
+  photoUrl,
 }: {
   name: string;
   /** Stable id used for the colour (falls back to the name). */
@@ -179,16 +180,34 @@ export function Avatar({
   checked?: boolean;
   /** Override the derived initial (e.g. instructors, where the name is "Kru …"). */
   initials?: string;
+  /**
+   * Profile photo (a stored `data:image/…` URL). When absent — the common case —
+   * the coloured initial is used, so every caller keeps working untouched.
+   */
+  photoUrl?: string | null;
 }) {
   const initials = (initialsProp ?? name.trim().charAt(0)).toUpperCase() || "?";
   return (
     <span className="relative inline-block shrink-0" style={{ width: size, height: size }}>
+      {photoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element -- a stored data URL:
+        // there is no remote origin for next/image to optimise, and it must render
+        // in the admin without a loader round-trip.
+        <img
+          src={photoUrl}
+          alt=""
+          width={size}
+          height={size}
+          className="h-full w-full rounded-full object-cover"
+        />
+      ) : (
       <span
         className="flex h-full w-full items-center justify-center rounded-full font-body font-bold text-white"
         style={{ background: avatarColor(seed ?? name), fontSize: size * 0.4 }}
       >
         {initials}
       </span>
+      )}
       {checked && (
         <span
           className="absolute -bottom-0.5 -right-0.5 flex items-center justify-center rounded-full border-2 border-surface-2 bg-sage"

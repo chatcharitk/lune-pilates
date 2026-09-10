@@ -495,6 +495,19 @@ export const instructors = pgTable("instructors", {
   name: text("name").notNull(),
   nameTh: text("name_th").notNull(),
   tag: text("tag"),
+  /**
+   * Profile photo as a `data:image/...;base64,…` URL, or null for the initial-letter
+   * avatar (2026-09-10).
+   *
+   * Held IN THE ROW rather than in object storage on purpose: the studio has a
+   * handful of instructors, the upload is downscaled to a small square before it
+   * ever leaves the browser (~20–40KB), and a data URL renders everywhere with no
+   * public bucket, no signed-URL plumbing and no second failure mode. If the roster
+   * ever grows large enough for this to weigh on queries, move it to the storage
+   * adapter and keep a key here — the column is deliberately the only thing that
+   * would need to change.
+   */
+  photoUrl: text("photo_url"),
   active: boolean("active").notNull().default(true),
 });
 

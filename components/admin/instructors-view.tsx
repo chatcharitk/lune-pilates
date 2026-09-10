@@ -18,7 +18,7 @@
 // a local editable copy of the week and mirrors the prototype's toggleDay / addRange
 // / removeRange (presets only, no free time entry — faithful to MAvailEditor).
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useId, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminLang } from "./admin-context";
 import { Avatar, Badge, Dot, Drawer } from "./ui";
@@ -27,6 +27,8 @@ import {
   setInstructorActive,
   setInstructorAvailability,
   updateInstructor,
+  setInstructorPhoto,
+  type SetInstructorPhotoFailureCode,
   type InstructorCrudFailureCode,
   type SetInstructorAvailabilityFailureCode,
 } from "@/app/actions/instructors";
@@ -241,7 +243,7 @@ function InstructorCard({
     <div className="flex flex-col rounded-2xl border border-line bg-surface-2 p-4 shadow-soft">
       {/* avatar + name + badge */}
       <div className="mb-3.5 flex items-center gap-3">
-        <Avatar name={tt(ins.name)} seed={ins.id} initials={ins.initials} size={46} />
+        <PhotoControl instructor={ins} />
         <div className="min-w-0 flex-1">
           <p className="truncate font-head text-[17px] font-semibold text-ink">{tt(ins.name)}</p>
           <p className="mt-0.5 font-body text-[12.5px] text-muted">
@@ -828,4 +830,164 @@ function XIcon() {
       <path d="M18 6 6 18M6 6l12 12" />
     </svg>
   );
+}
+
+// ───────────────────────── profile photo ─────────────────────────
+
+/** Longest edge of the stored square, in CSS pixels. Comfortably sharp at the 46px
+ *  card avatar on a 3× screen, and small enough to sit in a database row. */
+const AVATAR_PX = 256;
+const AVATAR_JPEG_QUALITY = 0.85;
+/** Guard before decoding: real phone photos are a few MB, anything past this is not
+ *  a portrait the owner meant to pick. The server re-checks the DECODED size. */
+const AVATAR_MAX_SOURCE_BYTES = 12 * 1024 * 1024;
+
+/**
+ * The avatar, doubling as the upload control: tap it to pick a photo, and a small
+ * remove button appears once one is set.
+ *
+ * The image is cropped square and downscaled IN THE BROWSER before upload — a
+ * full-size phone photo would otherwise travel to the server and into a row. The
+ * server still re-validates and re-encodes from the decoded bytes (CLAUDE.md §8):
+ * this is for weight, not for trust.
+ */
+function PhotoControl({ instructor }: { instructor: AdminInstructor }) {
+  const { t, tt } = useAdminLang();
+  const router = useRouter();
+  const inputId = useId();
+  const [pending, startTransition] = useTransition();
+  const [errorKey, setErrorKey] = useState<StrKey | null>(null);
+
+  function upload(dataUrl: string | null) {
+    setErrorKey(null);
+    startTransition(async () => {
+      try {
+        const res = await setInstructorPhoto({ id: instructor.id, photoDataUrl: dataUrl });
+        if (res.ok) router.refresh();
+        else setErrorKey(photoErrorKey(res.code));
+      } catch {
+        setErrorKey("err_photo_save");
+      }
+    });
+  }
+
+  async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // Clear the input so picking the SAME file again still fires a change event.
+    e.target.value = "";
+    if (!file) return;
+    setErrorKey(null);
+    if (!file.type.startsWith("image/") || file.size > AVATAR_MAX_SOURCE_BYTES) {
+      setErrorKey("err_photo_invalid");
+      return;
+    }
+    try {
+      upload(await toSquareAvatarDataUrl(file));
+    } catch {
+      setErrorKey("err_photo_invalid");
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className="relative">
+        <label
+          htmlFor={inputId}
+          title={t("instr_photo_change")}
+          aria-label={t("instr_photo_change_a11y").replace("{name}", tt(instructor.name))}
+          className={`block cursor-pointer rounded-full ring-offset-2 transition-opacity focus-within:ring-2 focus-within:ring-taupe ${
+            pending ? "opacity-50" : "hover:opacity-85"
+          }`}
+        >
+          <Avatar
+            name={tt(instructor.name)}
+            seed={instructor.id}
+            initials={instructor.initials}
+            photoUrl={instructor.photoUrl}
+            size={46}
+          />
+          {/* Small camera badge so the avatar reads as something you can tap, rather
+              than decoration that happens to be clickable. */}
+          <span
+            aria-hidden
+            className="absolute -bottom-0.5 -right-0.5 flex h-[18px] w-[18px] items-center justify-center rounded-full border-2 border-surface-2 bg-taupe text-white"
+          >
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+              <circle cx="12" cy="13" r="4" />
+            </svg>
+          </span>
+          <input
+            id={inputId}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            onChange={onPick}
+            disabled={pending}
+            className="sr-only"
+          />
+        </label>
+      </div>
+
+      {instructor.photoUrl && !pending && (
+        <button
+          type="button"
+          onClick={() => upload(null)}
+          className="font-body text-[10.5px] font-semibold text-muted underline underline-offset-2"
+        >
+          {t("instr_photo_remove")}
+        </button>
+      )}
+      {errorKey && (
+        <p role="alert" className="max-w-[92px] text-center font-body text-[10px] leading-tight text-rose">
+          {t(errorKey)}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function photoErrorKey(code: SetInstructorPhotoFailureCode): StrKey {
+  switch (code) {
+    case "UNAUTHORIZED":
+      return "err_cat_forbidden";
+    case "UNKNOWN_INSTRUCTOR":
+      return "err_unknown_instructor";
+    case "TOO_LARGE":
+      return "err_photo_too_large";
+    case "INVALID_FILE":
+      return "err_photo_invalid";
+    default:
+      return "err_photo_save";
+  }
+}
+
+/**
+ * Read `file`, crop it to a centred square and scale it to AVATAR_PX, returning a
+ * JPEG data URL. Centre-crop rather than squash: a portrait squeezed into a circle
+ * looks wrong in a way people notice on their own face.
+ */
+async function toSquareAvatarDataUrl(file: File): Promise<string> {
+  const bitmap = await createImageBitmap(file);
+  try {
+    const side = Math.min(bitmap.width, bitmap.height);
+    const sx = Math.max(0, (bitmap.width - side) / 2);
+    const sy = Math.max(0, (bitmap.height - side) / 2);
+    const target = Math.min(AVATAR_PX, side);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = target;
+    canvas.height = target;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("no 2d context");
+    // White backing so a transparent PNG doesn't come out black once encoded as JPEG.
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, target, target);
+    ctx.drawImage(bitmap, sx, sy, side, side, 0, 0, target, target);
+
+    const dataUrl = canvas.toDataURL("image/jpeg", AVATAR_JPEG_QUALITY);
+    if (!dataUrl.startsWith("data:image/jpeg")) throw new Error("encode failed");
+    return dataUrl;
+  } finally {
+    bitmap.close();
+  }
 }

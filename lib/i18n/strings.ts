@@ -1183,6 +1183,27 @@ export const STR = {
     en: "Validity must be a whole number between 1 and {max} for the unit you picked.",
     th: "อายุการใช้งานต้องเป็นจำนวนเต็มระหว่าง 1 ถึง {max} ตามหน่วยที่เลือก",
   },
+  // ───────── admin: instructor profile photo (2026-09-10) ─────────
+  instr_photo_change: { en: "Change photo", th: "เปลี่ยนรูปโปรไฟล์" },
+  // {name} → the instructor's name.
+  instr_photo_change_a11y: {
+    en: "Change {name}’s profile photo",
+    th: "เปลี่ยนรูปโปรไฟล์ของ {name}",
+  },
+  instr_photo_remove: { en: "Remove", th: "ลบรูป" },
+  err_photo_invalid: {
+    en: "That file isn’t a usable image.",
+    th: "ไฟล์นี้ไม่ใช่รูปภาพที่ใช้ได้",
+  },
+  err_photo_too_large: {
+    en: "That image is too large.",
+    th: "รูปภาพมีขนาดใหญ่เกินไป",
+  },
+  err_photo_save: {
+    en: "Couldn’t save the photo. Please try again.",
+    th: "บันทึกรูปภาพไม่สำเร็จ กรุณาลองใหม่",
+  },
+
   // ───────── admin: customer edit — tier, household, expiry (2026-09-08) ─────────
   edit_tier: { en: "Customer type", th: "ประเภทลูกค้า" },
   edit_house: { en: "House number", th: "บ้านเลขที่" },

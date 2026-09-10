@@ -1,0 +1,12 @@
+-- Instructor profile photos (owner request, 2026-09-10).
+-- lib/db/schema.ts → instructors.photoUrl
+--
+-- Apply by hand against Neon (db:push needs a TTY, unavailable in an agent session):
+--   psql "$DATABASE_URL" -f drizzle/0009_instructor_photo.sql
+-- Idempotent: safe to re-run.
+--
+-- The photo is stored as a base64 data URL in the row. The studio has a handful of
+-- instructors and the browser downscales each upload to a small square (~20–40KB)
+-- before sending, so this avoids a public bucket and signed-URL plumbing entirely.
+-- NULL simply means "use the initial-letter avatar", which is every existing row.
+ALTER TABLE "instructors" ADD COLUMN IF NOT EXISTS "photo_url" text;

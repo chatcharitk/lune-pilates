@@ -77,6 +77,8 @@ export interface AdminInstructor {
   active: boolean;
   /** Avatar initial (e.g. "M" / "P" / "N"), derived from the name. */
   initials: string;
+  /** Profile photo data URL, or null → the initial-letter avatar is used instead. */
+  photoUrl: string | null;
   todaysClasses: AdminInstructorClass[];
   /** Number of classes today (= todaysClasses.length). */
   classCount: number;
@@ -193,6 +195,7 @@ export async function getAdminInstructors(now: Date = new Date()): Promise<Admin
       name: instructors.name,
       nameTh: instructors.nameTh,
       tag: instructors.tag,
+      photoUrl: instructors.photoUrl,
     })
     .from(instructors)
     .where(eq(instructors.active, true))
@@ -284,6 +287,7 @@ export async function getAdminInstructors(now: Date = new Date()): Promise<Admin
       tagRaw: ins.tag ?? "",
       active: true, // this query is active-only (where active = true)
       initials: initialsFor(name),
+      photoUrl: ins.photoUrl,
       todaysClasses,
       classCount: todaysClasses.length,
       attendees: todaysClasses.reduce((sum, c) => sum + c.booked, 0),
@@ -391,6 +395,8 @@ function mockAdminInstructors(dayStart: Date): AdminInstructor[] {
       tagRaw: meta.tag?.en ?? "",
       active: true,
       initials: initialsFor(meta.name),
+      photoUrl: null, // no photos on the no-DB mock path
+
       todaysClasses,
       classCount: todaysClasses.length,
       attendees: todaysClasses.reduce((sum, c) => sum + c.booked, 0),
