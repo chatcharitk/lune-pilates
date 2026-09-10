@@ -14,6 +14,7 @@ import { ScheduleView } from "@/components/customer/schedule-view";
 import {
   MAX_WEEK_OFFSET,
   clampWeekOffset,
+  scheduleDefaultDay,
   scheduleWeekDays,
   scheduleWeekStart,
   weekRangeLabel,
@@ -46,6 +47,7 @@ export default async function SchedulePage({
       key={offset}
       classes={classes}
       week={scheduleWeekDays(offset, now)}
+      defaultDay={scheduleDefaultDay(offset, now)}
       rangeLabel={weekRangeLabel(offset, now)}
       weekOffset={offset}
       maxWeekOffset={MAX_WEEK_OFFSET}

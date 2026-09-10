@@ -129,6 +129,12 @@ export interface WeekDay {
   dow: Bilingual;
   date: number; // calendar day-of-month
   today?: boolean;
+  /**
+   * Already gone in Bangkok time. The chip still renders — a week that silently
+   * started on Thursday didn't read as a calendar — but it is shown muted and is
+   * not selectable, since nothing in the past is bookable.
+   */
+  past?: boolean;
 }
 
 const DOW_LABELS: Bilingual[] = [
@@ -171,11 +177,13 @@ export function buildWeek(start: Date, now: Date = new Date(), count = 7): WeekD
     const d = addDays(studioStartOfDay(start), i);
     const parts = studioParts(d);
     const dow = parts.isoDow; // Mon=1 … Sun=7
+    const midnight = studioStartOfDay(d).getTime();
     return {
       d: dow,
       dow: DOW_LABELS[dow - 1]!,
       date: parts.day,
-      today: studioStartOfDay(d).getTime() === today,
+      today: midnight === today,
+      ...(midnight < today ? { past: true } : {}),
     };
   });
 }
@@ -211,24 +219,40 @@ export function clampWeekOffset(raw: string | undefined | null): number {
 
 /**
  * The `weekStart` instant fed to `listBookableClasses` for a forward `offset`
- * (0 = current week). Offset 0 anchors to Bangkok 00:00 TODAY (a rolling window,
- * so no already-past days are fetched); offset n>0 anchors to Bangkok Monday of
- * the nth week ahead, so each future week is a clean Mon–Sun span.
+ * (0 = current week) — always Bangkok Monday 00:00 of that week, so the fetched
+ * window is exactly the Mon–Sun the chips show.
+ *
+ * The current week used to anchor at TODAY, which had two costs. The strip lost its
+ * earlier days, so mid-week the calendar rendered as a stray 4-day stub with dead
+ * space where Monday–Wednesday should be. And because the query window is
+ * [weekStart, +7d) while chips match on DAY-OF-WEEK, a today-anchored week reached
+ * into the next one: classes on those overflow days shared a weekday number with
+ * this week's early chips and were simply unreachable. Anchoring both to Monday
+ * makes the mapping one-to-one.
+ *
+ * Past days are not a problem to fetch: `listBookableClasses` only returns classes
+ * that start after `now`, so the early part of the current week comes back empty by
+ * construction rather than by trimming the window.
  */
 export function scheduleWeekStart(offset: number, now: Date = new Date()): Date {
-  if (offset <= 0) return studioStartOfDay(now);
-  return addDays(studioStartOfWeekMonday(now), offset * 7);
+  return addDays(studioStartOfWeekMonday(now), Math.max(0, offset) * 7);
 }
 
 /**
- * The day chips for the viewed week: the current week runs today → Sunday (so the
- * strip never offers un-bookable past days), every future week is a full Mon–Sun.
+ * The day chips for the viewed week: always a full Mon–Sun. In the current week the
+ * days before today carry `past: true` — rendered muted and unselectable rather than
+ * removed, so the row always reads as a week.
  */
 export function scheduleWeekDays(offset: number, now: Date = new Date()): WeekDay[] {
-  const start = scheduleWeekStart(offset, now);
-  // Mon=1 … Sun=7 → 7,6,…,1 remaining days this week; future weeks always show 7.
-  const count = offset <= 0 ? 8 - studioIsoDow(start) : 7;
-  return buildWeek(start, now, count);
+  return buildWeek(scheduleWeekStart(offset, now), now, 7);
+}
+
+/**
+ * The day the schedule should open on: TODAY in the current week (what a customer
+ * came to see), Monday in any future week. Never a past day — those aren't bookable.
+ */
+export function scheduleDefaultDay(offset: number, now: Date = new Date()): number {
+  return offset <= 0 ? studioIsoDow(studioStartOfDay(now)) : 1;
 }
 
 /**

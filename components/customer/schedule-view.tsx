@@ -32,6 +32,7 @@ const PODS: PartOfDay[] = ["morning", "afternoon", "evening"];
 export function ScheduleView({
   classes,
   week,
+  defaultDay,
   rangeLabel,
   weekOffset,
   maxWeekOffset,
@@ -41,12 +42,17 @@ export function ScheduleView({
   rangeLabel: Bilingual;
   /** Forward offset of the viewed week (0 = current week). */
   weekOffset: number;
+  /** Day the week opens on — today in the current week, Monday in a future one. */
+  defaultDay: number;
   /** Furthest forward offset reachable (disables "next" at the horizon). */
   maxWeekOffset: number;
 }) {
   const { t, tt, lang } = useCustomerLang();
   const router = useRouter();
-  const [day, setDay] = useState(week[0]?.d ?? 1); // default to the week's first day
+  // Open on today in the current week, Monday in a future one — never a past day,
+  // which is not selectable. The page keys this component by week offset, so this
+  // initial value is recomputed whenever the viewed week changes.
+  const [day, setDay] = useState(defaultDay);
   const [filter, setFilter] = useState<"all" | ClassType>("all");
 
   const canPrev = weekOffset > 0;
@@ -98,7 +104,7 @@ export function ScheduleView({
 
         {/* day chips */}
         <div
-          className="flex gap-2 overflow-x-auto px-[18px] pb-3 pt-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex gap-1.5 px-[18px] pb-3 pt-1.5"
           role="tablist"
           aria-label={t("nav_schedule")}
         >
@@ -110,11 +116,17 @@ export function ScheduleView({
                 type="button"
                 role="tab"
                 aria-selected={on}
-                onClick={() => setDay(w.d)}
-                className={`flex w-[50px] shrink-0 flex-col items-center gap-[3px] rounded-2xl border px-0 pb-2.5 pt-[9px] transition-colors ${
+                // Past days are shown for shape but cannot be opened — nothing in
+                // them is bookable, so selecting one could only ever be empty.
+                disabled={w.past}
+                aria-disabled={w.past || undefined}
+                onClick={() => !w.past && setDay(w.d)}
+                className={`flex min-w-[40px] flex-1 basis-0 flex-col items-center gap-[3px] rounded-2xl border px-0 pb-2.5 pt-[9px] transition-colors ${
                   on
                     ? "border-transparent bg-ink text-cream"
-                    : "border-line bg-surface-2 text-ink-soft"
+                    : w.past
+                      ? "border-transparent bg-transparent text-muted/55"
+                      : "border-line bg-surface-2 text-ink-soft"
                 }`}
               >
                 <span
@@ -136,8 +148,18 @@ export function ScheduleView({
           })}
         </div>
 
-        {/* filter chips */}
-        <div className="flex gap-2 overflow-x-auto border-b border-line px-[18px] pb-3.5 pt-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {/* filter chips — six of them never fit a phone width, so the row scrolls.
+            The mask fades the last chip out at the edge instead of guillotining it
+            mid-word, which read as a broken layout rather than "scroll for more". */}
+        <div
+          className="flex gap-2 overflow-x-auto border-b border-line px-[18px] pb-3.5 pt-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          style={{
+            WebkitMaskImage:
+              "linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 28px), transparent 100%)",
+            maskImage:
+              "linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 28px), transparent 100%)",
+          }}
+        >
           <FilterChip active={filter === "all"} onClick={() => setFilter("all")}>
             {t("filter_all")}
           </FilterChip>
