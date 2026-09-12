@@ -1225,6 +1225,14 @@ export const STR = {
     en: "Optional. Narrows the code to a single package within the types above.",
     th: "ไม่บังคับ จำกัดโค้ดให้ใช้ได้กับแพ็กเกจเดียวภายในประเภทด้านบน",
   },
+  promo_applies_none: {
+    en: "Set a discount above first, then you can pin the code to one package.",
+    th: "ตั้งส่วนลดด้านบนก่อน จึงจะจำกัดโค้ดให้ใช้ได้กับแพ็กเกจเดียว",
+  },
+  err_promo_item_not_covered: {
+    en: "That package’s class type has no discount in this code.",
+    th: "โค้ดนี้ยังไม่มีส่วนลดสำหรับประเภทคลาสของแพ็กเกจนั้น",
+  },
   err_promo_no_rules: {
     en: "Set a discount for at least one class type.",
     th: "กรุณาตั้งส่วนลดอย่างน้อยหนึ่งประเภทคลาส",

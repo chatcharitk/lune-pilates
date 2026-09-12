@@ -65,6 +65,8 @@ function saveErrorKey(code: SavePromoFailureCode): StrKey {
       return "err_promo_percent";
     case "BAD_WINDOW":
       return "err_promo_window";
+    case "ITEM_NOT_COVERED":
+      return "err_promo_item_not_covered";
     case "MOCK_NO_DB":
       return "err_cat_mock_no_db";
     default:
@@ -292,6 +294,23 @@ function PromoDrawer({
     setActive(existing?.active ?? true);
     setErrorKey(null);
   }, [state, existing]);
+
+  // The formats this code currently covers — an amount typed in is what makes a
+  // format covered, so this is derived from the rule rows rather than tracked
+  // separately (one source of truth, nothing to keep in step).
+  const coveredCategories = CATEGORY_ORDER.filter(
+    (cat) => rules[cat].value.trim() !== "" && items.some((i) => i.category === cat),
+  );
+
+  // Drop a package pin that the rules no longer cover. Without this, clearing the
+  // 1:1 amount would leave the code silently pinned to a 1:1 pack it can never
+  // apply to — the server refuses that save, but the owner should never be able to
+  // get the form into that state in the first place.
+  useEffect(() => {
+    if (appliesToItem === "") return;
+    const item = items.find((i) => i.id === appliesToItem);
+    if (!item || !coveredCategories.includes(item.category)) setAppliesToItem("");
+  }, [appliesToItem, coveredCategories, items]);
 
   function save() {
     setErrorKey(null);
@@ -544,19 +563,32 @@ function PromoDrawer({
         {/* Optional extra narrowing to ONE package. The per-format rows above
             already decide which formats are covered; this pins it to a single
             item within them (e.g. only the 10-class pack). */}
-        <PromoField label={t("promo_applies_to")} hint={t("promo_applies_hint")}>
+        <PromoField
+          label={t("promo_applies_to")}
+          hint={coveredCategories.length === 0 ? t("promo_applies_none") : t("promo_applies_hint")}
+        >
           {(id) => (
             <select
               id={id}
               value={appliesToItem}
               onChange={(e) => setAppliesToItem(e.target.value)}
-              className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3 font-body text-sm text-ink"
+              disabled={coveredCategories.length === 0}
+              className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3 font-body text-sm text-ink disabled:opacity-50"
             >
               <option value="">{t("promo_applies_all")}</option>
-              {items.map((i) => (
-                <option key={i.id} value={i.id}>
-                  {tt(i.label)}
-                </option>
+              {/* Grouped by format because several packages share a name ("1 class"
+                  exists for group, duo and trio) — ungrouped, the list is a guessing
+                  game about which one you are pinning the code to. */}
+              {coveredCategories.map((cat) => (
+                <optgroup key={cat} label={t(CATEGORY_KEY[cat])}>
+                  {items
+                    .filter((i) => i.category === cat)
+                    .map((i) => (
+                      <option key={i.id} value={i.id}>
+                        {tt(i.label)}
+                      </option>
+                    ))}
+                </optgroup>
               ))}
             </select>
           )}

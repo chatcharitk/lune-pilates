@@ -17,7 +17,7 @@ import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getDb } from "@/lib/db/client";
-import { promoCodeRules, promoCodes, promoRedemptions } from "@/lib/db/schema";
+import { catalogItems, promoCodeRules, promoCodes, promoRedemptions } from "@/lib/db/schema";
 import { requireOwner } from "@/lib/auth/admin";
 import { mockDataMode } from "@/lib/mock-mode";
 import { studioEndOfDay, studioInstant, studioParts, studioStartOfDay } from "@/lib/time";
@@ -105,6 +105,11 @@ export type SavePromoFailureCode =
   | "PERCENT_TOO_LARGE"
   /** The window ends before it starts. */
   | "BAD_WINDOW"
+  /**
+   * The code is pinned to one package whose class type it does not cover (or which
+   * no longer exists / is archived) — a code that could never apply to anything.
+   */
+  | "ITEM_NOT_COVERED"
   | MockNoDbCode;
 
 export type SavePromoResult = { ok: true; code: string } | { ok: false; code: SavePromoFailureCode };
@@ -140,6 +145,26 @@ export async function savePromoCode(raw: SavePromoInput): Promise<SavePromoResul
 
   if (mockDataMode()) return { ok: false, code: "MOCK_NO_DB" };
 
+  const itemId =
+    input.appliesToItemId && input.appliesToItemId !== "" ? input.appliesToItemId : null;
+
+  // Pinning to one package only narrows the formats above — it must not contradict
+  // them. A code restricted to a trio pack while trio carries no discount is dead on
+  // arrival (evaluatePromoCode refuses it), so refuse it here instead of storing it.
+  // The editor already hides those packages; this is the server's own check, since
+  // the covered set is money and never taken on the client's word (CLAUDE.md §8).
+  if (itemId !== null) {
+    const [item] = await getDb()
+      .select({ category: catalogItems.category, active: catalogItems.active })
+      .from(catalogItems)
+      .where(eq(catalogItems.id, itemId))
+      .limit(1);
+    if (!item || !item.active) return { ok: false, code: "ITEM_NOT_COVERED" };
+    if (!input.rules.some((r) => r.category === item.category)) {
+      return { ok: false, code: "ITEM_NOT_COVERED" };
+    }
+  }
+
   const code = normalizePromoCode(input.code);
   const values = {
     labelEn: input.labelEn,
@@ -148,7 +173,7 @@ export async function savePromoCode(raw: SavePromoInput): Promise<SavePromoResul
     endsAt,
     maxRedemptions: input.maxRedemptions > 0 ? input.maxRedemptions : null,
     maxPerCustomer: input.maxPerCustomer,
-    appliesToItemId: input.appliesToItemId && input.appliesToItemId !== "" ? input.appliesToItemId : null,
+    appliesToItemId: itemId,
     firstPurchaseOnly: input.firstPurchaseOnly,
     active: input.active,
   };
