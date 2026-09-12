@@ -490,7 +490,12 @@ export function CheckoutPanel({ catalog, isMember, house, terms }: CheckoutPanel
           role="tablist"
           aria-label={t("packages")}
           onKeyDown={onCatKeyDown}
-          className="mb-4 flex gap-1.5 rounded-[14px] bg-cream-2 p-1"
+          // Five formats (Group / 1:1 / Duo / Trio / Rental) no longer fit a phone
+          // width as equal segments: the longest Thai label broke mid-word onto a
+          // second line and made the whole control two rows tall. The tabs now keep
+          // their labels on one line and the strip scrolls if it must, so it still
+          // reads as a segmented control rather than a wrapped mess.
+          className="mb-4 flex gap-1.5 overflow-x-auto rounded-[14px] bg-cream-2 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {catalog.map((c) => {
             const on = c.id === catId;
@@ -504,7 +509,7 @@ export function CheckoutPanel({ catalog, isMember, house, terms }: CheckoutPanel
                 aria-controls={panelId}
                 tabIndex={on ? 0 : -1}
                 onClick={() => pickCategory(c.id)}
-                className={`flex-1 rounded-[10px] px-1 py-[9px] font-body text-[13px] font-semibold transition-all ${
+                className={`flex-1 whitespace-nowrap rounded-[10px] px-2.5 py-[9px] font-body text-[13px] font-semibold transition-all ${
                   on
                     ? "bg-surface-2 text-ink shadow-soft"
                     : "bg-transparent text-ink-soft"
@@ -658,13 +663,18 @@ function PackageCard({
       </span>
 
       <div className="min-w-0 flex-1">
-        <div className="flex items-baseline gap-1.5">
-          <span className="whitespace-nowrap font-head text-[19px] font-semibold leading-[1.3] text-ink">
+        {/* The name WRAPS. It used to be `whitespace-nowrap`, which was fine while
+            every label was short ("5 classes") but let a long one — the trial's
+            "ทดลอง: คลาสส่วนตัว 1:1 + คลาสกลุ่มฟรี" — run straight out of this column
+            and collide with the price. `flex-wrap` keeps the promo pill beside the
+            name when there is room and drops it underneath when there isn't. */}
+        <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-1">
+          <span className="font-head text-[19px] font-semibold leading-[1.3] text-ink">
             {tt(item.label)}
           </span>
           {item.tag && (
             <span
-              className={`rounded-full px-2.5 py-[3px] font-body text-[10px] font-bold uppercase tracking-[0.05em] ${
+              className={`shrink-0 rounded-full px-2.5 py-[3px] font-body text-[10px] font-bold uppercase tracking-[0.05em] ${
                 item.tag === "best_value"
                   ? "bg-taupe text-white"
                   : "bg-cream-2 text-taupe-deep"
@@ -674,10 +684,12 @@ function PackageCard({
             </span>
           )}
         </div>
-        <div className="mt-[7px] flex items-center gap-2 whitespace-nowrap font-body text-[12.5px] leading-[1.5] text-muted">
-          <span>{tt(item.sublabel)}</span>
+        {/* Same reasoning for the validity · per-class line: it wraps as a whole
+            rather than overflowing, but each half stays intact on its own line. */}
+        <div className="mt-[7px] flex flex-wrap items-center gap-x-2 gap-y-0.5 font-body text-[12.5px] leading-[1.5] text-muted">
+          <span className="whitespace-nowrap">{tt(item.sublabel)}</span>
           <span className="h-[3px] w-[3px] shrink-0 rounded-full bg-line-strong" />
-          <span>
+          <span className="whitespace-nowrap">
             {thb(item.perHour)}
             {t("per_hour")}
           </span>
