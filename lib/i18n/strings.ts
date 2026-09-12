@@ -1281,7 +1281,7 @@ export const STR = {
   },
 
   // ───────── promo codes (event discounts, 2026-09-12) ─────────
-  promo_have_code: { en: "Have a discount code?", th: "มีโค้ดส่วนลดไหม?" },
+  promo_have_code: { en: "Discount code", th: "โค้ดส่วนลด" },
   promo_placeholder: { en: "Enter code", th: "กรอกโค้ด" },
   promo_apply: { en: "Apply", th: "ใช้โค้ด" },
   promo_remove: { en: "Remove", th: "นำออก" },
