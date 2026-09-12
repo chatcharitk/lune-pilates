@@ -1202,11 +1202,12 @@ export const STR = {
   promo_kind_percent: { en: "Percent off", th: "ลดเป็นเปอร์เซ็นต์" },
   promo_kind_fixed: { en: "Baht off", th: "ลดเป็นบาท" },
   promo_value: { en: "Amount", th: "จำนวน" },
-  promo_starts: { en: "Starts", th: "เริ่ม" },
-  promo_ends: { en: "Ends", th: "สิ้นสุด" },
+  // The window is checked against the moment of PURCHASE, so say so.
+  promo_starts: { en: "Can be used from", th: "ใช้ซื้อได้ตั้งแต่" },
+  promo_ends: { en: "Can be used until", th: "ใช้ซื้อได้ถึง" },
   promo_window_hint: {
-    en: "Leave empty for no limit. The end day counts in full.",
-    th: "เว้นว่างหากไม่จำกัด วันสุดท้ายใช้ได้ทั้งวัน",
+    en: "The date the customer buys. Leave empty for no limit; the last day counts in full.",
+    th: "นับจากวันที่ลูกค้าซื้อ เว้นว่างหากไม่จำกัด วันสุดท้ายใช้ได้ทั้งวัน",
   },
   promo_max_total: { en: "Total uses", th: "จำนวนครั้งทั้งหมด" },
   promo_max_total_hint: {
@@ -1214,7 +1215,20 @@ export const STR = {
     th: "0 = ไม่จำกัด ใช้สำหรับ “30 คนแรก”",
   },
   promo_max_per_customer: { en: "Uses per customer", th: "ต่อลูกค้าหนึ่งคน" },
-  promo_applies_to: { en: "Applies to", th: "ใช้ได้กับ" },
+  promo_rules_title: { en: "Discount per class type", th: "ส่วนลดตามประเภทคลาส" },
+  promo_rules_hint: {
+    en: "Set an amount for each type this code covers. Leave a type blank and the code won’t work on it.",
+    th: "ใส่จำนวนสำหรับประเภทที่โค้ดนี้ใช้ได้ เว้นว่างไว้หากไม่ต้องการให้ใช้กับประเภทนั้น",
+  },
+  promo_applies_to: { en: "Limit to one package", th: "จำกัดเฉพาะแพ็กเกจเดียว" },
+  promo_applies_hint: {
+    en: "Optional. Narrows the code to a single package within the types above.",
+    th: "ไม่บังคับ จำกัดโค้ดให้ใช้ได้กับแพ็กเกจเดียวภายในประเภทด้านบน",
+  },
+  err_promo_no_rules: {
+    en: "Set a discount for at least one class type.",
+    th: "กรุณาตั้งส่วนลดอย่างน้อยหนึ่งประเภทคลาส",
+  },
   promo_applies_all: { en: "Any package", th: "ทุกแพ็กเกจ" },
   promo_first_only: { en: "First-time customers only", th: "ลูกค้าใหม่เท่านั้น" },
   promo_active: { en: "Available to customers", th: "เปิดให้ลูกค้าใช้" },

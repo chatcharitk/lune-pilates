@@ -17,7 +17,7 @@ import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getDb } from "@/lib/db/client";
-import { promoCodes, promoRedemptions } from "@/lib/db/schema";
+import { promoCodeRules, promoCodes, promoRedemptions } from "@/lib/db/schema";
 import { requireOwner } from "@/lib/auth/admin";
 import { mockDataMode } from "@/lib/mock-mode";
 import { studioEndOfDay, studioInstant, studioParts, studioStartOfDay } from "@/lib/time";
@@ -68,19 +68,28 @@ export async function listPromosForAdmin(): Promise<ListPromosResult> {
 
 const YMD = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
+/** One format's discount. Formats the owner leaves blank simply aren't sent. */
+const ruleInput = z.object({
+  category: z.enum(["group", "private", "duo", "trio", "rental"]),
+  kind: z.enum(["percent", "fixed"]),
+  value: z.number().int().positive().max(1_000_000),
+});
+
 const saveInput = z.object({
   code: z.string().trim().toUpperCase().regex(PROMO_CODE_PATTERN),
   labelEn: z.string().trim().min(1).max(60),
   labelTh: z.string().trim().min(1).max(60),
-  kind: z.enum(["percent", "fixed"]),
-  value: z.number().int().positive().max(1_000_000),
+  /**
+   * The discount PER CLASS FORMAT. A code covers exactly the formats listed here,
+   * so an empty list would be a code that can never apply — refused as NO_RULES.
+   */
+  rules: z.array(ruleInput).max(5),
   /** Bangkok calendar days; the end day counts in full. Empty string = unbounded. */
   startsOn: z.union([z.literal(""), YMD]),
   endsOn: z.union([z.literal(""), YMD]),
   /** 0 / absent = unlimited. */
   maxRedemptions: z.number().int().min(0).max(1_000_000),
   maxPerCustomer: z.number().int().positive().max(1_000),
-  appliesToCategory: z.enum(["group", "private", "duo", "trio", "rental"]).nullable(),
   appliesToItemId: z.string().trim().max(40).nullable(),
   firstPurchaseOnly: z.boolean(),
   active: z.boolean(),
@@ -90,6 +99,8 @@ export type SavePromoInput = z.infer<typeof saveInput>;
 export type SavePromoFailureCode =
   | "UNAUTHORIZED"
   | "INVALID_INPUT"
+  /** No format was given a discount — the code could never apply to anything. */
+  | "NO_RULES"
   /** A percentage over 100 would mean a negative price. */
   | "PERCENT_TOO_LARGE"
   /** The window ends before it starts. */
@@ -112,8 +123,13 @@ export async function savePromoCode(raw: SavePromoInput): Promise<SavePromoResul
   if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
   const input = parsed.data;
 
-  if (input.kind === "percent" && input.value > 100) {
+  if (input.rules.length === 0) return { ok: false, code: "NO_RULES" };
+  if (input.rules.some((r) => r.kind === "percent" && r.value > 100)) {
     return { ok: false, code: "PERCENT_TOO_LARGE" };
+  }
+  // One rule per format — a duplicate would make the stored discount ambiguous.
+  if (new Set(input.rules.map((r) => r.category)).size !== input.rules.length) {
+    return { ok: false, code: "INVALID_INPUT" };
   }
 
   const startsAt = input.startsOn === "" ? null : startOfYmd(input.startsOn);
@@ -128,22 +144,34 @@ export async function savePromoCode(raw: SavePromoInput): Promise<SavePromoResul
   const values = {
     labelEn: input.labelEn,
     labelTh: input.labelTh,
-    kind: input.kind,
-    value: input.value,
     startsAt,
     endsAt,
     maxRedemptions: input.maxRedemptions > 0 ? input.maxRedemptions : null,
     maxPerCustomer: input.maxPerCustomer,
-    appliesToCategory: input.appliesToCategory,
     appliesToItemId: input.appliesToItemId && input.appliesToItemId !== "" ? input.appliesToItemId : null,
     firstPurchaseOnly: input.firstPurchaseOnly,
     active: input.active,
   };
 
-  await getDb()
-    .insert(promoCodes)
-    .values({ code, ...values })
-    .onConflictDoUpdate({ target: promoCodes.code, set: values });
+  // The code and its per-format rules move together: a half-applied save could
+  // leave a live code with the wrong discounts, so both go in one transaction and
+  // the rules are REPLACED wholesale (removing a format is as meaningful as adding
+  // one — it takes that format out of the code's coverage).
+  await getDb().transaction(async (tx) => {
+    await tx
+      .insert(promoCodes)
+      .values({ code, ...values })
+      .onConflictDoUpdate({ target: promoCodes.code, set: values });
+    await tx.delete(promoCodeRules).where(eq(promoCodeRules.code, code));
+    await tx.insert(promoCodeRules).values(
+      input.rules.map((r) => ({
+        code,
+        category: r.category,
+        kind: r.kind,
+        value: r.value,
+      })),
+    );
+  });
 
   revalidatePath("/admin/settings/promos");
   return { ok: true, code };

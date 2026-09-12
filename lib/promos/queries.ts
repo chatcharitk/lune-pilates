@@ -9,7 +9,7 @@
 
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
-import { charges, promoCodes, promoRedemptions } from "@/lib/db/schema";
+import { charges, promoCodeRules, promoCodes, promoRedemptions } from "@/lib/db/schema";
 import { mockDataMode } from "@/lib/mock-mode";
 import type { PackageCategory } from "@/lib/domain/types";
 import { normalizePromoCode, type PromoCode, type PromoKind } from "./codes";
@@ -17,35 +17,53 @@ import { normalizePromoCode, type PromoCode, type PromoKind } from "./codes";
 /** Charge states that still hold their redemption slot. */
 const LIVE_CHARGE_STATUSES = ["pending", "awaiting_review", "paid"] as const;
 
-function rowToCode(r: {
+interface CodeRow {
   code: string;
   labelEn: string;
   labelTh: string;
-  kind: string;
-  value: number;
   startsAt: Date | null;
   endsAt: Date | null;
   maxRedemptions: number | null;
   maxPerCustomer: number;
-  appliesToCategory: PackageCategory | null;
   appliesToItemId: string | null;
   firstPurchaseOnly: boolean;
   active: boolean;
-}): PromoCode {
+}
+
+interface RuleRow {
+  code: string;
+  category: PackageCategory;
+  kind: string;
+  value: number;
+}
+
+/** Group rule rows by code, ready to hang off each PromoCode. */
+function rulesByCode(rows: RuleRow[]): Map<string, PromoCode["rules"]> {
+  const out = new Map<string, PromoCode["rules"]>();
+  for (const r of rows) {
+    const forCode = out.get(r.code) ?? {};
+    forCode[r.category] = {
+      // The column is CHECK-constrained to these two, but narrow defensively rather
+      // than cast: an unknown kind falls back to "fixed", whose value is read as flat
+      // THB — the conservative reading, since a stray "percent" of a large number
+      // would give far more away than a flat one.
+      kind: (r.kind === "percent" ? "percent" : "fixed") as PromoKind,
+      value: r.value,
+    };
+    out.set(r.code, forCode);
+  }
+  return out;
+}
+
+function rowToCode(r: CodeRow, rules: PromoCode["rules"]): PromoCode {
   return {
     code: r.code,
     label: { en: r.labelEn, th: r.labelTh },
-    // The column is CHECK-constrained to these two, but narrow defensively rather
-    // than cast: an unknown kind falls back to "fixed", whose value is read as flat
-    // THB — the conservative reading, since a stray "percent" of a large number
-    // would give far more away than a flat one.
-    kind: (r.kind === "percent" ? "percent" : "fixed") as PromoKind,
-    value: r.value,
+    rules,
     startsAt: r.startsAt,
     endsAt: r.endsAt,
     maxRedemptions: r.maxRedemptions,
     maxPerCustomer: r.maxPerCustomer,
-    appliesToCategory: r.appliesToCategory,
     appliesToItemId: r.appliesToItemId,
     firstPurchaseOnly: r.firstPurchaseOnly,
     active: r.active,
@@ -56,12 +74,13 @@ function rowToCode(r: {
 export async function loadPromoCode(raw: string): Promise<PromoCode | null> {
   if (mockDataMode()) return null; // no codes without a database
   const code = normalizePromoCode(raw);
-  const [row] = await getDb()
-    .select()
-    .from(promoCodes)
-    .where(eq(promoCodes.code, code))
-    .limit(1);
-  return row ? rowToCode(row) : null;
+  const db = getDb();
+  const [[row], ruleRows] = await Promise.all([
+    db.select().from(promoCodes).where(eq(promoCodes.code, code)).limit(1),
+    db.select().from(promoCodeRules).where(eq(promoCodeRules.code, code)),
+  ]);
+  if (!row) return null;
+  return rowToCode(row, rulesByCode(ruleRows).get(code) ?? {});
 }
 
 export interface PromoUsage {
@@ -111,9 +130,11 @@ export async function loadPromoUsageByCode(): Promise<Map<string, number>> {
 /** Every code, newest first — the admin list. */
 export async function listPromoCodes(): Promise<PromoCode[]> {
   if (mockDataMode()) return [];
-  const rows = await getDb()
-    .select()
-    .from(promoCodes)
-    .orderBy(sql`${promoCodes.createdAt} desc`);
-  return rows.map(rowToCode);
+  const db = getDb();
+  const [rows, ruleRows] = await Promise.all([
+    db.select().from(promoCodes).orderBy(sql`${promoCodes.createdAt} desc`),
+    db.select().from(promoCodeRules),
+  ]);
+  const grouped = rulesByCode(ruleRows);
+  return rows.map((r) => rowToCode(r, grouped.get(r.code) ?? {}));
 }

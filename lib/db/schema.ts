@@ -437,9 +437,12 @@ export const promoCodes = pgTable(
     code: text("code").primaryKey(),
     labelEn: text("label_en").notNull(),
     labelTh: text("label_th").notNull(),
-    // 'percent' → `value` is 1–100; 'fixed' → `value` is whole THB off.
-    kind: text("kind").notNull(),
-    value: integer("value").notNull(),
+    // DEAD legacy columns (2026-09-12): the discount moved to promo_code_rules so
+    // one code can be worth different amounts per class format. Kept nullable
+    // through the deploy window and dropped in drizzle/0012 — no longer read or
+    // written. Same treatment catalog_items.validity got when it was superseded.
+    kind: text("kind"),
+    value: integer("value"),
     // Window bounds, both optional. `endsAt` is stored as the LAST USABLE INSTANT of
     // its Bangkok day, matching how package expiry works — the final day counts in full.
     startsAt: timestamp("starts_at", { withTimezone: true }),
@@ -448,7 +451,7 @@ export const promoCodes = pgTable(
     maxRedemptions: integer("max_redemptions"),
     /** Redemptions allowed per customer. 1 stops one person draining a capped code. */
     maxPerCustomer: integer("max_per_customer").notNull().default(1),
-    /** Restrict to one class format. Null = any. */
+    /** DEAD legacy column — superseded by promo_code_rules (see above). */
     appliesToCategory: packageCategory("applies_to_category"),
     /** Restrict to a single catalog item. Null = any. Narrower than the category. */
     appliesToItemId: text("applies_to_item_id").references(() => catalogItems.id),
@@ -458,19 +461,40 @@ export const promoCodes = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    check("promo_kind_valid", sql`${t.kind} in ('percent','fixed')`),
-    check("promo_value_positive", sql`${t.value} > 0`),
-    // A percentage over 100 would be a negative price; the action clamps too, but
-    // the database refuses to hold one either way.
-    check(
-      "promo_percent_within_100",
-      sql`${t.kind} <> 'percent' or ${t.value} <= 100`,
-    ),
     check(
       "promo_max_redemptions_positive",
       sql`${t.maxRedemptions} is null or ${t.maxRedemptions} > 0`,
     ),
     check("promo_max_per_customer_positive", sql`${t.maxPerCustomer} > 0`),
+  ],
+);
+
+// What a code is worth, PER CLASS FORMAT (2026-09-12). One code can take ฿200 off a
+// group pack and ฿500 off a 1:1, so the studio advertises a single code that behaves
+// differently per format.
+//
+// A format with no row here is NOT covered by the code. That makes this table the
+// single place that answers both "how much" and "which formats" — there is no
+// separate restriction flag that could disagree with the amounts.
+export const promoCodeRules = pgTable(
+  "promo_code_rules",
+  {
+    code: text("code")
+      .notNull()
+      .references(() => promoCodes.code, { onDelete: "cascade" }),
+    category: packageCategory("category").notNull(),
+    /** 'percent' → `value` is 1–100; 'fixed' → `value` is whole THB off. */
+    kind: text("kind").notNull(),
+    value: integer("value").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.code, t.category] }),
+    check("promo_rule_kind_valid", sql`${t.kind} in ('percent','fixed')`),
+    check("promo_rule_value_positive", sql`${t.value} > 0`),
+    check(
+      "promo_rule_percent_within_100",
+      sql`${t.kind} <> 'percent' or ${t.value} <= 100`,
+    ),
   ],
 );
 

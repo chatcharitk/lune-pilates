@@ -24,6 +24,29 @@ import type { PackageCategory } from "@/lib/domain/types";
 import { isValidPromoCodeShape } from "@/lib/promos/codes";
 import { thb, type Bilingual, type StrKey } from "@/lib/i18n";
 
+/** Display order of the formats in the editor and the list badges. */
+const CATEGORY_ORDER: readonly PackageCategory[] = [
+  "group",
+  "private",
+  "duo",
+  "trio",
+  "rental",
+] as const;
+
+/** One format's row in the editor, as free text while being typed. */
+interface RuleDraft {
+  kind: "percent" | "fixed";
+  /** Empty means "this code does not cover this format". */
+  value: string;
+}
+
+function emptyRules(): Record<PackageCategory, RuleDraft> {
+  return CATEGORY_ORDER.reduce((acc, cat) => {
+    acc[cat] = { kind: "fixed", value: "" };
+    return acc;
+  }, {} as Record<PackageCategory, RuleDraft>);
+}
+
 const CATEGORY_KEY: Record<PackageCategory, StrKey> = {
   group: "cat_group",
   private: "cat_private",
@@ -36,6 +59,8 @@ function saveErrorKey(code: SavePromoFailureCode): StrKey {
   switch (code) {
     case "UNAUTHORIZED":
       return "err_cat_forbidden";
+    case "NO_RULES":
+      return "err_promo_no_rules";
     case "PERCENT_TOO_LARGE":
       return "err_promo_percent";
     case "BAD_WINDOW":
@@ -142,9 +167,17 @@ export function PromosView({
                     <span className="font-body text-[14px] font-bold tracking-[0.06em] text-ink">
                       {c.code}
                     </span>
-                    <Badge tone={c.active ? "green" : "neutral"}>
-                      {c.kind === "percent" ? `−${c.value}%` : `−${thb(c.value)}`}
-                    </Badge>
+                    {/* One badge per format the code covers — the whole point is
+                        that a single code can be worth different amounts. */}
+                    {CATEGORY_ORDER.filter((cat) => c.rules[cat]).map((cat) => {
+                      const rule = c.rules[cat]!;
+                      return (
+                        <Badge key={cat} tone={c.active ? "green" : "neutral"}>
+                          {t(CATEGORY_KEY[cat])}{" "}
+                          {rule.kind === "percent" ? `−${rule.value}%` : `−${thb(rule.value)}`}
+                        </Badge>
+                      );
+                    })}
                     {c.firstPurchaseOnly && (
                       <Badge tone="amber">{t("promo_first_only")}</Badge>
                     )}
@@ -223,13 +256,13 @@ function PromoDrawer({
   const [code, setCode] = useState("");
   const [labelEn, setLabelEn] = useState("");
   const [labelTh, setLabelTh] = useState("");
-  const [kind, setKind] = useState<"percent" | "fixed">("percent");
-  const [value, setValue] = useState("20");
+  // One draft row per format; an empty amount means "this code doesn't cover it".
+  const [rules, setRules] = useState<Record<PackageCategory, RuleDraft>>(emptyRules);
   const [startsOn, setStartsOn] = useState("");
   const [endsOn, setEndsOn] = useState("");
   const [maxTotal, setMaxTotal] = useState("0");
   const [maxPerCustomer, setMaxPerCustomer] = useState("1");
-  const [appliesTo, setAppliesTo] = useState(""); // "" | cat:<c> | item:<id>
+  const [appliesToItem, setAppliesToItem] = useState("");
   const [firstOnly, setFirstOnly] = useState(false);
   const [active, setActive] = useState(true);
   const [errorKey, setErrorKey] = useState<StrKey | null>(null);
@@ -240,19 +273,21 @@ function PromoDrawer({
     setCode(existing?.code ?? "");
     setLabelEn(existing?.label.en ?? "");
     setLabelTh(existing?.label.th ?? "");
-    setKind(existing?.kind ?? "percent");
-    setValue(String(existing?.value ?? 20));
+    setRules(
+      CATEGORY_ORDER.reduce((acc, cat) => {
+        const rule = existing?.rules[cat];
+        acc[cat] = {
+          kind: rule?.kind ?? "fixed",
+          value: rule ? String(rule.value) : "",
+        };
+        return acc;
+      }, {} as Record<PackageCategory, RuleDraft>),
+    );
     setStartsOn(existing?.startsOn ?? "");
     setEndsOn(existing?.endsOn ?? "");
     setMaxTotal(String(existing?.maxRedemptions ?? 0));
     setMaxPerCustomer(String(existing?.maxPerCustomer ?? 1));
-    setAppliesTo(
-      existing?.appliesToItemId
-        ? `item:${existing.appliesToItemId}`
-        : existing?.appliesToCategory
-          ? `cat:${existing.appliesToCategory}`
-          : "",
-    );
+    setAppliesToItem(existing?.appliesToItemId ?? "");
     setFirstOnly(existing?.firstPurchaseOnly ?? false);
     setActive(existing?.active ?? true);
     setErrorKey(null);
@@ -264,12 +299,24 @@ function PromoDrawer({
       setErrorKey("err_promo_code_shape");
       return;
     }
-    const numericValue = Number.parseInt(value, 10);
-    if (!Number.isSafeInteger(numericValue) || numericValue <= 0) {
+    // Only formats with an amount typed in are sent; the rest are simply not
+    // covered by this code.
+    const filled = CATEGORY_ORDER.flatMap((cat) => {
+      const draft = rules[cat];
+      if (draft.value.trim() === "") return [];
+      const parsedValue = Number.parseInt(draft.value, 10);
+      return [{ category: cat, kind: draft.kind, value: parsedValue }];
+    });
+
+    if (filled.length === 0) {
+      setErrorKey("err_promo_no_rules");
+      return;
+    }
+    if (filled.some((r) => !Number.isSafeInteger(r.value) || r.value <= 0)) {
       setErrorKey("err_promo_save");
       return;
     }
-    if (kind === "percent" && numericValue > 100) {
+    if (filled.some((r) => r.kind === "percent" && r.value > 100)) {
       setErrorKey("err_promo_percent");
       return;
     }
@@ -280,16 +327,12 @@ function PromoDrawer({
           code: code.trim().toUpperCase(),
           labelEn: labelEn.trim(),
           labelTh: labelTh.trim(),
-          kind,
-          value: numericValue,
+          rules: filled,
           startsOn,
           endsOn,
           maxRedemptions: Math.max(0, Number.parseInt(maxTotal, 10) || 0),
           maxPerCustomer: Math.max(1, Number.parseInt(maxPerCustomer, 10) || 1),
-          appliesToCategory: appliesTo.startsWith("cat:")
-            ? (appliesTo.slice(4) as PackageCategory)
-            : null,
-          appliesToItemId: appliesTo.startsWith("item:") ? appliesTo.slice(5) : null,
+          appliesToItemId: appliesToItem === "" ? null : appliesToItem,
           firstPurchaseOnly: firstOnly,
           active,
         });
@@ -384,34 +427,64 @@ function PromoDrawer({
           </PromoField>
         </div>
 
-        <div className="grid gap-3.5 sm:grid-cols-2">
-          <PromoField label={t("promo_kind")}>
-            {(id) => (
-              <select
-                id={id}
-                value={kind}
-                onChange={(e) => setKind(e.target.value as "percent" | "fixed")}
-                className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3 font-body text-sm text-ink"
-              >
-                <option value="percent">{t("promo_kind_percent")}</option>
-                <option value="fixed">{t("promo_kind_fixed")}</option>
-              </select>
-            )}
-          </PromoField>
-          <PromoField label={t("promo_value")}>
-            {(id) => (
-              <input
-                id={id}
-                type="number"
-                inputMode="numeric"
-                min={1}
-                max={kind === "percent" ? 100 : undefined}
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink"
-              />
-            )}
-          </PromoField>
+        {/* THE DISCOUNT, PER FORMAT. One code, different amounts — leave a format
+            blank and the code simply doesn't cover it, which is also how the owner
+            restricts a code to (say) 1:1 only. */}
+        <div>
+          <p className="mb-1.5 font-body text-[12px] font-semibold uppercase tracking-[0.07em] text-muted">
+            {t("promo_rules_title")}
+          </p>
+          <p className="mb-2.5 font-body text-[11.5px] leading-snug text-muted">
+            {t("promo_rules_hint")}
+          </p>
+          <div className="flex flex-col gap-2">
+            {CATEGORY_ORDER.map((cat) => {
+              const rule = rules[cat];
+              const on = rule.value.trim() !== "";
+              return (
+                <div
+                  key={cat}
+                  className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${
+                    on ? "border-taupe bg-surface" : "border-line bg-cream-2/40"
+                  }`}
+                >
+                  <span className="w-[70px] shrink-0 font-body text-[13px] font-semibold text-ink">
+                    {t(CATEGORY_KEY[cat])}
+                  </span>
+                  <select
+                    aria-label={`${t(CATEGORY_KEY[cat])} — ${t("promo_kind")}`}
+                    value={rule.kind}
+                    onChange={(e) =>
+                      setRules((prev) => ({
+                        ...prev,
+                        [cat]: { ...prev[cat], kind: e.target.value as "percent" | "fixed" },
+                      }))
+                    }
+                    className="h-10 shrink-0 rounded-lg border border-line-strong bg-surface px-2 font-body text-[13px] text-ink"
+                  >
+                    <option value="fixed">{t("promo_kind_fixed")}</option>
+                    <option value="percent">{t("promo_kind_percent")}</option>
+                  </select>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={rule.kind === "percent" ? 100 : undefined}
+                    placeholder="—"
+                    aria-label={`${t(CATEGORY_KEY[cat])} — ${t("promo_value")}`}
+                    value={rule.value}
+                    onChange={(e) =>
+                      setRules((prev) => ({
+                        ...prev,
+                        [cat]: { ...prev[cat], value: e.target.value },
+                      }))
+                    }
+                    className="h-10 min-w-0 flex-1 rounded-lg border border-line-strong bg-surface px-3 font-body text-[13px] text-ink"
+                  />
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         <div className="grid gap-3.5 sm:grid-cols-2">
@@ -468,22 +541,20 @@ function PromoDrawer({
           </PromoField>
         </div>
 
-        <PromoField label={t("promo_applies_to")}>
+        {/* Optional extra narrowing to ONE package. The per-format rows above
+            already decide which formats are covered; this pins it to a single
+            item within them (e.g. only the 10-class pack). */}
+        <PromoField label={t("promo_applies_to")} hint={t("promo_applies_hint")}>
           {(id) => (
             <select
               id={id}
-              value={appliesTo}
-              onChange={(e) => setAppliesTo(e.target.value)}
+              value={appliesToItem}
+              onChange={(e) => setAppliesToItem(e.target.value)}
               className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3 font-body text-sm text-ink"
             >
               <option value="">{t("promo_applies_all")}</option>
-              {(["group", "private", "duo", "trio", "rental"] as const).map((c) => (
-                <option key={c} value={`cat:${c}`}>
-                  {t(CATEGORY_KEY[c])}
-                </option>
-              ))}
               {items.map((i) => (
-                <option key={i.id} value={`item:${i.id}`}>
+                <option key={i.id} value={i.id}>
                   {tt(i.label)}
                 </option>
               ))}

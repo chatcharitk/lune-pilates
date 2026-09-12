@@ -16,14 +16,28 @@ import type { Bilingual } from "@/lib/i18n";
 
 export type PromoKind = "percent" | "fixed";
 
+/** What one code is worth for ONE class format. */
+export interface PromoRule {
+  kind: PromoKind;
+  /** 1–100 for `percent`; whole THB for `fixed`. */
+  value: number;
+}
+
 /** One owner-created campaign. */
 export interface PromoCode {
   /** Stored and compared UPPERCASE. */
   code: string;
   label: Bilingual;
-  kind: PromoKind;
-  /** 1–100 for `percent`; whole THB for `fixed`. */
-  value: number;
+  /**
+   * The discount PER CLASS FORMAT (2026-09-12). One code can be worth ฿200 off a
+   * group pack and ฿500 off a 1:1 — the studio advertises a single code and it
+   * behaves differently per format.
+   *
+   * A format with NO rule is not covered: this doubles as the "which formats does
+   * this code apply to" restriction, so there is one place to look rather than a
+   * separate flag that could disagree with the amounts.
+   */
+  rules: Partial<Record<PackageCategory, PromoRule>>;
   /** Usable from this instant. Null = no start bound. */
   startsAt: Date | null;
   /** Last usable instant (end of its Bangkok day). Null = no end bound. */
@@ -31,8 +45,6 @@ export interface PromoCode {
   /** Total redemptions allowed across everyone. Null = unlimited. */
   maxRedemptions: number | null;
   maxPerCustomer: number;
-  /** Restrict to one class format. Null = any. */
-  appliesToCategory: PackageCategory | null;
   /** Restrict to one catalog item. Null = any. */
   appliesToItemId: string | null;
   firstPurchaseOnly: boolean;
@@ -56,21 +68,18 @@ export const MIN_CHARGED_THB = 1;
  * Percentages round DOWN (Math.floor), so rounding can only ever favour the studio
  * by at most ฿1 rather than quietly giving away more than the code advertises.
  */
-export function discountFor(code: Pick<PromoCode, "kind" | "value">, priceThb: number): number {
+export function discountFor(rule: PromoRule, priceThb: number): number {
   const raw =
-    code.kind === "percent"
-      ? Math.floor((priceThb * code.value) / 100)
-      : Math.floor(code.value);
+    rule.kind === "percent"
+      ? Math.floor((priceThb * rule.value) / 100)
+      : Math.floor(rule.value);
   const maxAllowed = Math.max(0, priceThb - MIN_CHARGED_THB);
   return Math.max(0, Math.min(raw, maxAllowed));
 }
 
 /** What the customer pays once `code` is applied to `priceThb`. */
-export function discountedAmount(
-  code: Pick<PromoCode, "kind" | "value">,
-  priceThb: number,
-): number {
-  return priceThb - discountFor(code, priceThb);
+export function discountedAmount(rule: PromoRule, priceThb: number): number {
+  return priceThb - discountFor(rule, priceThb);
 }
 
 export type PromoRefusal =
@@ -141,11 +150,12 @@ export function evaluatePromoCode(input: PromoEvaluationInput): PromoEvaluation 
   if (code.appliesToItemId !== null && code.appliesToItemId !== item.id) {
     return { ok: false, reason: "NOT_APPLICABLE" };
   }
-  if (code.appliesToCategory !== null && code.appliesToCategory !== item.category) {
-    return { ok: false, reason: "NOT_APPLICABLE" };
-  }
 
-  const discount = discountFor(code, item.price);
+  // No rule for this format → the code simply does not cover it.
+  const rule = code.rules[item.category];
+  if (!rule) return { ok: false, reason: "NOT_APPLICABLE" };
+
+  const discount = discountFor(rule, item.price);
   // A code that lands on zero off (a fixed code on an already-cheap item, or a
   // rounding-down percentage) is refused rather than applied as a no-op, so the
   // customer is never shown "code applied" beside an unchanged total.

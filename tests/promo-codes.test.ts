@@ -21,13 +21,18 @@ function code(over: Partial<PromoCode> = {}): PromoCode {
   return {
     code: "GRANDOPEN",
     label: { en: "Grand opening", th: "เปิดร้านใหญ่" },
-    kind: "percent",
-    value: 20,
+    // Covers every format at 20% unless a test says otherwise.
+    rules: {
+      group: { kind: "percent", value: 20 },
+      private: { kind: "percent", value: 20 },
+      duo: { kind: "percent", value: 20 },
+      trio: { kind: "percent", value: 20 },
+      rental: { kind: "percent", value: 20 },
+    },
     startsAt: null,
     endsAt: null,
     maxRedemptions: null,
     maxPerCustomer: 1,
-    appliesToCategory: null,
     appliesToItemId: null,
     firstPurchaseOnly: false,
     active: true,
@@ -124,12 +129,13 @@ describe("when a code may be applied", () => {
     expect(evaluate({ firstPurchaseOnly: true }, { hasPurchasedBefore: false }).ok).toBe(true);
   });
 
-  it("restricts to a format", () => {
-    expect(evaluate({ appliesToCategory: "private" })).toEqual({
+  it("covers only the formats it has a rule for", () => {
+    // A code with a 1:1 rule and nothing else must not discount a group pack.
+    expect(evaluate({ rules: { private: { kind: "percent", value: 20 } } })).toEqual({
       ok: false,
       reason: "NOT_APPLICABLE",
     });
-    expect(evaluate({ appliesToCategory: "group" }).ok).toBe(true);
+    expect(evaluate({ rules: { group: { kind: "percent", value: 20 } } }).ok).toBe(true);
   });
 
   it("restricts to a single package", () => {
@@ -143,7 +149,7 @@ describe("when a code may be applied", () => {
   it("refuses a code worth nothing rather than showing 'applied' beside an unchanged total", () => {
     // 1% of a ฿50 item rounds down to ฿0.
     const res = evaluatePromoCode({
-      code: code({ kind: "percent", value: 1 }),
+      code: code({ rules: { group: { kind: "percent", value: 1 } } }),
       item: { id: "x", category: "group", price: 50 },
       redemptionsUsed: 0,
       redemptionsByCustomer: 0,
@@ -180,5 +186,102 @@ describe("code shape", () => {
     ["empty", ""],
   ])("rejects %s", (_label, raw) => {
     expect(isValidPromoCodeShape(raw)).toBe(false);
+  });
+});
+
+// ───────────────────────── one code, different discounts per format ─────────────────────────
+// The owner's request (2026-09-12): advertise a single code that is worth different
+// amounts depending on which class type is being bought.
+
+describe("one code, a different discount per class format", () => {
+  const mixed = code({
+    rules: {
+      group: { kind: "fixed", value: 200 },
+      private: { kind: "fixed", value: 500 },
+      duo: { kind: "percent", value: 10 },
+      // trio and rental deliberately absent — the code does not cover them.
+    },
+  });
+
+  function forItem(category: "group" | "private" | "duo" | "trio" | "rental", price: number) {
+    return evaluatePromoCode({
+      code: mixed,
+      item: { id: "x", category, price },
+      redemptionsUsed: 0,
+      redemptionsByCustomer: 0,
+      hasPurchasedBefore: false,
+      now: NOW,
+    });
+  }
+
+  it("gives each covered format its own amount", () => {
+    expect(forItem("group", 5500)).toEqual({ ok: true, discount: 200, amount: 5300 });
+    expect(forItem("private", 15000)).toEqual({ ok: true, discount: 500, amount: 14500 });
+    // Percent and fixed can be mixed across formats on the same code.
+    expect(forItem("duo", 18000)).toEqual({ ok: true, discount: 1800, amount: 16200 });
+  });
+
+  it("does not apply to a format it has no rule for", () => {
+    expect(forItem("trio", 20000)).toEqual({ ok: false, reason: "NOT_APPLICABLE" });
+    expect(forItem("rental", 600)).toEqual({ ok: false, reason: "NOT_APPLICABLE" });
+  });
+
+  it("still honours the single-package restriction on top of the rules", () => {
+    const res = evaluatePromoCode({
+      code: code({
+        rules: { group: { kind: "fixed", value: 200 } },
+        appliesToItemId: "p10",
+      }),
+      item: { id: "p5", category: "group", price: 3000 },
+      redemptionsUsed: 0,
+      redemptionsByCustomer: 0,
+      hasPurchasedBefore: false,
+      now: NOW,
+    });
+    expect(res).toEqual({ ok: false, reason: "NOT_APPLICABLE" });
+  });
+});
+
+// ───────────────────────── the window is about the PURCHASE date ─────────────────────────
+
+describe("the date window is measured at the moment of purchase", () => {
+  const window = code({
+    rules: { group: { kind: "fixed", value: 200 } },
+    startsAt: new Date("2026-10-01T00:00:00Z"),
+    endsAt: new Date("2026-10-31T16:59:59.999Z"), // 31 Oct 23:59:59.999 Bangkok
+  });
+
+  function buyingAt(when: Date) {
+    return evaluatePromoCode({
+      code: window,
+      item: { id: "p10", category: "group", price: 5500 },
+      redemptionsUsed: 0,
+      redemptionsByCustomer: 0,
+      hasPurchasedBefore: false,
+      now: when,
+    });
+  }
+
+  it("refuses a purchase before the window, allows one inside it", () => {
+    expect(buyingAt(new Date("2026-09-30T23:00:00Z"))).toEqual({
+      ok: false,
+      reason: "NOT_STARTED",
+    });
+    expect(buyingAt(new Date("2026-10-15T06:00:00Z")).ok).toBe(true);
+  });
+
+  it("allows a purchase on the very last moment of the final day, and refuses the next", () => {
+    expect(buyingAt(new Date("2026-10-31T16:59:59.999Z")).ok).toBe(true);
+    expect(buyingAt(new Date("2026-10-31T17:00:00.000Z"))).toEqual({
+      ok: false,
+      reason: "EXPIRED",
+    });
+  });
+
+  it("says nothing about when the classes are USED — only when they were bought", () => {
+    // A package bought inside the window keeps its discount regardless of when the
+    // classes are later taken; the code is never consulted again after checkout.
+    const atPurchase = buyingAt(new Date("2026-10-15T06:00:00Z"));
+    expect(atPurchase).toEqual({ ok: true, discount: 200, amount: 5300 });
   });
 });
