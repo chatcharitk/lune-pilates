@@ -30,6 +30,7 @@ import type {
   CatalogTag,
 } from "@/lib/catalog/packages";
 import type { PackageCategory } from "@/lib/domain/types";
+import { formatStudioDate, studioDayFromYmd } from "@/lib/time";
 import { useRouter } from "next/navigation";
 import {
   createCheckout,
@@ -811,6 +812,15 @@ export function CheckoutPanel({ catalog, isMember, house, terms }: CheckoutPanel
 
 // ───────────────────────── package card ─────────────────────────
 
+/**
+ * A stored event day ("YYYY-MM-DD") as a short Bangkok date — "17 Sep" / "17 ก.ย.".
+ * Parsed through `studioDayFromYmd` so the label is the Bangkok day that was stored,
+ * never a day shifted by the reader's own timezone.
+ */
+function dayLabel(ymd: string, lang: Lang): string {
+  return formatStudioDate(studioDayFromYmd(ymd), lang, { day: "numeric", month: "short" });
+}
+
 function PackageCard({
   item,
   lang,
@@ -876,6 +886,14 @@ function PackageCard({
             {t("per_hour")}
           </span>
         </div>
+        {/* EVENT PACKAGE: credits that only open particular days' classes. Said on
+            the card itself, beside the price, because it is the whole reason the
+            price is what it is — finding out after paying would be a refund. */}
+        {item.classDays && item.classDays.length > 0 && (
+          <p className="mt-1.5 font-body text-[12px] leading-snug text-taupe-deep">
+            {t("buy_class_days")} {item.classDays.map((d) => dayLabel(d, lang)).join(" · ")}
+          </p>
+        )}
       </div>
 
       <div className="shrink-0 text-right">

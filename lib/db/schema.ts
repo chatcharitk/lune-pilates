@@ -83,6 +83,12 @@ export const packages = pgTable(
     // when a dormant component activates: the sibling's class start time. Gates
     // the window's near edge the way expires_at gates the far edge.
     activatesAt: timestamp("activates_at", { withTimezone: true }),
+    // EVENT DAYS (2026-09-12) — snapshot of the catalog item's `class_days` at
+    // purchase. The Bangkok days ("YYYY-MM-DD") whose classes these credits may be
+    // booked into; NULL = any day, which is every ordinary package. Copied rather
+    // than joined so a later edit to the item cannot change what somebody already
+    // paid for, exactly like the hours/validity snapshot beside it.
+    classDays: text("class_days").array(),
     // ── bundle wiring (see catalog_item_components) ──
     // Which component of the catalog item this row was created from. 'main' for an
     // ordinary single-balance package, so the composite UNIQUE below still dedupes
@@ -158,6 +164,14 @@ export const catalogItems = pgTable(
     labelEn: text("label_en").notNull(),
     labelTh: text("label_th").notNull(),
     active: boolean("active").notNull().default(true),
+    // EVENT DAYS (2026-09-12): the Bangkok days ("YYYY-MM-DD") whose classes this
+    // package's credits may be booked into. NULL = any day, which is every ordinary
+    // package. A special-priced opening class is sold as its own item with the event
+    // days listed here, so the price belongs to those classes rather than to whoever
+    // happens to be buying that week. Checked against the CLASS's start day at
+    // booking time, not the purchase date — the whole point is that it can be bought
+    // in advance.
+    classDays: text("class_days").array(),
     // TRIAL OFFERS (2026-09-08): only purchasable by a customer with no prior paid
     // purchase. Enforced server-side in createCheckout, and such items are hidden
     // from the buy screen for anyone who no longer qualifies.
@@ -370,6 +384,11 @@ export const charges = pgTable("charges", {
   validityAmount: integer("validity_amount"),
   validityUnit: text("validity_unit"), // 'day' | 'month'
   category: packageCategory("category"),
+  // EVENT DAYS snapshot (2026-09-12): the days whose classes the credits this charge
+  // grants may be booked into, frozen the same way and for the same reason as the
+  // hours/validity above — an owner editing the item while a slip sits in review
+  // must not change what the customer bought. Null = any day (every ordinary item).
+  classDays: text("class_days").array(),
   // ── T&C CONSENT (2026-09-07) ──
   // The exact Terms & Conditions version the customer ticked to accept before this
   // charge was opened, and when. Written server-side at createCheckout time from the

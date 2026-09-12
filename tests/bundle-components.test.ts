@@ -323,3 +323,48 @@ describe("packageDebitBlock with dormant / not-yet-active balances", () => {
     expect(packageDebitBlock({ hoursLeft: 0, expiresAt: null }, 2, now)).toBe("NOT_YET_ACTIVE");
   });
 });
+
+describe("event packages — credits sold for particular days' classes", () => {
+  const now = new Date("2026-09-12T05:00:00Z");
+  const live = { hoursLeft: 1, expiresAt: new Date("2026-10-01T00:00:00Z") };
+
+  it("spends on a class whose Bangkok day is one it was sold for", () => {
+    expect(
+      packageDebitBlock({ ...live, classDays: ["2026-09-17", "2026-09-21"] }, 1, now, "2026-09-17"),
+    ).toBeNull();
+  });
+
+  it("refuses a class on any other day, even while the credit is live", () => {
+    expect(
+      packageDebitBlock({ ...live, classDays: ["2026-09-17", "2026-09-21"] }, 1, now, "2026-09-18"),
+    ).toBe("WRONG_CLASS_DAY");
+  });
+
+  it("leaves an ordinary package (no days) usable on every day", () => {
+    expect(packageDebitBlock({ ...live, classDays: null }, 1, now, "2026-09-18")).toBeNull();
+    expect(packageDebitBlock(live, 1, now, "2026-09-18")).toBeNull();
+  });
+
+  it("refuses an empty day list rather than reading it as 'any day'", () => {
+    // A mis-saved [] must fail CLOSED: "sold for no days" is not "sold for all".
+    expect(packageDebitBlock({ ...live, classDays: [] }, 1, now, "2026-09-17")).toBe(
+      "WRONG_CLASS_DAY",
+    );
+  });
+
+  it("reports expiry and balance before the day — the reasons a customer can act on", () => {
+    const expired = { hoursLeft: 1, expiresAt: new Date("2026-09-01T00:00:00Z") };
+    expect(packageDebitBlock({ ...expired, classDays: ["2026-09-17"] }, 1, now, "2026-09-18")).toBe(
+      "EXPIRED",
+    );
+    expect(
+      packageDebitBlock({ ...live, hoursLeft: 0, classDays: ["2026-09-17"] }, 1, now, "2026-09-18"),
+    ).toBe("NO_CREDITS");
+  });
+
+  it("ignores the restriction when no class is in hand (a balance read)", () => {
+    // The balance still counts event credits — they ARE money the customer holds —
+    // so only the booking path, which always passes a day, can refuse them.
+    expect(packageDebitBlock({ ...live, classDays: ["2026-09-17"] }, 1, now)).toBeNull();
+  });
+});

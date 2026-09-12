@@ -525,6 +525,10 @@ function ItemFormDrawer({
   const [validityUnit, setValidityUnit] = useState<ValidityUnit>("month");
   const [tag, setTag] = useState<CatalogTag | "none">("none");
   const [firstPurchaseOnly, setFirstPurchaseOnly] = useState(false);
+  // EVENT DAYS: Bangkok days ("YYYY-MM-DD") whose classes these credits may be
+  // booked into. Empty = any day, which is every ordinary package.
+  const [classDays, setClassDays] = useState<string[]>([]);
+  const [dayDraft, setDayDraft] = useState("");
   const [labelEn, setLabelEn] = useState("");
   const [labelTh, setLabelTh] = useState("");
   const [errorKey, setErrorKey] = useState<StrKey | null>(null);
@@ -542,6 +546,8 @@ function ItemFormDrawer({
     setValidityUnit(item?.validity.unit ?? "month");
     setTag(item?.tag ?? "none");
     setFirstPurchaseOnly(item?.firstPurchaseOnly ?? false);
+    setClassDays(item?.classDays ?? []);
+    setDayDraft("");
     setLabelEn(item?.label.en ?? "");
     setLabelTh(item?.label.th ?? "");
     setErrorKey(null);
@@ -598,6 +604,7 @@ function ItemFormDrawer({
       labelEn: labelEn.trim(),
       labelTh: labelTh.trim(),
       firstPurchaseOnly,
+      classDays,
     };
 
     startTransition(async () => {
@@ -871,6 +878,69 @@ function ItemFormDrawer({
           </span>
         </span>
       </label>
+
+      {/* EVENT DAYS (2026-09-12). A special-priced class is sold as its own package
+          whose credits only open THOSE days' classes, so the price belongs to the
+          classes rather than to whoever happens to be buying that week. Left empty —
+          every ordinary package — the credits work on any day. */}
+      <div className="mt-1 rounded-xl border border-line-strong bg-surface px-3.5 py-3">
+        <p className="font-body text-sm font-semibold text-ink">{t("cat_class_days")}</p>
+        <p className="mt-0.5 font-body text-[12px] leading-snug text-muted">
+          {t("cat_class_days_hint")}
+        </p>
+
+        {classDays.length > 0 && (
+          <ul className="mt-2.5 flex flex-wrap gap-1.5">
+            {classDays.map((d) => (
+              <li key={d}>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-cream-2 py-1 pl-3 pr-1.5 font-body text-[12.5px] font-semibold text-taupe-deep">
+                  {d}
+                  <button
+                    type="button"
+                    onClick={() => setClassDays((prev) => prev.filter((x) => x !== d))}
+                    aria-label={`${t("promo_remove")} ${d}`}
+                    className="grid h-5 w-5 place-items-center rounded-full text-taupe-deep hover:bg-cream"
+                  >
+                    <svg
+                      width={12}
+                      height={12}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2.4}
+                      strokeLinecap="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M6 6l12 12M18 6L6 18" />
+                    </svg>
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="mt-2.5 flex items-center gap-2">
+          <input
+            type="date"
+            value={dayDraft}
+            onChange={(e) => setDayDraft(e.target.value)}
+            aria-label={t("cat_class_days_add")}
+            className="h-10 min-w-0 flex-1 rounded-lg border border-line-strong bg-surface px-3 font-body text-[13px] text-ink"
+          />
+          <button
+            type="button"
+            disabled={dayDraft === "" || classDays.includes(dayDraft)}
+            onClick={() => {
+              setClassDays((prev) => [...prev, dayDraft].sort());
+              setDayDraft("");
+            }}
+            className="inline-flex h-10 shrink-0 items-center rounded-lg border border-line-strong px-3 font-body text-[13px] font-semibold text-ink disabled:opacity-40"
+          >
+            {t("cat_class_days_add")}
+          </button>
+        </div>
+      </div>
 
       {/* Bundle parts — edit mode only: components hang off an existing item id.
           Saved by their own action (setItemComponents) because the set is validated

@@ -31,7 +31,7 @@ import {
   TYPE_DOT,
 } from "./schedule-helpers";
 import { Bell, Clock, Sparkle } from "./icons";
-import { formatStudioDate } from "@/lib/time";
+import { formatStudioDate, studioDayFromYmd } from "@/lib/time";
 import { studioImage } from "@/lib/studio-images";
 
 export interface HomeViewProps {
@@ -42,7 +42,13 @@ export interface HomeViewProps {
    * Only formats they actually hold appear — a balance can only book its own format
    * (they are not interchangeable), so there is deliberately no combined total.
    */
-  balances: { category: PackageCategory; classes: number; nearestExpiryIso: string | null }[];
+  balances: {
+    category: PackageCategory;
+    classes: number;
+    nearestExpiryIso: string | null;
+    /** Credits within this pool that only open particular days' classes. */
+    eventCredits: { days: string[]; classes: number }[];
+  }[];
   /** true when these balances are the shared household pool rather than personal. */
   isHouseholdPool: boolean;
   /** The viewer's soonest upcoming booking, or null to hide the card. */
@@ -178,6 +184,29 @@ export function HomeView({
                         {t("balance_expires").replace("{date}", expiry)}
                       </span>
                     )}
+                    {/* Part of this number may be EVENT credits, good only for the
+                        classes of certain days. Saying so here is the difference
+                        between a balance and a promise the booking screen breaks. */}
+                    {b.eventCredits.map((e) => (
+                      <span
+                        key={e.days.join(",")}
+                        className="mt-1 block font-body text-[11.5px] leading-tight text-taupe-deep"
+                      >
+                        {t("balance_event_days")
+                          .replace("{n}", String(e.classes))
+                          .replace(
+                            "{days}",
+                            e.days
+                              .map((d) =>
+                                formatStudioDate(studioDayFromYmd(d), lang, {
+                                  day: "numeric",
+                                  month: "short",
+                                }),
+                              )
+                              .join(" · "),
+                          )}
+                      </span>
+                    ))}
                   </span>
                   <span className="flex shrink-0 items-baseline gap-1.5">
                     <span className="font-head text-[30px] font-semibold leading-none text-ink tabular-nums">

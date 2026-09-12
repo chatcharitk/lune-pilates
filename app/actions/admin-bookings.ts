@@ -490,6 +490,7 @@ export async function adminReschedule(raw: AdminRescheduleInput): Promise<AdminR
     old.creditCost,
     newCost,
     now,
+    newCls.startsAt,
   );
   if (!packageId) {
     return { ok: false, code: "NO_USABLE_PACKAGE" };
@@ -557,12 +558,18 @@ export async function adminReschedule(raw: AdminRescheduleInput): Promise<AdminR
 interface ClassMeta {
   type: ClassType;
   capacity: number;
+  /** The class's own start — an event package is gated on its DAY, not on today. */
+  startsAt: Date;
 }
 
 async function loadClassMeta(classInstanceId: string): Promise<ClassMeta | null> {
   const db = getDb();
   const [row] = await db
-    .select({ type: classInstances.type, capacity: classInstances.capacity })
+    .select({
+      type: classInstances.type,
+      capacity: classInstances.capacity,
+      startsAt: classInstances.startsAt,
+    })
     .from(classInstances)
     .where(eq(classInstances.id, classInstanceId))
     .limit(1);

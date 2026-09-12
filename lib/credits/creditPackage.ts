@@ -329,6 +329,10 @@ export async function creditPackage(params: {
             ownerHouseholdId: owner.ownerHouseholdId,
             ownerUserId: owner.ownerUserId,
             purchaseChargeId: chargeId,
+            // Event days ride on every component of the purchase: a bundle sold for
+            // an event is an event bundle throughout, and `item` here is already the
+            // charge's frozen snapshot (itemForCredit), not today's catalog.
+            classDays: item.classDays ?? null,
           })
           .returning({ id: packages.id, hoursLeft: packages.hoursLeft });
 

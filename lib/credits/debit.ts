@@ -16,6 +16,7 @@ import { positionsForCapacity } from "@/lib/schedule/queries";
 import { isBookableForViewer } from "@/lib/schedule/visibility";
 import { hasRoomConflict, isRentalBookingOpen } from "@/lib/schedule/rental";
 import { creditCostForClassType } from "./cost";
+import { studioYmd } from "@/lib/time";
 import { packageDebitBlock } from "./guards";
 import { activateAnchoredPackages, deactivateAnchoredPackages } from "./activation";
 
@@ -58,7 +59,9 @@ export type BookFailureCode =
   | "NO_CREDITS"
   // A bundle component whose clock has not started yet — e.g. the trial's free
   // group class before the paid private class has been taken (2026-09-08).
-  | "NOT_YET_ACTIVE";
+  | "NOT_YET_ACTIVE"
+  // An event package used on a class outside the days it was sold for (2026-09-12).
+  | "WRONG_CLASS_DAY";
 
 export type BookResult =
   | { ok: true; bookingId: string; hoursLeft: number; freeCancelHours: number }
@@ -236,7 +239,9 @@ export async function bookClassWithDebit(
     // Cost for this class type (1 group / 2 private·duo·trio). The guard
     // re-checks the package holds at least `cost` credits and is not expired.
     const cost = creditCostForClassType(cls.type);
-    const block = packageDebitBlock(pkg, cost, now);
+    // The class's Bangkok day gates an event package (one sold for particular days'
+    // classes); an ordinary package has no days and ignores it.
+    const block = packageDebitBlock(pkg, cost, now, studioYmd(cls.startsAt));
     if (block) return { ok: false, code: block } as const;
 
     // The cancellation window is a single FIXED 5h window for every booking
@@ -478,9 +483,16 @@ export async function rescheduleWithinTransaction(
     const newPkgBalanceForGuard =
       samePackage && oldPkg ? newPkg.hoursLeft + refundCost : newPkg.hoursLeft;
     const block = packageDebitBlock(
-      { hoursLeft: newPkgBalanceForGuard, expiresAt: newPkg.expiresAt },
+      {
+        hoursLeft: newPkgBalanceForGuard,
+        expiresAt: newPkg.expiresAt,
+        // An event package must not be walked off its days by a reschedule: the
+        // destination class's day has to be one it was sold for.
+        classDays: newPkg.classDays,
+      },
       newCost,
       now,
+      studioYmd(newCls.startsAt),
     );
     if (block) return { ok: false, code: block } as const;
 

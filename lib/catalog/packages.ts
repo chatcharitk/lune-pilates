@@ -127,6 +127,17 @@ export interface CatalogItem {
    * it from anyone who no longer qualifies, so nobody is shown a dead option.
    */
   firstPurchaseOnly?: boolean;
+  /**
+   * EVENT DAYS (2026-09-12): the Bangkok days ("YYYY-MM-DD") whose classes this
+   * package's credits may be booked into. Absent/null = any day, which is every
+   * ordinary package.
+   *
+   * This is how a special price attaches to particular CLASSES rather than to
+   * whoever happens to be buying that week: the item is sold at its own price and
+   * its credits only open the doors of those days' classes. Checked against the
+   * class's start day at booking time, so it can be sold well in advance.
+   */
+  classDays?: string[];
 }
 
 /** A display group of items (the prototype's PACKAGE_CATS tabs). */
@@ -332,6 +343,7 @@ interface CatalogRow {
   tag: string | null;
   labelEn: string;
   labelTh: string;
+  classDays: string[] | null;
   active: boolean;
   firstPurchaseOnly: boolean;
   sortOrder: number;
@@ -350,6 +362,7 @@ function rowToAdminItem(r: CatalogRow): AdminCatalogItem {
   };
   return {
     ...toCatalogItem(seed),
+    ...(r.classDays && r.classDays.length > 0 ? { classDays: r.classDays } : {}),
     active: r.active,
     firstPurchaseOnly: r.firstPurchaseOnly,
     sortOrder: r.sortOrder,
@@ -374,6 +387,7 @@ const SELECT_COLUMNS = {
   tag: catalogItems.tag,
   labelEn: catalogItems.labelEn,
   labelTh: catalogItems.labelTh,
+  classDays: catalogItems.classDays,
   active: catalogItems.active,
   firstPurchaseOnly: catalogItems.firstPurchaseOnly,
   sortOrder: catalogItems.sortOrder,
@@ -481,6 +495,10 @@ export async function listPackageCatalog(
           label: i.label,
           sublabel: i.sublabel,
           ...(i.firstPurchaseOnly ? { firstPurchaseOnly: true } : {}),
+          // The buy screen says which days an event package is good for, so this
+          // must survive the projection — without it the card would price a class
+          // without naming the only classes it opens.
+          ...(i.classDays && i.classDays.length > 0 ? { classDays: i.classDays } : {}),
         }),
       );
     if (items.length === 0) continue;

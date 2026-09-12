@@ -104,6 +104,20 @@ const priceField = z.number().int().min(0).max(10_000_000);
 /** Required, non-empty bilingual copy: BOTH languages, always. */
 const labelField = z.string().trim().min(1).max(60);
 
+/**
+ * EVENT DAYS (2026-09-12): the Bangkok days whose classes this item's credits may be
+ * booked into. Empty = no restriction, which is every ordinary package.
+ *
+ * Capped at 31 because this is for an event ("the opening weekend"), not a way to
+ * hand-write a calendar; a longer list is a sign the item wants a validity window
+ * instead. Days are normalised (sorted, de-duplicated) so the stored list has one
+ * shape and the UI never shows the same day twice.
+ */
+const CLASS_DAYS = z
+  .array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/))
+  .max(31)
+  .optional();
+
 const createInput = z.object({
   id: z.string().trim().toLowerCase().min(2).max(40).regex(SLUG_RE),
   category: CATEGORY,
@@ -116,6 +130,7 @@ const createInput = z.object({
   labelTh: labelField,
   // Trial offer: only buyable by a customer with no prior paid purchase.
   firstPurchaseOnly: z.boolean().optional(),
+  classDays: CLASS_DAYS,
   sortOrder: z.number().int().min(0).max(10_000).optional(),
 });
 const createInputChecked = withValidityInRange(createInput);
@@ -135,10 +150,17 @@ const updateInput = z.object({
   labelEn: labelField,
   labelTh: labelField,
   firstPurchaseOnly: z.boolean().optional(),
+  classDays: CLASS_DAYS,
   sortOrder: z.number().int().min(0).max(10_000).optional(),
 });
 const updateInputChecked = withValidityInRange(updateInput);
 export type UpdateCatalogItemInput = z.infer<typeof updateInput>;
+
+/** Sorted, de-duplicated days — or null for "any day", the ordinary package. */
+function normalizeClassDays(days: string[] | undefined): string[] | null {
+  if (!days || days.length === 0) return null;
+  return [...new Set(days)].sort();
+}
 
 const idInput = z.object({ id: z.string().trim().min(1).max(40) });
 
@@ -265,6 +287,7 @@ export async function createCatalogItem(
         labelEn: input.labelEn,
         labelTh: input.labelTh,
         firstPurchaseOnly: input.firstPurchaseOnly ?? false,
+        classDays: normalizeClassDays(input.classDays),
         active: true,
         sortOrder,
       })
@@ -346,6 +369,7 @@ export async function updateCatalogItem(
       labelEn: input.labelEn,
       labelTh: input.labelTh,
       firstPurchaseOnly: input.firstPurchaseOnly ?? false,
+      classDays: normalizeClassDays(input.classDays),
       sortOrder,
     })
     .where(eq(catalogItems.id, input.id));

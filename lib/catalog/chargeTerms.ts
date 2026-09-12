@@ -44,6 +44,8 @@ export interface ChargeTermsSnapshot {
   validityAmount: number | null;
   validityUnit: string | null;
   category: PackageCategory | null;
+  /** Event days the charge was sold under; null = any day (2026-09-12). */
+  classDays: string[] | null;
 }
 
 /**
@@ -71,6 +73,11 @@ export function itemForCredit(live: CatalogItem, snapshot: ChargeTermsSnapshot):
     hours: snapshot.hours!,
     validity: validityFromRow(snapshot.validityAmount, snapshot.validityUnit, snapshot.validity),
     category: snapshot.category!,
+    // An empty list is stored as null, so "no days" and "any day" are the same
+    // thing here — and a legacy row (no snapshot at all) keeps the live item's days.
+    ...(snapshot.classDays && snapshot.classDays.length > 0
+      ? { classDays: snapshot.classDays }
+      : {}),
   };
 }
 
@@ -85,6 +92,7 @@ export function termsSnapshotFor(item: CatalogItem): {
   validityAmount: number;
   validityUnit: ValidityUnit;
   category: PackageCategory;
+  classDays: string[] | null;
 } {
   return {
     hours: item.hours,
@@ -92,6 +100,7 @@ export function termsSnapshotFor(item: CatalogItem): {
     validityAmount: item.validity.amount,
     validityUnit: item.validity.unit,
     category: item.category,
+    classDays: item.classDays && item.classDays.length > 0 ? item.classDays : null,
   };
 }
 

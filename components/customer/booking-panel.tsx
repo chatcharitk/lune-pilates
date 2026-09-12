@@ -59,6 +59,8 @@ function errorKey(code: BookActionFailureCode): StrKey {
     case "NO_CREDITS":
     case "EXPIRED":
       return "err_no_package";
+    case "WRONG_CLASS_DAY":
+      return "err_wrong_class_day";
     case "CLASS_FULL":
     case "POSITION_TAKEN":
       return "err_full";

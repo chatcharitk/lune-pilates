@@ -1242,6 +1242,22 @@ export const STR = {
     th: "โค้ดนี้ถูกใช้ไปแล้ว จึงลบไม่ได้ กรุณาปิดการใช้งานแทน เพื่อเก็บประวัติว่าใครได้รับส่วนลดไว้",
   },
   err_promo_gone: { en: "That code no longer exists.", th: "ไม่พบโค้ดนี้แล้ว" },
+  err_wrong_class_day: {
+    en: "Those credits are only good for the special classes they were bought for. Buy a class to book this one.",
+    th: "เครดิตที่มีใช้ได้เฉพาะคลาสพิเศษที่ซื้อไว้ กรุณาซื้อคลาสเพิ่มเพื่อจองคลาสนี้",
+  },
+  balance_event_days: {
+    en: "{n} only for classes on {days}",
+    th: "{n} คลาส ใช้ได้เฉพาะคลาสวันที่ {days}",
+  },
+  buy_class_days: { en: "Only for classes on", th: "ใช้ได้เฉพาะคลาสวันที่" },
+  // Event days on a package (2026-09-12).
+  cat_class_days: { en: "Only for classes on", th: "ใช้ได้เฉพาะคลาสวันที่" },
+  cat_class_days_hint: {
+    en: "Leave empty and the credits work on any day. Add days to sell a special-priced class: the credits then only open those days’ classes, whenever they are bought.",
+    th: "เว้นว่างไว้ เครดิตจะใช้ได้ทุกวัน ใส่วันที่เมื่อต้องการขายคลาสราคาพิเศษ เครดิตจะใช้จองได้เฉพาะคลาสของวันนั้น ไม่ว่าจะซื้อเมื่อไหร่",
+  },
+  cat_class_days_add: { en: "Add day", th: "เพิ่มวัน" },
   promo_applies_none: {
     en: "Set a discount above first, then you can pin the code to one package.",
     th: "ตั้งส่วนลดด้านบนก่อน จึงจะจำกัดโค้ดให้ใช้ได้กับแพ็กเกจเดียว",

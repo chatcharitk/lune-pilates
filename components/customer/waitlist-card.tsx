@@ -44,6 +44,8 @@ function confirmErrorKey(code: ConfirmWaitlistFailureCode): StrKey {
     case "PACKAGE_NOT_FOUND":
     case "EXPIRED":
       return "err_offer_no_credits";
+    case "WRONG_CLASS_DAY":
+      return "err_wrong_class_day";
     case "NOT_FOUND":
       return "err_cancel_not_found";
     case "NOT_VISIBLE":

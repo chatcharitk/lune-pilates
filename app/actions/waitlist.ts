@@ -274,13 +274,18 @@ export async function confirmWaitlistOffer(
     }
 
     const [cls] = await tx
-      .select({ type: classInstances.type })
+      .select({ type: classInstances.type, startsAt: classInstances.startsAt })
       .from(classInstances)
       .where(eq(classInstances.id, row.classInstanceId))
       .limit(1);
     if (!cls) return { ok: false, code: "CLASS_NOT_FOUND" } as const;
 
-    return { ok: true, classInstanceId: row.classInstanceId, type: cls.type } as const;
+    return {
+      ok: true,
+      classInstanceId: row.classInstanceId,
+      type: cls.type,
+      startsAt: cls.startsAt,
+    } as const;
   });
 
   if (!gate.ok) return { ok: false, code: gate.code };
@@ -291,6 +296,7 @@ export async function confirmWaitlistOffer(
     gate.type as ClassType,
     now,
     creditCostForClassType(gate.type as ClassType),
+    gate.startsAt,
   );
   if (!packageId) {
     return { ok: false, code: "NO_USABLE_PACKAGE" };

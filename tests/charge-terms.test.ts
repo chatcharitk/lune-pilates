@@ -35,7 +35,7 @@ const PAID = {
   validity: "two_months",
   validityAmount: 2,
   validityUnit: "month",
-  category: "group" as const,
+  category: "group" as const, classDays: null,
 };
 
 describe("itemForCredit — a complete snapshot wins over the live item", () => {
@@ -65,7 +65,7 @@ describe("itemForCredit — a complete snapshot wins over the live item", () => 
       validity: "45_day",
       validityAmount: 45,
       validityUnit: "day",
-      category: "group",
+      category: "group", classDays: null,
     });
     expect(out.validity).toEqual({ amount: 45, unit: "day" });
   });
@@ -78,7 +78,7 @@ describe("itemForCredit — a complete snapshot wins over the live item", () => 
       validity: "one_month",
       validityAmount: 1,
       validityUnit: "month",
-      category: "group",
+      category: "group", classDays: null,
     });
     expect(out.hours).toBe(1);
     expect(out.validity).toEqual({ amount: 1, unit: "month" });
@@ -90,7 +90,7 @@ describe("itemForCredit — a complete snapshot wins over the live item", () => 
       validity: "two_months",
       validityAmount: null,
       validityUnit: null,
-      category: "group",
+      category: "group", classDays: null,
     });
     expect(out.validity).toEqual({ amount: 2, unit: "month" });
   });
@@ -100,6 +100,7 @@ describe("itemForCredit — legacy and partial snapshots fall back", () => {
   it("all-null (a pre-migration charge) credits from the live item, exactly as before", () => {
     const out = itemForCredit(LIVE_EDITED, {
       hours: null,
+      classDays: null,
       validity: null,
       validityAmount: null,
       validityUnit: null,
@@ -110,9 +111,9 @@ describe("itemForCredit — legacy and partial snapshots fall back", () => {
 
   it("a half-written snapshot is legacy, NOT a mix of paid and live terms", () => {
     for (const partial of [
-      { hours: 10, validity: null, validityAmount: null, validityUnit: null, category: null },
-      { hours: null, validity: "two_months", validityAmount: 2, validityUnit: "month", category: null },
-      { hours: 10, validity: null, validityAmount: null, validityUnit: null, category: "group" as const },
+      { hours: 10, validity: null, validityAmount: null, validityUnit: null, category: null, classDays: null },
+      { hours: null, validity: "two_months", validityAmount: 2, validityUnit: "month", category: null, classDays: null },
+      { hours: 10, validity: null, validityAmount: null, validityUnit: null, category: "group" as const, classDays: null },
     ]) {
       const out = itemForCredit(LIVE_EDITED, partial);
       expect(out).toEqual(LIVE_EDITED); // whole live item, never a stitched hybrid
@@ -127,7 +128,7 @@ describe("termsSnapshotFor — what every charge-creation site writes", () => {
       validity: "three_months",
       validityAmount: 3,
       validityUnit: "month",
-      category: "group",
+      category: "group", classDays: null,
     });
   });
 
@@ -142,7 +143,7 @@ describe("termsSnapshotFor — what every charge-creation site writes", () => {
       validity: "10_day",
       validityAmount: 10,
       validityUnit: "day",
-      category: "group",
+      category: "group", classDays: null,
     });
     expect(itemForCredit(dayItem, termsSnapshotFor(dayItem)).validity).toEqual({
       amount: 10,

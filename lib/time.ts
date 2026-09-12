@@ -102,6 +102,18 @@ export function addDays(d: Date, n: number): Date {
 }
 
 /**
+ * The Bangkok calendar day of an instant as "YYYY-MM-DD".
+ *
+ * The inverse of `studioDayFromYmd`, and the form a day takes whenever it is
+ * stored or compared as a day rather than an instant — a class's date, a promo
+ * window bound, the days a package may be spent on.
+ */
+export function studioYmd(d: Date): string {
+  const { year, month0, day } = studioParts(d);
+  return `${year}-${String(month0 + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/**
  * The UTC instant of Bangkok 00:00 on a "yyyy-mm-dd" calendar day (so a week/day
  * URL param is anchored to the Bangkok day boundary, never the runtime TZ's).
  * Falls back to the Bangkok start-of-today for an absent/malformed string so the

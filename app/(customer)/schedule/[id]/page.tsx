@@ -38,7 +38,16 @@ export default async function ClassDetailPage({
   // panel hides the estimate and surfaces the no-credits state instead of promising
   // a booking the debit would then reject.
   const cost = creditCostForClassType(detail.type);
-  const balanceBefore = await getUsableBalance(viewer, detail.type, new Date(), cost);
+  // The class's own start is passed so an EVENT package — credits sold for
+  // particular days' classes — counts here only for the classes it can actually
+  // settle, and the CTA keeps agreeing with the debit.
+  const balanceBefore = await getUsableBalance(
+    viewer,
+    detail.type,
+    new Date(),
+    cost,
+    new Date(detail.startsAt),
+  );
 
   return (
     <ClassDetailView

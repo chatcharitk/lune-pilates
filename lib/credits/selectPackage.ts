@@ -14,11 +14,12 @@
 //   - When several qualify, debit the one expiring soonest first (use-it-or-lose-it),
 //     so credits are never silently wasted.
 
-import { and, asc, eq, gt, gte, isNull, lte, or, type SQL } from "drizzle-orm";
+import { and, asc, eq, gt, gte, isNull, lte, or, sql, type SQL } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { packages, users } from "@/lib/db/schema";
 import type { ClassType, PackageCategory } from "@/lib/domain/types";
 import type { SessionUser } from "@/lib/auth/session";
+import { studioYmd } from "@/lib/time";
 import { getMockSession } from "@/lib/mock/session";
 import { mockDataMode } from "@/lib/mock-mode";
 
@@ -47,6 +48,22 @@ function ownerWhere(viewer: SessionUser): SQL {
  */
 function activeByNow(now: Date) {
   return or(isNull(packages.activatesAt), lte(packages.activatesAt, now));
+}
+
+/**
+ * The day filter for an EVENT package (2026-09-12): one sold for particular days'
+ * classes may only settle a class on one of those days. `class_days` null — every
+ * ordinary package — matches anything.
+ *
+ * `classStartsAt` is optional because the balance reads have no class in hand; there,
+ * an event package still counts towards the pool (it IS money the customer holds).
+ * The booking path always passes it, and `packageDebitBlock` re-checks under the
+ * lock, so selection being the looser of the two cannot let a debit through.
+ */
+function usableOnClassDay(classStartsAt: Date | undefined): SQL {
+  if (!classStartsAt) return sql`true`;
+  const day = studioYmd(classStartsAt);
+  return sql`(${packages.classDays} is null or ${day} = any(${packages.classDays}))`;
 }
 
 /**
@@ -94,6 +111,7 @@ export async function selectUsablePackageRow(
   classType: ClassType,
   now: Date = new Date(),
   minHours = 0,
+  classStartsAt?: Date,
 ): Promise<UsablePackage | null> {
   const category = packageCategoryForClassType(classType);
   const db = getDb();
@@ -111,9 +129,13 @@ export async function selectUsablePackageRow(
         minHours > 0 ? gte(packages.hoursLeft, minHours) : gt(packages.hoursLeft, 0),
         gt(packages.expiresAt, now),
         activeByNow(now),
+        usableOnClassDay(classStartsAt),
       ),
     )
-    .orderBy(asc(packages.expiresAt))
+    // An event package is spent FIRST when it is eligible: it is the narrowest
+    // credit the customer holds (good for these classes only), so leaving it behind
+    // in favour of a general one would strand it.
+    .orderBy(sql`${packages.classDays} is null`, asc(packages.expiresAt))
     .limit(1);
 
   return rows[0] ?? null;
@@ -129,8 +151,9 @@ export async function selectUsablePackage(
   classType: ClassType,
   now: Date = new Date(),
   minHours = 0,
+  classStartsAt?: Date,
 ): Promise<string | null> {
-  const row = await selectUsablePackageRow(viewer, classType, now, minHours);
+  const row = await selectUsablePackageRow(viewer, classType, now, minHours, classStartsAt);
   return row?.id ?? null;
 }
 
@@ -154,6 +177,7 @@ export async function selectPackageForReschedule(
   refundCost: number,
   newCost: number,
   now: Date = new Date(),
+  newClassStartsAt?: Date,
 ): Promise<string | null> {
   const db = getDb();
   const category = packageCategoryForClassType(newClassType);
@@ -171,6 +195,7 @@ export async function selectPackageForReschedule(
         eq(packages.category, category),
         gt(packages.expiresAt, now),
         activeByNow(now),
+        usableOnClassDay(newClassStartsAt),
       ),
     )
     .limit(1);
@@ -179,7 +204,7 @@ export async function selectPackageForReschedule(
   }
 
   // Otherwise a DIFFERENT package must cover the new cost entirely on its own.
-  return selectUsablePackage(viewer, newClassType, now, newCost);
+  return selectUsablePackage(viewer, newClassType, now, newCost, newClassStartsAt);
 }
 
 /** A target user's pool-ownership context — the only fields package selection needs. */
@@ -219,13 +244,14 @@ export async function selectUsablePackageForUser(
   classType: ClassType,
   now: Date = new Date(),
   minHours = 0,
+  classStartsAt?: Date,
 ): Promise<string | null> {
   const owner = await loadPoolOwner(userId);
   if (!owner) return null;
   // `selectUsablePackageRow` reads only id/tier/householdId via `ownerWhere`; the
   // remaining SessionUser fields are display-only and irrelevant to selection.
   const viewer: SessionUser = { ...owner, name: "", houseNumber: null };
-  const row = await selectUsablePackageRow(viewer, classType, now, minHours);
+  const row = await selectUsablePackageRow(viewer, classType, now, minHours, classStartsAt);
   return row?.id ?? null;
 }
 
@@ -250,13 +276,22 @@ export async function selectPackageForRescheduleForUser(
   refundCost: number,
   newCost: number,
   now: Date = new Date(),
+  newClassStartsAt?: Date,
 ): Promise<string | null> {
   const owner = await loadPoolOwner(userId);
   if (!owner) return null;
   // `selectPackageForReschedule` reads only id/tier/householdId via `ownerWhere`;
   // the remaining SessionUser fields are display-only and irrelevant to selection.
   const viewer: SessionUser = { ...owner, name: "", houseNumber: null };
-  return selectPackageForReschedule(viewer, newClassType, oldPackageId, refundCost, newCost, now);
+  return selectPackageForReschedule(
+    viewer,
+    newClassType,
+    oldPackageId,
+    refundCost,
+    newCost,
+    now,
+    newClassStartsAt,
+  );
 }
 
 /**
@@ -317,6 +352,16 @@ export interface CreditBalance {
   classes: number;
   /** Soonest expiry among this pool's packages, or null when it holds none. */
   nearestExpiry: Date | null;
+  /**
+   * EVENT CREDITS inside this pool (2026-09-12): credits that only open the classes
+   * of particular days, grouped by the days they are good for. Empty for an ordinary
+   * pool.
+   *
+   * They are counted in `classes` too — they ARE credits the customer holds — so
+   * this exists to say which part of the number is day-limited. Showing the total
+   * alone would promise a free choice of class that those credits do not buy.
+   */
+  eventCredits: { days: string[]; classes: number }[];
 }
 
 /**
@@ -376,9 +421,9 @@ export async function getCreditBalances(
     if (mock.credits <= 0) return [];
     const day = 24 * 3_600_000;
     return [
-      { category: "group", classes: mock.credits, nearestExpiry: new Date(now.getTime() + 40 * day) },
-      { category: "private", classes: 2, nearestExpiry: new Date(now.getTime() + 12 * day) },
-      { category: "duo", classes: 1, nearestExpiry: new Date(now.getTime() + 5 * day) },
+      { category: "group", classes: mock.credits, nearestExpiry: new Date(now.getTime() + 40 * day) , eventCredits: [] },
+      { category: "private", classes: 2, nearestExpiry: new Date(now.getTime() + 12 * day) , eventCredits: [] },
+      { category: "duo", classes: 1, nearestExpiry: new Date(now.getTime() + 5 * day) , eventCredits: [] },
     ];
   }
 
@@ -388,6 +433,7 @@ export async function getCreditBalances(
       category: packages.category,
       hoursLeft: packages.hoursLeft,
       expiresAt: packages.expiresAt,
+      classDays: packages.classDays,
     })
     .from(packages)
     .where(
@@ -403,16 +449,25 @@ export async function getCreditBalances(
   const byCategory = new Map<PackageCategory, CreditBalance>();
   for (const r of rows) {
     const current = byCategory.get(r.category);
-    if (current) {
-      current.classes += r.hoursLeft;
-      // Rows arrive expiry-ascending, so the first one seen is already the soonest.
-    } else {
-      byCategory.set(r.category, {
+    const row =
+      current ??
+      // Rows arrive expiry-ascending, so the first one seen carries the soonest.
+      ({
         category: r.category,
-        classes: r.hoursLeft,
+        classes: 0,
         nearestExpiry: r.expiresAt,
-      });
+        eventCredits: [],
+      } satisfies CreditBalance);
+    row.classes += r.hoursLeft;
+    if (r.classDays && r.classDays.length > 0) {
+      // Group by the day SET, so two packages sold for the same event read as one
+      // line rather than two identical ones.
+      const key = r.classDays.join(",");
+      const existing = row.eventCredits.find((e) => e.days.join(",") === key);
+      if (existing) existing.classes += r.hoursLeft;
+      else row.eventCredits.push({ days: r.classDays, classes: r.hoursLeft });
     }
+    byCategory.set(r.category, row);
   }
 
   // Largest balance first, then soonest expiry, then a stable category order — so

@@ -166,11 +166,12 @@ export async function getUsableBalance(
   classType: ClassType,
   now: Date = new Date(),
   minHours = 0,
+  classStartsAt?: Date,
 ): Promise<number | null> {
   if (mockDataMode()) {
     return getMockSession().credits;
   }
-  const pkg = await selectUsablePackageRow(viewer, classType, now, minHours);
+  const pkg = await selectUsablePackageRow(viewer, classType, now, minHours, classStartsAt);
   return pkg?.hoursLeft ?? null;
 }
 

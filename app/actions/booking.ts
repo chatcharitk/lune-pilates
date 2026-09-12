@@ -99,7 +99,13 @@ export async function bookClass(raw: BookClassInput): Promise<BookResult> {
   // Pick the package to debit — never trust a client-supplied package id. Pass the
   // booking's cost so we choose a package that can actually cover it (the pool may
   // hold credits in another package even if the soonest-expiring one is short).
-  const packageId = await selectUsablePackage(viewer, cls.type, now, creditCostForClassType(cls.type));
+  const packageId = await selectUsablePackage(
+    viewer,
+    cls.type,
+    now,
+    creditCostForClassType(cls.type),
+    cls.startsAt,
+  );
   if (!packageId) {
     return { ok: false, code: "NO_USABLE_PACKAGE" };
   }
