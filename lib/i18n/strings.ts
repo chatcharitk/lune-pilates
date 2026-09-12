@@ -1225,6 +1225,23 @@ export const STR = {
     en: "Optional. Narrows the code to a single package within the types above.",
     th: "ไม่บังคับ จำกัดโค้ดให้ใช้ได้กับแพ็กเกจเดียวภายในประเภทด้านบน",
   },
+  promo_item_rules_toggle: { en: "Set per package", th: "ตั้งแยกรายแพ็กเกจ" },
+  promo_item_rules_hint: {
+    en: "An amount here replaces the type’s amount for that package only.",
+    th: "จำนวนตรงนี้จะใช้แทนจำนวนของประเภท เฉพาะแพ็กเกจนั้น",
+  },
+  promo_item_uses_type: { en: "type’s amount", th: "ตามประเภท" },
+  promo_delete: { en: "Delete", th: "ลบ" },
+  promo_delete_confirm: {
+    en: "Delete this code for good? Customers who type it will be told it doesn’t exist.",
+    th: "ลบโค้ดนี้ถาวรหรือไม่? ลูกค้าที่พิมพ์โค้ดนี้จะได้รับแจ้งว่าไม่มีโค้ดนี้",
+  },
+  promo_deleted: { en: "Code deleted", th: "ลบโค้ดแล้ว" },
+  err_promo_has_redemptions: {
+    en: "This code has been used, so it can’t be deleted. Turn it off instead — the record of who received it stays.",
+    th: "โค้ดนี้ถูกใช้ไปแล้ว จึงลบไม่ได้ กรุณาปิดการใช้งานแทน เพื่อเก็บประวัติว่าใครได้รับส่วนลดไว้",
+  },
+  err_promo_gone: { en: "That code no longer exists.", th: "ไม่พบโค้ดนี้แล้ว" },
   promo_applies_none: {
     en: "Set a discount above first, then you can pin the code to one package.",
     th: "ตั้งส่วนลดด้านบนก่อน จึงจะจำกัดโค้ดให้ใช้ได้กับแพ็กเกจเดียว",

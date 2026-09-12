@@ -12,6 +12,7 @@ import {
   evaluatePromoCode,
   isValidPromoCodeShape,
   normalizePromoCode,
+  ruleForItem,
   type PromoCode,
 } from "@/lib/promos/codes";
 
@@ -29,6 +30,7 @@ function code(over: Partial<PromoCode> = {}): PromoCode {
       trio: { kind: "percent", value: 20 },
       rental: { kind: "percent", value: 20 },
     },
+    itemRules: {},
     startsAt: null,
     endsAt: null,
     maxRedemptions: null,
@@ -283,5 +285,53 @@ describe("the date window is measured at the moment of purchase", () => {
     // classes are later taken; the code is never consulted again after checkout.
     const atPurchase = buyingAt(new Date("2026-10-15T06:00:00Z"));
     expect(atPurchase).toEqual({ ok: true, discount: 200, amount: 5300 });
+  });
+});
+
+describe("per-package amounts override the format amount", () => {
+  // The owner's case: one code on the poster, ฿200 off a single class but ฿800 off
+  // the 10-class pack — a flat format amount cannot say both.
+  const PACK = { id: "p10", category: "group" as const, price: 5500 };
+  const DROP = { id: "drop", category: "group" as const, price: 700 };
+
+  const perPack = code({
+    rules: { group: { kind: "fixed", value: 200 } },
+    itemRules: { p10: { kind: "fixed", value: 800 } },
+  });
+
+  function evalWith(c: PromoCode, item: typeof PACK) {
+    return evaluatePromoCode({
+      code: c,
+      item,
+      redemptionsUsed: 0,
+      redemptionsByCustomer: 0,
+      hasPurchasedBefore: false,
+      now: NOW,
+    });
+  }
+
+  it("uses the package's own amount when it has one", () => {
+    expect(evalWith(perPack, PACK)).toEqual({ ok: true, discount: 800, amount: 4700 });
+  });
+
+  it("falls back to the format amount for every other package", () => {
+    expect(evalWith(perPack, DROP)).toEqual({ ok: true, discount: 200, amount: 500 });
+  });
+
+  it("covers a package whose format has no amount at all", () => {
+    const packOnly = code({ rules: {}, itemRules: { p10: { kind: "fixed", value: 800 } } });
+    expect(evalWith(packOnly, PACK)).toEqual({ ok: true, discount: 800, amount: 4700 });
+    expect(evalWith(packOnly, DROP)).toEqual({ ok: false, reason: "NOT_APPLICABLE" });
+  });
+
+  it("still clamps a package amount to the price floor", () => {
+    const greedy = code({ rules: {}, itemRules: { drop: { kind: "fixed", value: 9999 } } });
+    expect(evalWith(greedy, DROP)).toEqual({ ok: true, discount: 699, amount: 1 });
+  });
+
+  it("resolves the same rule outside the evaluator", () => {
+    expect(ruleForItem(perPack, PACK)).toEqual({ kind: "fixed", value: 800 });
+    expect(ruleForItem(perPack, DROP)).toEqual({ kind: "fixed", value: 200 });
+    expect(ruleForItem(perPack, { id: "duo-drop", category: "duo" })).toBeNull();
   });
 });

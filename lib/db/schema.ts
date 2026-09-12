@@ -498,6 +498,38 @@ export const promoCodeRules = pgTable(
   ],
 );
 
+// A per-PACKAGE override of the format amount (2026-09-12). A format's rule is the
+// default for every package of that format; a row here pins ONE package to its own
+// amount — "฿200 off a single class but ฿800 off the 10-class pack" inside one code,
+// which a format-level amount alone cannot express (a flat ฿200 is a quarter off a
+// drop-in and a rounding error on a pack).
+//
+// A package with a row here is covered even when its format has none, so a code can
+// also discount nothing BUT the 10-class pack.
+export const promoItemRules = pgTable(
+  "promo_item_rules",
+  {
+    code: text("code")
+      .notNull()
+      .references(() => promoCodes.code, { onDelete: "cascade" }),
+    itemId: text("item_id")
+      .notNull()
+      .references(() => catalogItems.id),
+    /** 'percent' → `value` is 1–100; 'fixed' → `value` is whole THB off. */
+    kind: text("kind").notNull(),
+    value: integer("value").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.code, t.itemId] }),
+    check("promo_item_rule_kind_valid", sql`${t.kind} in ('percent','fixed')`),
+    check("promo_item_rule_value_positive", sql`${t.value} > 0`),
+    check(
+      "promo_item_rule_percent_within_100",
+      sql`${t.kind} <> 'percent' or ${t.value} <= 100`,
+    ),
+  ],
+);
+
 // One row per charge that used a code. `chargeId` is the PRIMARY KEY, which is what
 // makes redemption counting idempotent: a retried or double-submitted checkout
 // cannot consume a second slot of a capped code.

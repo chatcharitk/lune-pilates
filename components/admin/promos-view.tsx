@@ -15,9 +15,11 @@ import { useRouter } from "next/navigation";
 import { useAdminLang } from "./admin-context";
 import { Badge, Drawer } from "./ui";
 import {
+  deletePromoCode,
   savePromoCode,
   setPromoActive,
   type AdminPromoCode,
+  type DeletePromoFailureCode,
   type SavePromoFailureCode,
 } from "@/app/actions/admin-promos";
 import type { PackageCategory } from "@/lib/domain/types";
@@ -74,6 +76,21 @@ function saveErrorKey(code: SavePromoFailureCode): StrKey {
   }
 }
 
+function deleteErrorKey(code: DeletePromoFailureCode): StrKey {
+  switch (code) {
+    case "UNAUTHORIZED":
+      return "err_cat_forbidden";
+    case "HAS_REDEMPTIONS":
+      return "err_promo_has_redemptions";
+    case "NOT_FOUND":
+      return "err_promo_gone";
+    case "MOCK_NO_DB":
+      return "err_cat_mock_no_db";
+    default:
+      return "err_promo_save";
+  }
+}
+
 export interface PromoItemOption {
   id: string;
   label: Bilingual;
@@ -95,6 +112,7 @@ export function PromosView({
   const { t, tt } = useAdminLang();
   const router = useRouter();
   const [form, setForm] = useState<FormState | null>(null);
+  const [deleting, setDeleting] = useState<AdminPromoCode | null>(null);
   const [toast, setToast] = useState<StrKey | null>(null);
   const [errorKey, setErrorKey] = useState<StrKey | null>(null);
   const [pending, startTransition] = useTransition();
@@ -216,12 +234,34 @@ export function PromosView({
                   >
                     {c.active ? t("promo_retire") : t("promo_restore")}
                   </button>
+                  {/* Delete is only offered for a code nobody has used — once it has
+                      been redeemed the server refuses, and retiring is the honest
+                      action anyway (the discount someone received stays on record). */}
+                  {c.used === 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setDeleting(c)}
+                      className="inline-flex h-9 items-center rounded-lg border border-line px-3 font-body text-[13px] font-semibold text-[#a56a52]"
+                    >
+                      {t("promo_delete")}
+                    </button>
+                  )}
                 </div>
               </div>
             </li>
           ))}
         </ul>
       )}
+
+      <DeletePromoDrawer
+        code={deleting}
+        onClose={() => setDeleting(null)}
+        onDeleted={() => {
+          setDeleting(null);
+          flash("promo_deleted");
+          router.refresh();
+        }}
+      />
 
       <PromoDrawer
         state={form}
@@ -234,6 +274,82 @@ export function PromosView({
         }}
       />
     </div>
+  );
+}
+
+// ───────────────────────── delete confirmation ─────────────────────────
+
+function DeletePromoDrawer({
+  code,
+  onClose,
+  onDeleted,
+}: {
+  code: AdminPromoCode | null;
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
+  const { t } = useAdminLang();
+  const [pending, startTransition] = useTransition();
+  const [errorKey, setErrorKey] = useState<StrKey | null>(null);
+
+  useEffect(() => {
+    if (code) setErrorKey(null);
+  }, [code]);
+
+  function confirm() {
+    if (!code) return;
+    setErrorKey(null);
+    startTransition(async () => {
+      try {
+        const res = await deletePromoCode(code.code);
+        if (res.ok) onDeleted();
+        else setErrorKey(deleteErrorKey(res.code));
+      } catch {
+        setErrorKey("err_promo_save");
+      }
+    });
+  }
+
+  const footer = (
+    <>
+      <button
+        type="button"
+        onClick={onClose}
+        className="inline-flex h-11 items-center rounded-xl border border-line-strong px-4 font-body text-sm font-semibold text-ink"
+      >
+        {t("cancel")}
+      </button>
+      <div className="flex-1" />
+      <button
+        type="button"
+        onClick={confirm}
+        disabled={pending}
+        className="inline-flex h-11 items-center rounded-xl bg-[#a56a52] px-5 font-body text-sm font-semibold text-cream disabled:opacity-50"
+      >
+        {t("promo_delete")}
+      </button>
+    </>
+  );
+
+  return (
+    <Drawer open={code !== null} onClose={onClose} title={t("promo_delete")} footer={footer}>
+      {code && (
+        <div className="flex flex-col gap-3.5">
+          <p className="font-head text-lg font-semibold text-ink">{code.code}</p>
+          <p className="font-body text-[14px] leading-relaxed text-ink">
+            {t("promo_delete_confirm")}
+          </p>
+          {errorKey && (
+            <p
+              role="alert"
+              className="rounded-xl bg-rose/15 px-3.5 py-2.5 font-body text-[13px] font-medium text-[#a56a52]"
+            >
+              {t(errorKey)}
+            </p>
+          )}
+        </div>
+      )}
+    </Drawer>
   );
 }
 
@@ -260,6 +376,12 @@ function PromoDrawer({
   const [labelTh, setLabelTh] = useState("");
   // One draft row per format; an empty amount means "this code doesn't cover it".
   const [rules, setRules] = useState<Record<PackageCategory, RuleDraft>>(emptyRules);
+  // Per-PACKAGE overrides, keyed by catalog item id. A blank amount means "this
+  // package just uses its class type's amount".
+  const [itemRules, setItemRules] = useState<Record<string, RuleDraft>>({});
+  // Which types have their package list open. Opened automatically for a code that
+  // already has overrides, so they are never hidden from whoever opens the code.
+  const [openCats, setOpenCats] = useState<PackageCategory[]>([]);
   const [startsOn, setStartsOn] = useState("");
   const [endsOn, setEndsOn] = useState("");
   const [maxTotal, setMaxTotal] = useState("0");
@@ -285,6 +407,17 @@ function PromoDrawer({
         return acc;
       }, {} as Record<PackageCategory, RuleDraft>),
     );
+    const seededItems: Record<string, RuleDraft> = {};
+    for (const item of items) {
+      const rule = existing?.itemRules[item.id];
+      seededItems[item.id] = { kind: rule?.kind ?? "fixed", value: rule ? String(rule.value) : "" };
+    }
+    setItemRules(seededItems);
+    setOpenCats(
+      CATEGORY_ORDER.filter((cat) =>
+        items.some((i) => i.category === cat && existing?.itemRules[i.id] !== undefined),
+      ),
+    );
     setStartsOn(existing?.startsOn ?? "");
     setEndsOn(existing?.endsOn ?? "");
     setMaxTotal(String(existing?.maxRedemptions ?? 0));
@@ -293,13 +426,18 @@ function PromoDrawer({
     setFirstOnly(existing?.firstPurchaseOnly ?? false);
     setActive(existing?.active ?? true);
     setErrorKey(null);
-  }, [state, existing]);
+  }, [state, existing, items]);
 
   // The formats this code currently covers — an amount typed in is what makes a
   // format covered, so this is derived from the rule rows rather than tracked
   // separately (one source of truth, nothing to keep in step).
   const coveredCategories = CATEGORY_ORDER.filter(
-    (cat) => rules[cat].value.trim() !== "" && items.some((i) => i.category === cat),
+    (cat) =>
+      items.some(
+        (i) =>
+          i.category === cat &&
+          (rules[cat].value.trim() !== "" || (itemRules[i.id]?.value.trim() ?? "") !== ""),
+      ),
   );
 
   // Drop a package pin that the rules no longer cover. Without this, clearing the
@@ -309,8 +447,12 @@ function PromoDrawer({
   useEffect(() => {
     if (appliesToItem === "") return;
     const item = items.find((i) => i.id === appliesToItem);
-    if (!item || !coveredCategories.includes(item.category)) setAppliesToItem("");
-  }, [appliesToItem, coveredCategories, items]);
+    const stillCovered =
+      item !== undefined &&
+      (rules[item.category].value.trim() !== "" ||
+        (itemRules[item.id]?.value.trim() ?? "") !== "");
+    if (!stillCovered) setAppliesToItem("");
+  }, [appliesToItem, items, rules, itemRules]);
 
   function save() {
     setErrorKey(null);
@@ -327,15 +469,23 @@ function PromoDrawer({
       return [{ category: cat, kind: draft.kind, value: parsedValue }];
     });
 
-    if (filled.length === 0) {
+    // Same for packages: an amount typed beside one overrides its type's.
+    const filledItems = items.flatMap((item) => {
+      const draft = itemRules[item.id];
+      if (!draft || draft.value.trim() === "") return [];
+      return [{ itemId: item.id, kind: draft.kind, value: Number.parseInt(draft.value, 10) }];
+    });
+
+    if (filled.length === 0 && filledItems.length === 0) {
       setErrorKey("err_promo_no_rules");
       return;
     }
-    if (filled.some((r) => !Number.isSafeInteger(r.value) || r.value <= 0)) {
+    const every = [...filled, ...filledItems];
+    if (every.some((r) => !Number.isSafeInteger(r.value) || r.value <= 0)) {
       setErrorKey("err_promo_save");
       return;
     }
-    if (filled.some((r) => r.kind === "percent" && r.value > 100)) {
+    if (every.some((r) => r.kind === "percent" && r.value > 100)) {
       setErrorKey("err_promo_percent");
       return;
     }
@@ -347,6 +497,7 @@ function PromoDrawer({
           labelEn: labelEn.trim(),
           labelTh: labelTh.trim(),
           rules: filled,
+          itemRules: filledItems,
           startsOn,
           endsOn,
           maxRedemptions: Math.max(0, Number.parseInt(maxTotal, 10) || 0),
@@ -460,46 +611,146 @@ function PromoDrawer({
             {CATEGORY_ORDER.map((cat) => {
               const rule = rules[cat];
               const on = rule.value.trim() !== "";
+              const catItems = items.filter((i) => i.category === cat);
+              const overrides = catItems.filter(
+                (i) => (itemRules[i.id]?.value.trim() ?? "") !== "",
+              ).length;
+              const open = openCats.includes(cat);
               return (
                 <div
                   key={cat}
-                  className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${
-                    on ? "border-taupe bg-surface" : "border-line bg-cream-2/40"
+                  className={`rounded-xl border ${
+                    on || overrides > 0 ? "border-taupe bg-surface" : "border-line bg-cream-2/40"
                   }`}
                 >
-                  <span className="w-[70px] shrink-0 font-body text-[13px] font-semibold text-ink">
-                    {t(CATEGORY_KEY[cat])}
-                  </span>
-                  <select
-                    aria-label={`${t(CATEGORY_KEY[cat])} — ${t("promo_kind")}`}
-                    value={rule.kind}
-                    onChange={(e) =>
-                      setRules((prev) => ({
-                        ...prev,
-                        [cat]: { ...prev[cat], kind: e.target.value as "percent" | "fixed" },
-                      }))
-                    }
-                    className="h-10 shrink-0 rounded-lg border border-line-strong bg-surface px-2 font-body text-[13px] text-ink"
-                  >
-                    <option value="fixed">{t("promo_kind_fixed")}</option>
-                    <option value="percent">{t("promo_kind_percent")}</option>
-                  </select>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    max={rule.kind === "percent" ? 100 : undefined}
-                    placeholder="—"
-                    aria-label={`${t(CATEGORY_KEY[cat])} — ${t("promo_value")}`}
-                    value={rule.value}
-                    onChange={(e) =>
-                      setRules((prev) => ({
-                        ...prev,
-                        [cat]: { ...prev[cat], value: e.target.value },
-                      }))
-                    }
-                    className="h-10 min-w-0 flex-1 rounded-lg border border-line-strong bg-surface px-3 font-body text-[13px] text-ink"
-                  />
+                  <div className="flex items-center gap-2 px-3 py-2">
+                    <span className="w-[70px] shrink-0 font-body text-[13px] font-semibold text-ink">
+                      {t(CATEGORY_KEY[cat])}
+                    </span>
+                    <select
+                      aria-label={`${t(CATEGORY_KEY[cat])} — ${t("promo_kind")}`}
+                      value={rule.kind}
+                      onChange={(e) =>
+                        setRules((prev) => ({
+                          ...prev,
+                          [cat]: { ...prev[cat], kind: e.target.value as "percent" | "fixed" },
+                        }))
+                      }
+                      className="h-10 shrink-0 rounded-lg border border-line-strong bg-surface px-2 font-body text-[13px] text-ink"
+                    >
+                      <option value="fixed">{t("promo_kind_fixed")}</option>
+                      <option value="percent">{t("promo_kind_percent")}</option>
+                    </select>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={rule.kind === "percent" ? 100 : undefined}
+                      placeholder="—"
+                      aria-label={`${t(CATEGORY_KEY[cat])} — ${t("promo_value")}`}
+                      value={rule.value}
+                      onChange={(e) =>
+                        setRules((prev) => ({
+                          ...prev,
+                          [cat]: { ...prev[cat], value: e.target.value },
+                        }))
+                      }
+                      className="h-10 min-w-0 flex-1 rounded-lg border border-line-strong bg-surface px-3 font-body text-[13px] text-ink"
+                    />
+                  </div>
+
+                  {/* PER-PACKAGE amounts, folded away until asked for. A flat baht
+                      amount means very different things to a ฿700 single class and a
+                      ฿5,500 ten-class pack, so each package may carry its own — but
+                      most codes won't, and the common case should stay a one-line row. */}
+                  {catItems.length > 0 && (
+                    <div className="border-t border-line px-3 py-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOpenCats((prev) =>
+                            prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
+                          )
+                        }
+                        aria-expanded={open}
+                        className="flex w-full items-center gap-1.5 font-body text-[12px] font-semibold text-taupe-deep"
+                      >
+                        <svg
+                          width={14}
+                          height={14}
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2.2}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                          className={`shrink-0 transition-transform ${open ? "rotate-90" : ""}`}
+                        >
+                          <path d="m9 18 6-6-6-6" />
+                        </svg>
+                        {t("promo_item_rules_toggle")}
+                        {overrides > 0 && (
+                          <span className="rounded-full bg-cream-2 px-1.5 py-0.5 text-[11px] font-semibold text-taupe-deep">
+                            {overrides}
+                          </span>
+                        )}
+                      </button>
+
+                      {open && (
+                        <div className="mt-2 flex flex-col gap-1.5">
+                          <p className="font-body text-[11.5px] leading-snug text-muted">
+                            {t("promo_item_rules_hint")}
+                          </p>
+                          {catItems.map((item) => {
+                            const draft = itemRules[item.id] ?? { kind: "fixed" as const, value: "" };
+                            return (
+                              <div key={item.id} className="flex items-center gap-2">
+                                <span className="min-w-0 flex-1 truncate font-body text-[12.5px] text-ink">
+                                  {tt(item.label)}
+                                </span>
+                                <select
+                                  aria-label={`${tt(item.label)} — ${t("promo_kind")}`}
+                                  value={draft.kind}
+                                  onChange={(e) =>
+                                    setItemRules((prev) => ({
+                                      ...prev,
+                                      [item.id]: {
+                                        ...draft,
+                                        kind: e.target.value as "percent" | "fixed",
+                                      },
+                                    }))
+                                  }
+                                  className="h-9 shrink-0 rounded-lg border border-line bg-surface px-2 font-body text-[12.5px] text-ink"
+                                >
+                                  <option value="fixed">{t("promo_kind_fixed")}</option>
+                                  <option value="percent">{t("promo_kind_percent")}</option>
+                                </select>
+                                <input
+                                  type="number"
+                                  inputMode="numeric"
+                                  min={1}
+                                  max={draft.kind === "percent" ? 100 : undefined}
+                                  // Blank = "use the type's amount", which is what the
+                                  // placeholder has to say — "—" would read as "none".
+                                  placeholder={on ? t("promo_item_uses_type") : "—"}
+                                  aria-label={`${tt(item.label)} — ${t("promo_value")}`}
+                                  value={draft.value}
+                                  onChange={(e) =>
+                                    setItemRules((prev) => ({
+                                      ...prev,
+                                      [item.id]: { ...draft, value: e.target.value },
+                                    }))
+                                  }
+                                  className="h-9 w-[104px] shrink-0 rounded-lg border border-line bg-surface px-2.5 font-body text-[12.5px] text-ink"
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}

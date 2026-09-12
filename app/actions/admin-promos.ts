@@ -13,11 +13,17 @@
 // references them and is the audit trail of who got what discount. Retiring a code
 // switches it off instead, which stops new redemptions while leaving history intact.
 
-import { eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getDb } from "@/lib/db/client";
-import { catalogItems, promoCodeRules, promoCodes, promoRedemptions } from "@/lib/db/schema";
+import {
+  catalogItems,
+  promoCodeRules,
+  promoCodes,
+  promoItemRules,
+  promoRedemptions,
+} from "@/lib/db/schema";
 import { requireOwner } from "@/lib/auth/admin";
 import { mockDataMode } from "@/lib/mock-mode";
 import { studioEndOfDay, studioInstant, studioParts, studioStartOfDay } from "@/lib/time";
@@ -75,6 +81,13 @@ const ruleInput = z.object({
   value: z.number().int().positive().max(1_000_000),
 });
 
+/** One package's own amount, overriding its format's. */
+const itemRuleInput = z.object({
+  itemId: z.string().trim().min(1).max(40),
+  kind: z.enum(["percent", "fixed"]),
+  value: z.number().int().positive().max(1_000_000),
+});
+
 const saveInput = z.object({
   code: z.string().trim().toUpperCase().regex(PROMO_CODE_PATTERN),
   labelEn: z.string().trim().min(1).max(60),
@@ -84,6 +97,11 @@ const saveInput = z.object({
    * so an empty list would be a code that can never apply — refused as NO_RULES.
    */
   rules: z.array(ruleInput).max(5),
+  /**
+   * Per-PACKAGE overrides. A package listed here is covered even when its format is
+   * not, so these count towards "does this code apply to anything".
+   */
+  itemRules: z.array(itemRuleInput).max(50),
   /** Bangkok calendar days; the end day counts in full. Empty string = unbounded. */
   startsOn: z.union([z.literal(""), YMD]),
   endsOn: z.union([z.literal(""), YMD]),
@@ -128,12 +146,21 @@ export async function savePromoCode(raw: SavePromoInput): Promise<SavePromoResul
   if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
   const input = parsed.data;
 
-  if (input.rules.length === 0) return { ok: false, code: "NO_RULES" };
-  if (input.rules.some((r) => r.kind === "percent" && r.value > 100)) {
+  if (input.rules.length === 0 && input.itemRules.length === 0) {
+    return { ok: false, code: "NO_RULES" };
+  }
+  if (
+    input.rules.some((r) => r.kind === "percent" && r.value > 100) ||
+    input.itemRules.some((r) => r.kind === "percent" && r.value > 100)
+  ) {
     return { ok: false, code: "PERCENT_TOO_LARGE" };
   }
-  // One rule per format — a duplicate would make the stored discount ambiguous.
+  // One rule per format, one per package — a duplicate would make the stored
+  // discount ambiguous.
   if (new Set(input.rules.map((r) => r.category)).size !== input.rules.length) {
+    return { ok: false, code: "INVALID_INPUT" };
+  }
+  if (new Set(input.itemRules.map((r) => r.itemId)).size !== input.itemRules.length) {
     return { ok: false, code: "INVALID_INPUT" };
   }
 
@@ -148,6 +175,18 @@ export async function savePromoCode(raw: SavePromoInput): Promise<SavePromoResul
   const itemId =
     input.appliesToItemId && input.appliesToItemId !== "" ? input.appliesToItemId : null;
 
+  // Every per-package amount must name a package that is actually on sale. A rule
+  // against an archived or deleted id would be money pointed at nothing, and the
+  // foreign key alone would let an archived package through.
+  if (input.itemRules.length > 0) {
+    const ids = input.itemRules.map((r) => r.itemId);
+    const found = await getDb()
+      .select({ id: catalogItems.id })
+      .from(catalogItems)
+      .where(and(inArray(catalogItems.id, ids), eq(catalogItems.active, true)));
+    if (found.length !== ids.length) return { ok: false, code: "ITEM_NOT_COVERED" };
+  }
+
   // Pinning to one package only narrows the formats above — it must not contradict
   // them. A code restricted to a trio pack while trio carries no discount is dead on
   // arrival (evaluatePromoCode refuses it), so refuse it here instead of storing it.
@@ -160,9 +199,11 @@ export async function savePromoCode(raw: SavePromoInput): Promise<SavePromoResul
       .where(eq(catalogItems.id, itemId))
       .limit(1);
     if (!item || !item.active) return { ok: false, code: "ITEM_NOT_COVERED" };
-    if (!input.rules.some((r) => r.category === item.category)) {
-      return { ok: false, code: "ITEM_NOT_COVERED" };
-    }
+    // Covered by its own amount, or by its format's.
+    const covered =
+      input.itemRules.some((r) => r.itemId === itemId) ||
+      input.rules.some((r) => r.category === item.category);
+    if (!covered) return { ok: false, code: "ITEM_NOT_COVERED" };
   }
 
   const code = normalizePromoCode(input.code);
@@ -188,14 +229,27 @@ export async function savePromoCode(raw: SavePromoInput): Promise<SavePromoResul
       .values({ code, ...values })
       .onConflictDoUpdate({ target: promoCodes.code, set: values });
     await tx.delete(promoCodeRules).where(eq(promoCodeRules.code, code));
-    await tx.insert(promoCodeRules).values(
-      input.rules.map((r) => ({
-        code,
-        category: r.category,
-        kind: r.kind,
-        value: r.value,
-      })),
-    );
+    if (input.rules.length > 0) {
+      await tx.insert(promoCodeRules).values(
+        input.rules.map((r) => ({
+          code,
+          category: r.category,
+          kind: r.kind,
+          value: r.value,
+        })),
+      );
+    }
+    await tx.delete(promoItemRules).where(eq(promoItemRules.code, code));
+    if (input.itemRules.length > 0) {
+      await tx.insert(promoItemRules).values(
+        input.itemRules.map((r) => ({
+          code,
+          itemId: r.itemId,
+          kind: r.kind,
+          value: r.value,
+        })),
+      );
+    }
   });
 
   revalidatePath("/admin/settings/promos");
@@ -282,4 +336,54 @@ export async function listPromoRedemptions(code: string): Promise<PromoRedemptio
       createdAt: r.createdAt.toISOString(),
     })),
   };
+}
+
+// ───────────────────────── delete ─────────────────────────
+
+export type DeletePromoFailureCode =
+  | "UNAUTHORIZED"
+  | "INVALID_INPUT"
+  | "NOT_FOUND"
+  /** Someone has already used it — retiring is the only safe way to stop it. */
+  | "HAS_REDEMPTIONS"
+  | MockNoDbCode;
+
+export type DeletePromoResult = { ok: true } | { ok: false; code: DeletePromoFailureCode };
+
+/**
+ * Delete a code outright — for a typo or a campaign that never ran.
+ *
+ * A code that has been REDEEMED is never deleted, not even when the charge was later
+ * cancelled: promo_redemptions is the record of who was given which discount, and
+ * the charge itself stores the code it was bought under. Retiring (setPromoActive
+ * false) stops new use while that history stays readable, so this refuses rather
+ * than cascading the evidence away.
+ */
+export async function deletePromoCode(raw: string): Promise<DeletePromoResult> {
+  if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
+
+  const parsed = z.string().trim().toUpperCase().regex(PROMO_CODE_PATTERN).safeParse(raw);
+  if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
+  if (mockDataMode()) return { ok: false, code: "MOCK_NO_DB" };
+
+  const code = normalizePromoCode(parsed.data);
+  const db = getDb();
+
+  const [used] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(promoRedemptions)
+    .where(eq(promoRedemptions.code, code));
+  if ((used?.n ?? 0) > 0) return { ok: false, code: "HAS_REDEMPTIONS" };
+
+  // The rule tables cascade from promo_codes; delete them explicitly anyway so the
+  // intent is on the page rather than in a migration.
+  const deleted = await db.transaction(async (tx) => {
+    await tx.delete(promoItemRules).where(eq(promoItemRules.code, code));
+    await tx.delete(promoCodeRules).where(eq(promoCodeRules.code, code));
+    return tx.delete(promoCodes).where(eq(promoCodes.code, code)).returning({ code: promoCodes.code });
+  });
+  if (deleted.length === 0) return { ok: false, code: "NOT_FOUND" };
+
+  revalidatePath("/admin/settings/promos");
+  return { ok: true };
 }

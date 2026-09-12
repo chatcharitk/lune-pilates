@@ -9,10 +9,16 @@
 
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
-import { charges, promoCodeRules, promoCodes, promoRedemptions } from "@/lib/db/schema";
+import {
+  charges,
+  promoCodeRules,
+  promoCodes,
+  promoItemRules,
+  promoRedemptions,
+} from "@/lib/db/schema";
 import { mockDataMode } from "@/lib/mock-mode";
 import type { PackageCategory } from "@/lib/domain/types";
-import { normalizePromoCode, type PromoCode, type PromoKind } from "./codes";
+import { normalizePromoCode, type PromoCode, type PromoKind, type PromoRule } from "./codes";
 
 /** Charge states that still hold their redemption slot. */
 const LIVE_CHARGE_STATUSES = ["pending", "awaiting_review", "paid"] as const;
@@ -37,29 +43,54 @@ interface RuleRow {
   value: number;
 }
 
-/** Group rule rows by code, ready to hang off each PromoCode. */
-function rulesByCode(rows: RuleRow[]): Map<string, PromoCode["rules"]> {
-  const out = new Map<string, PromoCode["rules"]>();
+interface ItemRuleRow {
+  code: string;
+  itemId: string;
+  kind: string;
+  value: number;
+}
+
+/** Narrow a stored kind. Unknown → "fixed", the conservative reading (see below). */
+function toKind(raw: string): PromoKind {
+  return raw === "percent" ? "percent" : "fixed";
+}
+
+/** Group per-package overrides by code. */
+function itemRulesByCode(rows: ItemRuleRow[]): Map<string, Record<string, PromoRule>> {
+  const out = new Map<string, Record<string, PromoRule>>();
   for (const r of rows) {
     const forCode = out.get(r.code) ?? {};
-    forCode[r.category] = {
-      // The column is CHECK-constrained to these two, but narrow defensively rather
-      // than cast: an unknown kind falls back to "fixed", whose value is read as flat
-      // THB — the conservative reading, since a stray "percent" of a large number
-      // would give far more away than a flat one.
-      kind: (r.kind === "percent" ? "percent" : "fixed") as PromoKind,
-      value: r.value,
-    };
+    forCode[r.itemId] = { kind: toKind(r.kind), value: r.value };
     out.set(r.code, forCode);
   }
   return out;
 }
 
-function rowToCode(r: CodeRow, rules: PromoCode["rules"]): PromoCode {
+/** Group rule rows by code, ready to hang off each PromoCode. */
+function rulesByCode(rows: RuleRow[]): Map<string, PromoCode["rules"]> {
+  const out = new Map<string, PromoCode["rules"]>();
+  for (const r of rows) {
+    const forCode = out.get(r.code) ?? {};
+    // The column is CHECK-constrained to these two, but narrow defensively rather
+    // than cast: an unknown kind falls back to "fixed", whose value is read as flat
+    // THB — the conservative reading, since a stray "percent" of a large number
+    // would give far more away than a flat one.
+    forCode[r.category] = { kind: toKind(r.kind), value: r.value };
+    out.set(r.code, forCode);
+  }
+  return out;
+}
+
+function rowToCode(
+  r: CodeRow,
+  rules: PromoCode["rules"],
+  itemRules: PromoCode["itemRules"],
+): PromoCode {
   return {
     code: r.code,
     label: { en: r.labelEn, th: r.labelTh },
     rules,
+    itemRules,
     startsAt: r.startsAt,
     endsAt: r.endsAt,
     maxRedemptions: r.maxRedemptions,
@@ -75,12 +106,17 @@ export async function loadPromoCode(raw: string): Promise<PromoCode | null> {
   if (mockDataMode()) return null; // no codes without a database
   const code = normalizePromoCode(raw);
   const db = getDb();
-  const [[row], ruleRows] = await Promise.all([
+  const [[row], ruleRows, itemRuleRows] = await Promise.all([
     db.select().from(promoCodes).where(eq(promoCodes.code, code)).limit(1),
     db.select().from(promoCodeRules).where(eq(promoCodeRules.code, code)),
+    db.select().from(promoItemRules).where(eq(promoItemRules.code, code)),
   ]);
   if (!row) return null;
-  return rowToCode(row, rulesByCode(ruleRows).get(code) ?? {});
+  return rowToCode(
+    row,
+    rulesByCode(ruleRows).get(code) ?? {},
+    itemRulesByCode(itemRuleRows).get(code) ?? {},
+  );
 }
 
 export interface PromoUsage {
@@ -131,10 +167,12 @@ export async function loadPromoUsageByCode(): Promise<Map<string, number>> {
 export async function listPromoCodes(): Promise<PromoCode[]> {
   if (mockDataMode()) return [];
   const db = getDb();
-  const [rows, ruleRows] = await Promise.all([
+  const [rows, ruleRows, itemRuleRows] = await Promise.all([
     db.select().from(promoCodes).orderBy(sql`${promoCodes.createdAt} desc`),
     db.select().from(promoCodeRules),
+    db.select().from(promoItemRules),
   ]);
   const grouped = rulesByCode(ruleRows);
-  return rows.map((r) => rowToCode(r, grouped.get(r.code) ?? {}));
+  const groupedItems = itemRulesByCode(itemRuleRows);
+  return rows.map((r) => rowToCode(r, grouped.get(r.code) ?? {}, groupedItems.get(r.code) ?? {}));
 }

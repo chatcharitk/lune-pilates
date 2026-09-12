@@ -38,6 +38,15 @@ export interface PromoCode {
    * separate flag that could disagree with the amounts.
    */
   rules: Partial<Record<PackageCategory, PromoRule>>;
+  /**
+   * Per-PACKAGE overrides, keyed by catalog item id (2026-09-12). The format amount
+   * is the default for every package of that format; an entry here replaces it for
+   * one package — "฿200 off a single class, ฿800 off the 10-class pack" in one code.
+   *
+   * A package listed here is covered even when its format is not, so a code can
+   * discount the 10-class pack and nothing else.
+   */
+  itemRules: Record<string, PromoRule>;
   /** Usable from this instant. Null = no start bound. */
   startsAt: Date | null;
   /** Last usable instant (end of its Bangkok day). Null = no end bound. */
@@ -80,6 +89,19 @@ export function discountFor(rule: PromoRule, priceThb: number): number {
 /** What the customer pays once `code` is applied to `priceThb`. */
 export function discountedAmount(rule: PromoRule, priceThb: number): number {
   return priceThb - discountFor(rule, priceThb);
+}
+
+/**
+ * The rule that governs `item` — its own, else its format's, else none.
+ *
+ * The single place the precedence is decided, so the checkout, the admin preview and
+ * the coverage checks can never disagree about what a code is worth.
+ */
+export function ruleForItem(
+  code: PromoCode,
+  item: { id: string; category: PackageCategory },
+): PromoRule | null {
+  return code.itemRules[item.id] ?? code.rules[item.category] ?? null;
 }
 
 export type PromoRefusal =
@@ -151,8 +173,8 @@ export function evaluatePromoCode(input: PromoEvaluationInput): PromoEvaluation 
     return { ok: false, reason: "NOT_APPLICABLE" };
   }
 
-  // No rule for this format → the code simply does not cover it.
-  const rule = code.rules[item.category];
+  // This package's own amount, else its format's. Neither → not covered.
+  const rule = ruleForItem(code, item);
   if (!rule) return { ok: false, reason: "NOT_APPLICABLE" };
 
   const discount = discountFor(rule, item.price);
