@@ -38,6 +38,14 @@ import { getCatalogItem, type CatalogItem } from "@/lib/catalog/packages";
 import { termsSnapshotFor } from "@/lib/catalog/chargeTerms";
 import { componentsForItem, isBundle, totalHours } from "@/lib/catalog/components";
 import { hasEverPurchased, isItemPurchasableBy } from "@/lib/catalog/eligibility";
+import {
+  evaluatePromoCode,
+  isValidPromoCodeShape,
+  type PromoCode,
+  type PromoRefusal,
+} from "@/lib/promos/codes";
+import { loadPromoCode, loadPromoUsage } from "@/lib/promos/queries";
+import { promoRedemptions } from "@/lib/db/schema";
 import { serializeComponentsSnapshot } from "@/lib/catalog/componentsSnapshot";
 import { loadActiveTerms, SEED_TERMS } from "@/lib/settings/terms";
 import { getPaymentProvider } from "@/lib/payments";
@@ -59,6 +67,12 @@ const createCheckoutInput = z.object({
    * the currently-active version (see TERMS_OUTDATED below).
    */
   termsVersionId: z.string().min(1),
+  /**
+   * An optional event discount code. Only the STRING crosses the wire — the server
+   * loads the code, re-checks its window/caps/applicability and recomputes the
+   * price. A client-supplied discount is never trusted (CLAUDE.md §8).
+   */
+  promoCode: z.string().trim().max(32).optional(),
 });
 export type CreateCheckoutInput = z.infer<typeof createCheckoutInput>;
 
@@ -90,7 +104,13 @@ export type CreateCheckoutFailureCode =
    * bought before. Server-side rule — the buy screen hides such items, but the gate
    * here is what actually enforces it (CLAUDE.md §8).
    */
-  | "NOT_ELIGIBLE";
+  | "NOT_ELIGIBLE"
+  /**
+   * The promo code could not be applied. The specific reason travels alongside in
+   * `promoRefusal` so the buy screen can say "that code has run out" rather than a
+   * flat "invalid code" — which is what generates front-desk phone calls.
+   */
+  | "PROMO_REJECTED";
 
 export interface CheckoutSession {
   chargeId: string;
@@ -101,11 +121,13 @@ export interface CheckoutSession {
   /** Opaque reference tying the charge to this user + item (verified on confirm). */
   reference: string;
   item: CheckoutItemSummary;
+  /** The applied code + what it took off, when one was used. Display only. */
+  promo?: { code: string; label: Bilingual; discount: number; originalAmount: number };
 }
 
 export type CreateCheckoutResult =
   | { ok: true; checkout: CheckoutSession }
-  | { ok: false; code: CreateCheckoutFailureCode };
+  | { ok: false; code: CreateCheckoutFailureCode; promoRefusal?: PromoRefusal };
 
 /**
  * Open a PromptPay charge for the catalog item `packageId`. Resolves the price
@@ -144,6 +166,38 @@ export async function createCheckout(raw: CreateCheckoutInput): Promise<CreateCh
     return { ok: false, code: "NOT_ELIGIBLE" };
   }
 
+  // PROMO CODE. Optional; when present the server loads it, re-checks its window,
+  // caps and applicability, and recomputes what is owed. Nothing about the discount
+  // comes from the client beyond the code string itself.
+  let promo: { code: PromoCode; discount: number; amount: number } | null = null;
+  if (parsed.data.promoCode && parsed.data.promoCode.trim() !== "") {
+    const typed = parsed.data.promoCode;
+    if (!isValidPromoCodeShape(typed)) {
+      return { ok: false, code: "PROMO_REJECTED", promoRefusal: "NOT_FOUND" };
+    }
+    const loaded = await loadPromoCode(typed);
+    if (!loaded) {
+      return { ok: false, code: "PROMO_REJECTED", promoRefusal: "NOT_FOUND" };
+    }
+    const usage = await loadPromoUsage(loaded.code, viewer.id);
+    const evaluated = evaluatePromoCode({
+      code: loaded,
+      item: { id: item.id, category: item.category, price: item.price },
+      redemptionsUsed: usage.total,
+      redemptionsByCustomer: usage.byCustomer,
+      // A first-purchase-only CODE asks the same question the trial ITEM does.
+      hasPurchasedBefore: await hasEverPurchased(viewer.id),
+      now: new Date(),
+    });
+    if (!evaluated.ok) {
+      return { ok: false, code: "PROMO_REJECTED", promoRefusal: evaluated.reason };
+    }
+    promo = { code: loaded, discount: evaluated.discount, amount: evaluated.amount };
+  }
+
+  /** What the customer actually pays — the catalog price unless a code applied. */
+  const chargeAmount = promo ? promo.amount : item.price;
+
   // Resolve what this item actually grants. A plain item yields its single implicit
   // component (nothing to snapshot); a BUNDLE yields several, which are frozen onto
   // the charge below so a later edit cannot change this purchase.
@@ -156,7 +210,7 @@ export async function createCheckout(raw: CreateCheckoutInput): Promise<CreateCh
   const reference = `pkg_${item.id}_u_${viewer.id}_${Date.now()}`;
 
   const charge = await getPaymentProvider().createPromptPayCharge({
-    amount: item.price,
+    amount: chargeAmount,
     reference,
   });
 
@@ -174,7 +228,13 @@ export async function createCheckout(raw: CreateCheckoutInput): Promise<CreateCh
         chargeId: charge.chargeId,
         packageId: item.id,
         userId: viewer.id,
-        amount: item.price,
+        amount: chargeAmount,
+        // Why `amount` differs from the catalog price. Frozen here so editing or
+        // retiring the code later cannot change what this charge was billed, and so
+        // the front desk can match a transfer slip against the original price.
+        promoCode: promo?.code.code ?? null,
+        promoDiscount: promo?.discount ?? null,
+        originalAmount: promo ? item.price : null,
         reference: charge.reference,
         // The consent record: WHICH terms this customer accepted, and when. Because
         // terms_versions is append-only, this stays a verbatim pointer to the exact
@@ -203,6 +263,20 @@ export async function createCheckout(raw: CreateCheckoutInput): Promise<CreateCh
         // (lib/catalog/chargeTerms.ts).
         ...termsSnapshotFor(item),
       });
+
+    // Claim the redemption slot IN THE SAME breath as the charge. Recording it now
+    // (rather than at approval) is what stops a capped code overselling while
+    // several people pay at once; charge_id is the primary key there, so a retried
+    // checkout cannot consume a second slot. If the charge is later cancelled or
+    // rejected the row stays as audit but stops counting, handing the slot back.
+    if (promo) {
+      await getDb().insert(promoRedemptions).values({
+        chargeId: charge.chargeId,
+        code: promo.code.code,
+        userId: viewer.id,
+        discountAmount: promo.discount,
+      });
+    }
   }
 
   return {
@@ -212,6 +286,16 @@ export async function createCheckout(raw: CreateCheckoutInput): Promise<CreateCh
       qrPayload: charge.qrPayload,
       amount: charge.amount,
       reference: charge.reference,
+      ...(promo
+        ? {
+            promo: {
+              code: promo.code.code,
+              label: promo.code.label,
+              discount: promo.discount,
+              originalAmount: item.price,
+            },
+          }
+        : {}),
       item: {
         id: item.id,
         category: item.category,
@@ -455,4 +539,70 @@ export async function confirmPayment(raw: ConfirmPaymentInput): Promise<ConfirmP
           : "pending";
 
   return { ok: true, status, rejectionReason: intent.rejectionReason ?? null };
+}
+
+// ───────────────────────── preview a promo code ─────────────────────────
+
+const previewPromoInput = z.object({
+  packageId: z.string().min(1),
+  code: z.string().trim().min(1).max(32),
+});
+export type PreviewPromoCodeInput = z.infer<typeof previewPromoInput>;
+
+export type PreviewPromoCodeResult =
+  | {
+      ok: true;
+      code: string;
+      label: Bilingual;
+      discount: number;
+      /** What they would pay with the code applied. */
+      amount: number;
+      /** The catalog price, for the struck-through "was" figure. */
+      originalAmount: number;
+    }
+  | { ok: false; reason: PromoRefusal };
+
+/**
+ * Check a typed code against a package WITHOUT opening a charge, so the buy screen
+ * can show the new total before the customer commits.
+ *
+ * This is a convenience, not a gate: `createCheckout` runs the identical evaluation
+ * again when the charge is actually opened. Anything that changes in between — the
+ * last slot going to someone else, the owner switching the code off — is caught
+ * there, which is the only place that matters (CLAUDE.md §8).
+ */
+export async function previewPromoCode(
+  raw: PreviewPromoCodeInput,
+): Promise<PreviewPromoCodeResult> {
+  const parsed = previewPromoInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, reason: "NOT_FOUND" };
+
+  if (!isValidPromoCodeShape(parsed.data.code)) return { ok: false, reason: "NOT_FOUND" };
+
+  const item = await getCatalogItem(parsed.data.packageId);
+  if (!item) return { ok: false, reason: "NOT_APPLICABLE" };
+
+  const code = await loadPromoCode(parsed.data.code);
+  if (!code) return { ok: false, reason: "NOT_FOUND" };
+
+  const viewer = await getCurrentUser();
+  const usage = await loadPromoUsage(code.code, viewer.id);
+  const evaluated = evaluatePromoCode({
+    code,
+    item: { id: item.id, category: item.category, price: item.price },
+    redemptionsUsed: usage.total,
+    redemptionsByCustomer: usage.byCustomer,
+    hasPurchasedBefore: await hasEverPurchased(viewer.id),
+    now: new Date(),
+  });
+  if (!evaluated.ok) return { ok: false, reason: evaluated.reason };
+
+  return {
+    ok: true,
+    code: code.code,
+    label: code.label,
+    discount: evaluated.discount,
+    amount: evaluated.amount,
+    originalAmount: item.price,
+  };
 }

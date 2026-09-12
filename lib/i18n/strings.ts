@@ -1183,6 +1183,108 @@ export const STR = {
     en: "Validity must be a whole number between 1 and {max} for the unit you picked.",
     th: "อายุการใช้งานต้องเป็นจำนวนเต็มระหว่าง 1 ถึง {max} ตามหน่วยที่เลือก",
   },
+  // ───────── admin: promo codes ─────────
+  settings_promos_title: { en: "Promo codes", th: "โค้ดส่วนลด" },
+  settings_promos_desc: {
+    en: "Event discounts for pre-opening, soft opening and grand opening.",
+    th: "ส่วนลดสำหรับงานเปิดร้าน พรีโอเพนนิ่ง ซอฟต์โอเพนนิ่ง และแกรนด์โอเพนนิ่ง",
+  },
+  promo_new: { en: "New code", th: "สร้างโค้ด" },
+  promo_edit: { en: "Edit code", th: "แก้ไขโค้ด" },
+  promo_code_label: { en: "Code", th: "โค้ด" },
+  promo_code_hint: {
+    en: "Letters, numbers and dashes, e.g. GRANDOPEN. Not case-sensitive for customers.",
+    th: "ตัวอักษร ตัวเลข และขีดกลาง เช่น GRANDOPEN ลูกค้าพิมพ์ตัวเล็กหรือใหญ่ก็ได้",
+  },
+  promo_name_en: { en: "Name (English)", th: "ชื่อ (อังกฤษ)" },
+  promo_name_th: { en: "Name (Thai)", th: "ชื่อ (ไทย)" },
+  promo_kind: { en: "Discount", th: "ประเภทส่วนลด" },
+  promo_kind_percent: { en: "Percent off", th: "ลดเป็นเปอร์เซ็นต์" },
+  promo_kind_fixed: { en: "Baht off", th: "ลดเป็นบาท" },
+  promo_value: { en: "Amount", th: "จำนวน" },
+  promo_starts: { en: "Starts", th: "เริ่ม" },
+  promo_ends: { en: "Ends", th: "สิ้นสุด" },
+  promo_window_hint: {
+    en: "Leave empty for no limit. The end day counts in full.",
+    th: "เว้นว่างหากไม่จำกัด วันสุดท้ายใช้ได้ทั้งวัน",
+  },
+  promo_max_total: { en: "Total uses", th: "จำนวนครั้งทั้งหมด" },
+  promo_max_total_hint: {
+    en: "0 = unlimited. Use this for “first 30 people”.",
+    th: "0 = ไม่จำกัด ใช้สำหรับ “30 คนแรก”",
+  },
+  promo_max_per_customer: { en: "Uses per customer", th: "ต่อลูกค้าหนึ่งคน" },
+  promo_applies_to: { en: "Applies to", th: "ใช้ได้กับ" },
+  promo_applies_all: { en: "Any package", th: "ทุกแพ็กเกจ" },
+  promo_first_only: { en: "First-time customers only", th: "ลูกค้าใหม่เท่านั้น" },
+  promo_active: { en: "Available to customers", th: "เปิดให้ลูกค้าใช้" },
+  promo_used_count: { en: "{used} used", th: "ใช้แล้ว {used}" },
+  promo_used_of: { en: "{used} of {max} used", th: "ใช้แล้ว {used} จาก {max}" },
+  promo_retire: { en: "Turn off", th: "ปิดใช้งาน" },
+  promo_restore: { en: "Turn on", th: "เปิดใช้งาน" },
+  promo_none: { en: "No codes yet.", th: "ยังไม่มีโค้ด" },
+  promo_saved: { en: "Code saved", th: "บันทึกโค้ดแล้ว" },
+  err_promo_code_shape: {
+    en: "Use 2–24 letters, numbers or dashes, starting with a letter or number.",
+    th: "ใช้ตัวอักษร ตัวเลข หรือขีดกลาง 2–24 ตัว โดยขึ้นต้นด้วยตัวอักษรหรือตัวเลข",
+  },
+  err_promo_percent: {
+    en: "A percentage can’t be more than 100.",
+    th: "เปอร์เซ็นต์ต้องไม่เกิน 100",
+  },
+  err_promo_window: {
+    en: "The end date is before the start date.",
+    th: "วันสิ้นสุดอยู่ก่อนวันเริ่ม",
+  },
+  err_promo_save: {
+    en: "Couldn’t save the code. Please try again.",
+    th: "บันทึกโค้ดไม่สำเร็จ กรุณาลองใหม่",
+  },
+
+  // ───────── promo codes (event discounts, 2026-09-12) ─────────
+  promo_have_code: { en: "Have a discount code?", th: "มีโค้ดส่วนลดไหม?" },
+  promo_placeholder: { en: "Enter code", th: "กรอกโค้ด" },
+  promo_apply: { en: "Apply", th: "ใช้โค้ด" },
+  promo_remove: { en: "Remove", th: "นำออก" },
+  promo_checking: { en: "Checking…", th: "กำลังตรวจสอบ…" },
+  /** {discount} → the amount taken off, already formatted as ฿. */
+  promo_applied: { en: "−{discount}", th: "−{discount}" },
+  promo_was: { en: "Was {amount}", th: "จาก {amount}" },
+  // Refusals are specific on purpose: "invalid code" for all of these is what
+  // generates front-desk phone calls.
+  err_promo_not_found: {
+    en: "We don’t recognise that code. Check the spelling and try again.",
+    th: "ไม่พบโค้ดนี้ กรุณาตรวจสอบตัวสะกดแล้วลองใหม่",
+  },
+  err_promo_inactive: {
+    en: "That code isn’t available any more.",
+    th: "โค้ดนี้ไม่เปิดให้ใช้แล้ว",
+  },
+  err_promo_not_started: {
+    en: "That code isn’t active yet.",
+    th: "โค้ดนี้ยังไม่เริ่มใช้งาน",
+  },
+  err_promo_expired: {
+    en: "That code has expired.",
+    th: "โค้ดนี้หมดอายุแล้ว",
+  },
+  err_promo_exhausted: {
+    en: "That code has been fully claimed.",
+    th: "โค้ดนี้ถูกใช้ครบจำนวนแล้ว",
+  },
+  err_promo_already_used: {
+    en: "You’ve already used that code.",
+    th: "คุณใช้โค้ดนี้ไปแล้ว",
+  },
+  err_promo_not_applicable: {
+    en: "That code doesn’t apply to this package.",
+    th: "โค้ดนี้ใช้กับแพ็กเกจนี้ไม่ได้",
+  },
+  err_promo_first_purchase: {
+    en: "That code is for first-time customers only.",
+    th: "โค้ดนี้สำหรับลูกค้าใหม่เท่านั้น",
+  },
+
   // ───────── admin: instructor profile photo (2026-09-10) ─────────
   instr_photo_change: { en: "Change photo", th: "เปลี่ยนรูปโปรไฟล์" },
   // {name} → the instructor's name.

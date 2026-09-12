@@ -38,6 +38,17 @@ const LINKS: SettingsLink[] = [
       </>
     ),
   },
+  {
+    href: "/admin/settings/promos",
+    titleKey: "settings_promos_title",
+    descKey: "settings_promos_desc",
+    icon: (
+      <>
+        <path d="M20.6 8.4 12 3 3.4 8.4v7.2L12 21l8.6-5.4z" />
+        <path d="M9 12h6M12 9v6" />
+      </>
+    ),
+  },
   // Existing routes — see the page doc for why they are linked, not re-homed.
   {
     href: "/admin/visibility",

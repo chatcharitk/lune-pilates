@@ -33,11 +33,14 @@ import type { PackageCategory } from "@/lib/domain/types";
 import { useRouter } from "next/navigation";
 import {
   createCheckout,
+  previewPromoCode,
   uploadPaymentSlip,
   confirmPayment,
   type CheckoutSession,
+  type PreviewPromoCodeResult,
   type UploadPaymentSlipFailureCode,
 } from "@/app/actions/purchase";
+import type { PromoRefusal } from "@/lib/promos/codes";
 import { makeT, thb, type Lang, type Bilingual } from "@/lib/i18n";
 import type { StrKey } from "@/lib/i18n/strings";
 import { useCustomerLang } from "./customer-context";
@@ -75,6 +78,27 @@ const CAT_TAB_KEY: Record<PackageCategory, StrKey> = {
   duo: "cat_duo",
   trio: "cat_trio",
   rental: "cat_rental",
+};
+
+/** A code the SERVER has evaluated against the selected package. */
+interface AppliedPromo {
+  code: string;
+  /** THB off, as returned by previewPromoCode — never computed here. */
+  discount: number;
+  /** What the customer would pay with it applied. */
+  amount: number;
+}
+
+/** Each refusal gets its own sentence — see the strings for why. */
+const PROMO_REFUSAL_KEY: Record<PromoRefusal, StrKey> = {
+  NOT_FOUND: "err_promo_not_found",
+  INACTIVE: "err_promo_inactive",
+  NOT_STARTED: "err_promo_not_started",
+  EXPIRED: "err_promo_expired",
+  EXHAUSTED: "err_promo_exhausted",
+  ALREADY_USED: "err_promo_already_used",
+  NOT_APPLICABLE: "err_promo_not_applicable",
+  NOT_FIRST_PURCHASE: "err_promo_first_purchase",
 };
 
 // Lets a step component label the dialog via the sheet's generated id.
@@ -262,6 +286,7 @@ export function CheckoutPanel({ catalog, isMember, house, terms }: CheckoutPanel
   // Stable ids tying each category tab to the package radiogroup it controls
   // (aria-controls / aria-labelledby), matching the admin Segmented pattern (A2).
   const baseId = useId();
+  const promoFieldId = `${baseId}-promo`;
   const catTabId = (id: PackageCategory) => `${baseId}-cat-${id}`;
   const panelId = `${baseId}-packages`;
 
@@ -299,6 +324,14 @@ export function CheckoutPanel({ catalog, isMember, house, terms }: CheckoutPanel
   // every purchase, so a tick is never carried over from a previous checkout.
   const [agreed, setAgreed] = useState(false);
 
+  // ───────── promo code ─────────
+  // `applied` is the SERVER's evaluation, never a locally-computed discount — the
+  // panel only ever renders what previewPromoCode returned (CLAUDE.md §8).
+  const [promoInput, setPromoInput] = useState("");
+  const [applied, setApplied] = useState<AppliedPromo | null>(null);
+  const [promoRefusal, setPromoRefusal] = useState<PromoRefusal | null>(null);
+  const [promoChecking, setPromoChecking] = useState(false);
+
   const sheetOpen =
     phase === "terms" ||
     phase === "loading" ||
@@ -307,6 +340,65 @@ export function CheckoutPanel({ catalog, isMember, house, terms }: CheckoutPanel
     phase === "submitted" ||
     phase === "paid" ||
     phase === "rejected";
+
+  /** Ask the server what a typed code is worth for the CURRENTLY selected package. */
+  const checkPromo = useCallback(
+    async (raw: string, packageId: string): Promise<PreviewPromoCodeResult | null> => {
+      if (raw.trim() === "") return null;
+      try {
+        return await previewPromoCode({ packageId, code: raw });
+      } catch {
+        return { ok: false, reason: "NOT_FOUND" };
+      }
+    },
+    [],
+  );
+
+  async function applyPromo() {
+    if (!selected || promoChecking) return;
+    setPromoRefusal(null);
+    setPromoChecking(true);
+    const res = await checkPromo(promoInput, selected.id);
+    setPromoChecking(false);
+    if (!res) return;
+    if (res.ok) {
+      setApplied({ code: res.code, discount: res.discount, amount: res.amount });
+      setPromoInput(res.code);
+    } else {
+      setApplied(null);
+      setPromoRefusal(res.reason);
+    }
+  }
+
+  function clearPromo() {
+    setApplied(null);
+    setPromoRefusal(null);
+    setPromoInput("");
+  }
+
+  // A code valid for one package need not be valid for another — switching the
+  // selection RE-ASKS the server rather than carrying a stale discount across, so
+  // the total on screen is always one the checkout would actually honour.
+  useEffect(() => {
+    if (!applied || !selected) return;
+    let cancelled = false;
+    void (async () => {
+      const res = await checkPromo(applied.code, selected.id);
+      if (cancelled || !res) return;
+      if (res.ok) {
+        setApplied({ code: res.code, discount: res.discount, amount: res.amount });
+        setPromoRefusal(null);
+      } else {
+        setApplied(null);
+        setPromoRefusal(res.reason);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // `applied.code` (not the object) — re-run when the package or the code changes,
+    // not on every refreshed evaluation of the same one.
+  }, [selected?.id, applied?.code, checkPromo, selected, applied]);
 
   /**
    * Step 1 of every purchase: open the Terms & Conditions for reading. No charge
@@ -334,10 +426,18 @@ export function CheckoutPanel({ catalog, isMember, house, terms }: CheckoutPanel
       const res = await createCheckout({
         packageId: selected.id,
         termsVersionId: terms.id,
+        ...(applied ? { promoCode: applied.code } : {}),
       });
       if (res.ok) {
         setCheckout(res.checkout);
         setPhase("pay");
+      } else if (res.code === "PROMO_REJECTED") {
+        // The code was fine at preview and is not now — the last slot went to
+        // someone else, or the owner switched it off mid-flow. Drop it, say why,
+        // and leave the customer on the buy screen at full price.
+        setApplied(null);
+        setPromoRefusal(res.promoRefusal ?? "NOT_FOUND");
+        setPhase("idle");
       } else {
         setErrorKey(checkoutErrorKey(res.code));
         setPhase("idle");
@@ -545,6 +645,76 @@ export function CheckoutPanel({ catalog, isMember, house, terms }: CheckoutPanel
           </div>
         </div>
 
+        {/* promo code — event discounts (pre-opening, soft opening, grand opening).
+            Only the typed string is sent; the discount shown is whatever the server
+            evaluated for the SELECTED package. */}
+        <div className="mt-4 rounded-lune-sm border border-line bg-surface-2 px-4 py-3.5">
+          {applied ? (
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="truncate rounded-full bg-cream-2 px-2.5 py-1 font-body text-[12px] font-bold tracking-[0.04em] text-taupe-deep">
+                  {applied.code}
+                </span>
+                <span className="font-body text-[13px] font-semibold text-sage-deep">
+                  {t("promo_applied").replace("{discount}", thb(applied.discount))}
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={clearPromo}
+                className="shrink-0 font-body text-[12.5px] font-semibold text-muted underline underline-offset-2"
+              >
+                {t("promo_remove")}
+              </button>
+            </div>
+          ) : (
+            <>
+              <label
+                htmlFor={promoFieldId}
+                className="mb-2 block font-body text-[12.5px] font-semibold text-ink-soft"
+              >
+                {t("promo_have_code")}
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id={promoFieldId}
+                  value={promoInput}
+                  onChange={(e) => {
+                    setPromoInput(e.target.value.toUpperCase());
+                    setPromoRefusal(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void applyPromo();
+                    }
+                  }}
+                  placeholder={t("promo_placeholder")}
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  maxLength={32}
+                  disabled={promoChecking}
+                  className="h-11 min-w-0 flex-1 rounded-lune-sm border border-line-strong bg-surface px-3.5 font-body text-sm uppercase tracking-[0.06em] text-ink placeholder:normal-case placeholder:tracking-normal placeholder:text-muted disabled:opacity-60"
+                />
+                <button
+                  type="button"
+                  onClick={() => void applyPromo()}
+                  disabled={promoChecking || promoInput.trim() === ""}
+                  className="h-11 shrink-0 rounded-lune-sm bg-ink px-4 font-body text-sm font-semibold text-cream disabled:bg-cream-2 disabled:text-muted"
+                >
+                  {promoChecking ? t("promo_checking") : t("promo_apply")}
+                </button>
+              </div>
+            </>
+          )}
+          {promoRefusal && (
+            <p role="alert" className="mt-2 font-body text-[12.5px] leading-snug text-rose">
+              {t(PROMO_REFUSAL_KEY[promoRefusal])}
+            </p>
+          )}
+        </div>
+
         {/* shared non-transferable note */}
         <div className="mt-3.5 flex items-center gap-[7px] px-1 font-body text-[12px] text-muted">
           <Info size={13} className="shrink-0" />
@@ -561,9 +731,20 @@ export function CheckoutPanel({ catalog, isMember, house, terms }: CheckoutPanel
         <div className="flex items-center gap-3.5">
           <div className="shrink-0">
             <div className="font-body text-[11px] text-muted">{t("total")}</div>
-            <div className="font-head text-xl font-semibold leading-[1.1] text-ink">
-              {selected ? thb(selected.price) : "—"}
-            </div>
+            {selected && applied ? (
+              <>
+                <div className="font-body text-[11px] leading-none text-muted line-through">
+                  {thb(selected.price)}
+                </div>
+                <div className="font-head text-xl font-semibold leading-[1.1] text-ink">
+                  {thb(applied.amount)}
+                </div>
+              </>
+            ) : (
+              <div className="font-head text-xl font-semibold leading-[1.1] text-ink">
+                {selected ? thb(selected.price) : "—"}
+              </div>
+            )}
           </div>
           <button
             type="button"
@@ -589,6 +770,7 @@ export function CheckoutPanel({ catalog, isMember, house, terms }: CheckoutPanel
             lang={lang}
             terms={terms}
             item={selected}
+            applied={applied}
             agreed={agreed}
             onToggleAgree={setAgreed}
             onAccept={startCheckout}
@@ -827,6 +1009,7 @@ function TermsStep({
   lang,
   terms,
   item,
+  applied,
   agreed,
   onToggleAgree,
   onAccept,
@@ -835,6 +1018,8 @@ function TermsStep({
   lang: Lang;
   terms: CustomerTerms;
   item: CatalogItem | undefined;
+  /** The evaluated discount, so the customer agrees against what they will pay. */
+  applied: AppliedPromo | null;
   agreed: boolean;
   onToggleAgree: (v: boolean) => void;
   onAccept: () => void;
@@ -875,11 +1060,23 @@ function TermsStep({
         {tt(terms.body)}
       </div>
 
-      {/* what they're agreeing to buy */}
+      {/* What they're agreeing to buy — at the price they will actually be charged.
+          Showing the pre-discount figure here would be the one number in the flow
+          that disagrees with the QR. */}
       {item && (
         <div className="mt-3 overflow-hidden rounded-lune-sm border border-line">
           <ReceiptLine label={tt(item.label)} value={tt(item.sublabel)} />
-          <ReceiptLine label={t("amount")} value={thb(item.price)} last />
+          {applied && (
+            <ReceiptLine
+              label={applied.code}
+              value={t("promo_applied").replace("{discount}", thb(applied.discount))}
+            />
+          )}
+          <ReceiptLine
+            label={t("amount")}
+            value={thb(applied ? applied.amount : item.price)}
+            last
+          />
         </div>
       )}
 

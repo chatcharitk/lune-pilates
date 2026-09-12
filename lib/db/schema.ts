@@ -383,6 +383,15 @@ export const charges = pgTable("charges", {
   // record, and admin POS (front-desk, in-person) sales do not collect one.
   termsVersionId: uuid("terms_version_id").references(() => termsVersions.id),
   termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
+  // ── PROMO SNAPSHOT (2026-09-12) ──
+  // What the customer actually paid is `amount`; these record WHY it differs from
+  // the catalog price. Frozen here for the same reason the terms and components are:
+  // an owner editing or retiring a code must not change what an already-open charge
+  // was billed, and the front desk needs the original price beside the code to match
+  // a transfer slip. All null when no code was used.
+  promoCode: text("promo_code"),
+  promoDiscount: integer("promo_discount"),
+  originalAmount: integer("original_amount"),
   // BUNDLE COMPONENTS SNAPSHOT (2026-09-08). JSON array of the components this
   // charge was opened against, frozen at checkout for exactly the reason the
   // hours/validity columns above are frozen: components are owner-editable at
@@ -411,6 +420,79 @@ export const charges = pgTable("charges", {
   reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
   // Why a slip was rejected (admin note shown back to the customer). Null unless rejected.
   rejectionReason: text("rejection_reason"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ───────────────────────── promo codes (event discounts) ─────────────────────────
+// Owner-created discount codes for studio events — pre-opening, soft opening,
+// grand opening (2026-09-12). A customer types the code on the buy screen and the
+// SERVER recomputes what they pay; the client only ever sends the string.
+//
+// `code` is the primary key and is stored UPPERCASE, so lookups are
+// case-insensitive without a functional index and a code can never be duplicated
+// with different casing.
+export const promoCodes = pgTable(
+  "promo_codes",
+  {
+    code: text("code").primaryKey(),
+    labelEn: text("label_en").notNull(),
+    labelTh: text("label_th").notNull(),
+    // 'percent' → `value` is 1–100; 'fixed' → `value` is whole THB off.
+    kind: text("kind").notNull(),
+    value: integer("value").notNull(),
+    // Window bounds, both optional. `endsAt` is stored as the LAST USABLE INSTANT of
+    // its Bangkok day, matching how package expiry works — the final day counts in full.
+    startsAt: timestamp("starts_at", { withTimezone: true }),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    /** Total redemptions allowed across everyone ("first 30"). Null = unlimited. */
+    maxRedemptions: integer("max_redemptions"),
+    /** Redemptions allowed per customer. 1 stops one person draining a capped code. */
+    maxPerCustomer: integer("max_per_customer").notNull().default(1),
+    /** Restrict to one class format. Null = any. */
+    appliesToCategory: packageCategory("applies_to_category"),
+    /** Restrict to a single catalog item. Null = any. Narrower than the category. */
+    appliesToItemId: text("applies_to_item_id").references(() => catalogItems.id),
+    /** Same rule the trial uses: only customers with no prior paid purchase. */
+    firstPurchaseOnly: boolean("first_purchase_only").notNull().default(false),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check("promo_kind_valid", sql`${t.kind} in ('percent','fixed')`),
+    check("promo_value_positive", sql`${t.value} > 0`),
+    // A percentage over 100 would be a negative price; the action clamps too, but
+    // the database refuses to hold one either way.
+    check(
+      "promo_percent_within_100",
+      sql`${t.kind} <> 'percent' or ${t.value} <= 100`,
+    ),
+    check(
+      "promo_max_redemptions_positive",
+      sql`${t.maxRedemptions} is null or ${t.maxRedemptions} > 0`,
+    ),
+    check("promo_max_per_customer_positive", sql`${t.maxPerCustomer} > 0`),
+  ],
+);
+
+// One row per charge that used a code. `chargeId` is the PRIMARY KEY, which is what
+// makes redemption counting idempotent: a retried or double-submitted checkout
+// cannot consume a second slot of a capped code.
+//
+// Rows are never deleted — they are the audit trail of who redeemed what. A
+// cancelled or rejected charge is instead EXCLUDED when counting against the cap
+// (see lib/promos/codes.ts), so abandoning a checkout hands the slot back.
+export const promoRedemptions = pgTable("promo_redemptions", {
+  chargeId: text("charge_id")
+    .primaryKey()
+    .references(() => charges.chargeId),
+  code: text("code")
+    .notNull()
+    .references(() => promoCodes.code),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id),
+  /** THB taken off, frozen at checkout — never recomputed from the live code. */
+  discountAmount: integer("discount_amount").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
