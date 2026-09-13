@@ -71,6 +71,7 @@ const SLIP_ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const TAG_KEY: Record<CatalogTag, StrKey> = {
   popular: "popular",
   best_value: "best_value",
+  promo: "tag_promo",
 };
 
 // Category id → the segmented-control tab label key.
@@ -910,7 +911,12 @@ function PackageCard({
               className={`shrink-0 rounded-full px-2.5 py-[3px] font-body text-[10px] font-bold uppercase tracking-[0.05em] ${
                 item.tag === "best_value"
                   ? "bg-taupe text-white"
-                  : "bg-cream-2 text-taupe-deep"
+                  : item.tag === "promo"
+                    ? // The loudest badge of the three: an offer is the thing the
+                      // studio is actively pushing, and it competes with "popular"
+                      // sitting on a pack right beside it.
+                      "bg-rose text-white"
+                    : "bg-cream-2 text-taupe-deep"
               }`}
             >
               {t(TAG_KEY[item.tag])}

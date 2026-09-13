@@ -95,7 +95,7 @@ function withValidityInRange<T extends z.ZodType<{ validityAmount: number; valid
     message: "validity amount out of range for its unit",
   });
 }
-const TAG = z.enum(["popular", "best_value"]);
+const TAG = z.enum(["popular", "best_value", "promo"]);
 
 /** Whole credits, strictly positive — matches the catalog_item_hours_positive CHECK. */
 const hoursField = z.number().int().positive().max(500);

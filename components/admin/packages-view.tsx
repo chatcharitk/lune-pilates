@@ -84,6 +84,7 @@ const VALIDITY_UNIT_KEY: Record<ValidityUnit, StrKey> = {
 const TAG_KEY: Record<CatalogTag, StrKey> = {
   popular: "cat_tag_popular",
   best_value: "cat_tag_best_value",
+  promo: "cat_tag_promo",
 };
 
 /**
@@ -831,6 +832,7 @@ function ItemFormDrawer({
               { value: "none", label: t("cat_tag_none") },
               { value: "popular", label: t("cat_tag_popular") },
               { value: "best_value", label: t("cat_tag_best_value") },
+              { value: "promo", label: t("cat_tag_promo") },
             ]}
           />
         )}

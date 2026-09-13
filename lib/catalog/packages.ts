@@ -98,10 +98,15 @@ export function validityFromRow(
   return parseLegacyValidity(legacyText ?? "");
 }
 
-/** Promotional badge a catalog item can carry. */
-export type CatalogTag = "popular" | "best_value";
+/**
+ * Promotional badge a catalog item can carry. "promo" (2026-09-13) marks an offer
+ * wherever it appears — it is a LABEL, independent of `promoShelf`, which decides
+ * which tab the item sits on. An offer usually wants both, but a badge on an
+ * ordinary pack ("โปรโมชั่น" on a seasonal price) needs no shelf of its own.
+ */
+export type CatalogTag = "popular" | "best_value" | "promo";
 
-export const CATALOG_TAGS: readonly CatalogTag[] = ["popular", "best_value"] as const;
+export const CATALOG_TAGS: readonly CatalogTag[] = ["popular", "best_value", "promo"] as const;
 
 /**
  * One purchasable item. `category` is the package balance bucket it credits
