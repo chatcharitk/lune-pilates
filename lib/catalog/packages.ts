@@ -25,6 +25,9 @@ import type { PackageCategory } from "@/lib/domain/types";
 import { getDb } from "@/lib/db/client";
 import { catalogItems } from "@/lib/db/schema";
 import { mockDataMode } from "@/lib/mock-mode";
+// Bundle parts for the buy card. components.ts imports only TYPES from this file,
+// so this direction carries no cycle at runtime.
+import { loadComponentsMap, sortComponents } from "./components";
 
 /**
  * How long a purchased package stays usable, as a STRUCTURED amount + unit (decided
@@ -138,11 +141,46 @@ export interface CatalogItem {
    * class's start day at booking time, so it can be sold well in advance.
    */
   classDays?: string[];
+  /**
+   * PROMOTIONAL SHELF (2026-09-13): show this item on the buy screen's "Promotions"
+   * tab instead of inside its format's tab. Display only — the credits it grants are
+   * still of its own format.
+   */
+  promoShelf?: boolean;
+  /** How many times one customer may buy this, ever. Absent = unlimited. */
+  maxPerCustomer?: number;
+  /**
+   * What a BUNDLE grants, in order, for the buy card — "1:1 class · use within 14
+   * days", "Free group class · use within 7 days of the first class". Absent for an
+   * ordinary single-balance package, whose sublabel already says everything.
+   *
+   * A bundle's terms are the offer. Leaving them to the item's NAME (which is what
+   * the trial did) means the customer agrees to a two-clock deal having read a
+   * single line of text.
+   */
+  parts?: CatalogItemPart[];
 }
+
+/** One line of a bundle's breakdown on the buy card. */
+export interface CatalogItemPart {
+  key: string;
+  label: Bilingual;
+  classes: number;
+  /** When its clock starts: at purchase, or when the anchor part is used. */
+  anchored: boolean;
+  validity: Validity;
+}
+
+/**
+ * A buy-screen TAB id. Every package category is one, plus the synthetic
+ * "promo" shelf (2026-09-13) — a display grouping that cuts across categories and is
+ * deliberately NOT a package category of its own (see `promoShelf`).
+ */
+export type CatalogTabId = PackageCategory | "promo";
 
 /** A display group of items (the prototype's PACKAGE_CATS tabs). */
 export interface CatalogCategory {
-  id: PackageCategory;
+  id: CatalogTabId;
   label: Bilingual;
   note: Bilingual;
   items: CatalogItem[];
@@ -292,6 +330,15 @@ export const CATEGORY_META: Record<PackageCategory, { label: Bilingual; note: Bi
   },
 };
 
+/** The promotional shelf's own tab copy. */
+const PROMO_META = {
+  label: { en: "Promotions", th: "โปรโมชั่น" },
+  note: {
+    en: "Limited offers · one per customer",
+    th: "ข้อเสนอพิเศษ · ซื้อได้คนละหนึ่งครั้ง",
+  },
+} as const;
+
 /** Display order of the categories (the tab order). */
 const CATEGORY_ORDER: readonly PackageCategory[] = [
   "group",
@@ -344,6 +391,8 @@ interface CatalogRow {
   labelEn: string;
   labelTh: string;
   classDays: string[] | null;
+  promoShelf: boolean;
+  maxPerCustomer: number | null;
   active: boolean;
   firstPurchaseOnly: boolean;
   sortOrder: number;
@@ -363,6 +412,8 @@ function rowToAdminItem(r: CatalogRow): AdminCatalogItem {
   return {
     ...toCatalogItem(seed),
     ...(r.classDays && r.classDays.length > 0 ? { classDays: r.classDays } : {}),
+    ...(r.promoShelf ? { promoShelf: true } : {}),
+    ...(r.maxPerCustomer !== null ? { maxPerCustomer: r.maxPerCustomer } : {}),
     active: r.active,
     firstPurchaseOnly: r.firstPurchaseOnly,
     sortOrder: r.sortOrder,
@@ -388,6 +439,8 @@ const SELECT_COLUMNS = {
   labelEn: catalogItems.labelEn,
   labelTh: catalogItems.labelTh,
   classDays: catalogItems.classDays,
+  promoShelf: catalogItems.promoShelf,
+  maxPerCustomer: catalogItems.maxPerCustomer,
   active: catalogItems.active,
   firstPurchaseOnly: catalogItems.firstPurchaseOnly,
   sortOrder: catalogItems.sortOrder,
@@ -476,33 +529,79 @@ export async function listPackageCatalog(
   const all = await listAllCatalogItems();
   const hasPurchasedBefore = opts.hasPurchasedBefore ?? false;
 
+  const visible = all
+    .filter((i) => i.active)
+    .filter((i) => !i.firstPurchaseOnly || !hasPurchasedBefore);
+
+  // A bundle's terms go on its card, so load the parts of every bundle on show in
+  // ONE read rather than per item.
+  const partsByItem = await loadItemParts(visible);
+
+  const project = (i: AdminCatalogItem): CatalogItem => ({
+    id: i.id,
+    category: i.category,
+    hours: i.hours,
+    price: i.price,
+    perHour: i.perHour,
+    validity: i.validity,
+    ...(i.tag ? { tag: i.tag } : {}),
+    label: i.label,
+    sublabel: i.sublabel,
+    ...(i.firstPurchaseOnly ? { firstPurchaseOnly: true } : {}),
+    // The buy screen says which days an event package is good for, so this
+    // must survive the projection — without it the card would price a class
+    // without naming the only classes it opens.
+    ...(i.classDays && i.classDays.length > 0 ? { classDays: i.classDays } : {}),
+    ...(i.promoShelf ? { promoShelf: true } : {}),
+    ...(i.maxPerCustomer !== undefined ? { maxPerCustomer: i.maxPerCustomer } : {}),
+    ...(partsByItem.has(i.id) ? { parts: partsByItem.get(i.id)! } : {}),
+  });
+
   const groups: CatalogCategory[] = [];
+
+  // The promotional shelf FIRST, and its items appear ONLY here — a 1+1 group pack
+  // listed under both "Promotions" and "Group Class" would read as two offers.
+  const promoItems = visible
+    .filter((i) => i.promoShelf)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map(project);
+  if (promoItems.length > 0) {
+    groups.push({ id: "promo", label: PROMO_META.label, note: PROMO_META.note, items: promoItems });
+  }
+
   for (const id of CATEGORY_ORDER) {
     if (HIDDEN_CATEGORIES.includes(id)) continue;
-    const items = all
-      .filter((i) => i.active && i.category === id)
-      .filter((i) => !i.firstPurchaseOnly || !hasPurchasedBefore)
+    const items = visible
+      .filter((i) => !i.promoShelf && i.category === id)
       .sort((a, b) => a.sortOrder - b.sortOrder)
-      .map(
-        (i): CatalogItem => ({
-          id: i.id,
-          category: i.category,
-          hours: i.hours,
-          price: i.price,
-          perHour: i.perHour,
-          validity: i.validity,
-          ...(i.tag ? { tag: i.tag } : {}),
-          label: i.label,
-          sublabel: i.sublabel,
-          ...(i.firstPurchaseOnly ? { firstPurchaseOnly: true } : {}),
-          // The buy screen says which days an event package is good for, so this
-          // must survive the projection — without it the card would price a class
-          // without naming the only classes it opens.
-          ...(i.classDays && i.classDays.length > 0 ? { classDays: i.classDays } : {}),
-        }),
-      );
+      .map(project);
     if (items.length === 0) continue;
     groups.push({ id, label: CATEGORY_META[id].label, note: CATEGORY_META[id].note, items });
   }
   return groups;
+}
+
+/**
+ * The display breakdown of every BUNDLE among `items`, keyed by item id. Items that
+ * grant a single balance are absent: their sublabel already says what they are, and
+ * a one-line "breakdown" would be noise.
+ */
+async function loadItemParts(items: AdminCatalogItem[]): Promise<Map<string, CatalogItemPart[]>> {
+  const out = new Map<string, CatalogItemPart[]>();
+  const configured = await loadComponentsMap(items.map((i) => i.id));
+  for (const item of items) {
+    const parts = configured.get(item.id);
+    if (!parts || parts.length < 2) continue;
+    out.set(
+      item.id,
+      sortComponents(parts).map((c) => ({
+        key: c.componentKey,
+        label: c.label,
+        classes: c.hours,
+        anchored: c.anchorComponentKey !== null,
+        validity: c.validity,
+      })),
+    );
+  }
+  return out;
 }

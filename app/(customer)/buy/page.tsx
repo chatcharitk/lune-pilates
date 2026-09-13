@@ -11,7 +11,11 @@
 // server-resolved pool (invariant 2), mirroring app/(customer)/home/page.tsx.
 
 import { listPackageCatalog } from "@/lib/catalog/packages";
-import { hasEverPurchased } from "@/lib/catalog/eligibility";
+import {
+  countPurchasesByItem,
+  hasEverPurchased,
+  withinPurchaseLimit,
+} from "@/lib/catalog/eligibility";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getCreditOverview } from "@/lib/credits/selectPackage";
 import { loadActiveTerms } from "@/lib/settings/terms";
@@ -36,9 +40,21 @@ export default async function BuyCreditsPage() {
   // re-checks the accepted version and refuses a stale one (TERMS_OUTDATED).
   const terms = await loadActiveTerms();
 
+  // Which LIMITED items this customer has already taken, so the card can say so
+  // instead of letting them get as far as the QR. createCheckout re-checks it.
+  const limited = catalog.flatMap((c) => c.items.filter((i) => i.maxPerCustomer !== undefined));
+  const counts = await countPurchasesByItem(
+    viewer.id,
+    limited.map((i) => i.id),
+  );
+  const soldOutForYou = limited
+    .filter((i) => !withinPurchaseLimit(i, counts.get(i.id) ?? 0))
+    .map((i) => i.id);
+
   return (
     <BuyView
       catalog={catalog}
+      soldOutForYou={soldOutForYou}
       hours={overview.hours}
       nearestExpiryIso={overview.nearestExpiry ? overview.nearestExpiry.toISOString() : null}
       isMember={isMember}

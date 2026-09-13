@@ -528,6 +528,9 @@ function ItemFormDrawer({
   // EVENT DAYS: Bangkok days ("YYYY-MM-DD") whose classes these credits may be
   // booked into. Empty = any day, which is every ordinary package.
   const [classDays, setClassDays] = useState<string[]>([]);
+  // Promotional shelf + per-customer cap (2026-09-13).
+  const [promoShelf, setPromoShelf] = useState(false);
+  const [maxPerCustomer, setMaxPerCustomer] = useState("0");
   const [dayDraft, setDayDraft] = useState("");
   const [labelEn, setLabelEn] = useState("");
   const [labelTh, setLabelTh] = useState("");
@@ -547,6 +550,8 @@ function ItemFormDrawer({
     setTag(item?.tag ?? "none");
     setFirstPurchaseOnly(item?.firstPurchaseOnly ?? false);
     setClassDays(item?.classDays ?? []);
+    setPromoShelf(item?.promoShelf ?? false);
+    setMaxPerCustomer(String(item?.maxPerCustomer ?? 0));
     setDayDraft("");
     setLabelEn(item?.label.en ?? "");
     setLabelTh(item?.label.th ?? "");
@@ -604,6 +609,8 @@ function ItemFormDrawer({
       labelEn: labelEn.trim(),
       labelTh: labelTh.trim(),
       firstPurchaseOnly,
+      promoShelf,
+      maxPerCustomer: Math.max(0, Number.parseInt(maxPerCustomer, 10) || 0),
       classDays,
     };
 
@@ -878,6 +885,41 @@ function ItemFormDrawer({
           </span>
         </span>
       </label>
+
+      {/* PROMOTIONAL SHELF + the cap that keeps an introductory offer introductory.
+          The shelf is display only: a 1+1 group pack still grants GROUP credits, so
+          the free class can actually book a group class. */}
+      <label className="mt-1 flex cursor-pointer items-start gap-3 rounded-xl border border-line-strong bg-surface px-3.5 py-3">
+        <input
+          type="checkbox"
+          checked={promoShelf}
+          onChange={(e) => setPromoShelf(e.target.checked)}
+          className="mt-0.5 h-4 w-4 shrink-0 accent-[#8C7A63]"
+        />
+        <span className="min-w-0">
+          <span className="block font-body text-sm font-semibold text-ink">
+            {t("cat_promo_shelf")}
+          </span>
+          <span className="mt-0.5 block font-body text-[12px] leading-snug text-muted">
+            {t("cat_promo_shelf_hint")}
+          </span>
+        </span>
+      </label>
+
+      <Field label={t("cat_max_per_customer")} hint={t("cat_max_per_customer_hint")}>
+        {(id) => (
+          <input
+            id={id}
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={1000}
+            value={maxPerCustomer}
+            onChange={(e) => setMaxPerCustomer(e.target.value)}
+            className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3 font-body text-sm text-ink"
+          />
+        )}
+      </Field>
 
       {/* EVENT DAYS (2026-09-12). A special-priced class is sold as its own package
           whose credits only open THOSE days' classes, so the price belongs to the

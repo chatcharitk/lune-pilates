@@ -37,7 +37,12 @@ import { charges, paymentSlips } from "@/lib/db/schema";
 import { getCatalogItem, type CatalogItem } from "@/lib/catalog/packages";
 import { termsSnapshotFor } from "@/lib/catalog/chargeTerms";
 import { componentsForItem, isBundle, totalHours } from "@/lib/catalog/components";
-import { hasEverPurchased, isItemPurchasableBy } from "@/lib/catalog/eligibility";
+import {
+  countPurchasesOf,
+  hasEverPurchased,
+  isItemPurchasableBy,
+  withinPurchaseLimit,
+} from "@/lib/catalog/eligibility";
 import {
   evaluatePromoCode,
   isValidPromoCodeShape,
@@ -105,6 +110,8 @@ export type CreateCheckoutFailureCode =
    * here is what actually enforces it (CLAUDE.md §8).
    */
   | "NOT_ELIGIBLE"
+  /** A limited offer this customer has already taken (2026-09-13). */
+  | "LIMIT_REACHED"
   /**
    * The promo code could not be applied. The specific reason travels alongside in
    * `promoRefusal` so the buy screen can say "that code has run out" rather than a
@@ -164,6 +171,17 @@ export async function createCheckout(raw: CreateCheckoutInput): Promise<CreateCh
   // Checked here rather than trusted from the client, which only ever sends an item id.
   if (item.firstPurchaseOnly && !isItemPurchasableBy(item, await hasEverPurchased(viewer.id))) {
     return { ok: false, code: "NOT_ELIGIBLE" };
+  }
+
+  // PER-CUSTOMER LIMIT. "Buy one get one, once per customer" (2026-09-13): a live
+  // charge for this item already holds the customer's slot, so opening a second
+  // checkout while the first sits in review cannot yield two. The buy screen marks
+  // such an item as bought; this is the rule that actually enforces it.
+  if (
+    item.maxPerCustomer !== undefined &&
+    !withinPurchaseLimit(item, await countPurchasesOf(viewer.id, item.id))
+  ) {
+    return { ok: false, code: "LIMIT_REACHED" };
   }
 
   // PROMO CODE. Optional; when present the server loads it, re-checks its window,

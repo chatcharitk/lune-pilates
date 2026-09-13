@@ -48,6 +48,8 @@ export interface HomeViewProps {
     nearestExpiryIso: string | null;
     /** Credits within this pool that only open particular days' classes. */
     eventCredits: { days: string[]; classes: number }[];
+    /** Bonus classes waiting for their first class to be taken. */
+    pendingClasses: number;
   }[];
   /** true when these balances are the shared household pool rather than personal. */
   isHouseholdPool: boolean;
@@ -187,6 +189,15 @@ export function HomeView({
                     {/* Part of this number may be EVENT credits, good only for the
                         classes of certain days. Saying so here is the difference
                         between a balance and a promise the booking screen breaks. */}
+                    {/* A bundle's free class, still asleep. Saying "waiting" is the
+                        only honest way to show a credit that exists but cannot be
+                        booked yet — and its absence is what makes someone think the
+                        free class they paid for never arrived. */}
+                    {b.pendingClasses > 0 && (
+                      <span className="mt-1 block font-body text-[11.5px] leading-tight text-sage-deep">
+                        {t("balance_pending_bonus").replace("{n}", String(b.pendingClasses))}
+                      </span>
+                    )}
                     {b.eventCredits.map((e) => (
                       <span
                         key={e.days.join(",")}

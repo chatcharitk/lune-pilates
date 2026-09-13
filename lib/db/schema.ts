@@ -164,6 +164,17 @@ export const catalogItems = pgTable(
     labelEn: text("label_en").notNull(),
     labelTh: text("label_th").notNull(),
     active: boolean("active").notNull().default(true),
+    // PROMOTIONAL SHELF (2026-09-13). A "buy one get one" package sits on its own
+    // tab in the buy screen rather than inside its format's tab: it is a different
+    // KIND of offer, and burying it among the ordinary packs was the owner's
+    // objection. Display only — the credits it grants stay in their real formats
+    // (the free group class is group credit), because a booking matches credit to
+    // class type and a "promo" pool could book nothing at all.
+    promoShelf: boolean("promo_shelf").notNull().default(false),
+    // How many times ONE customer may buy this item, ever. Null = unlimited, which
+    // is every ordinary package. 1 is what makes "buy one get one" an introduction
+    // rather than a permanent half-price tariff.
+    maxPerCustomer: integer("max_per_customer"),
     // EVENT DAYS (2026-09-12): the Bangkok days ("YYYY-MM-DD") whose classes this
     // package's credits may be booked into. NULL = any day, which is every ordinary
     // package. A special-priced opening class is sold as its own item with the event

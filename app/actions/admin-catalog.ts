@@ -130,6 +130,10 @@ const createInput = z.object({
   labelTh: labelField,
   // Trial offer: only buyable by a customer with no prior paid purchase.
   firstPurchaseOnly: z.boolean().optional(),
+  /** Own tab on the buy screen (a promotional offer), not its format's tab. */
+  promoShelf: z.boolean().optional(),
+  /** Purchases allowed per customer, ever. 0 / absent = unlimited. */
+  maxPerCustomer: z.number().int().min(0).max(1_000).optional(),
   classDays: CLASS_DAYS,
   sortOrder: z.number().int().min(0).max(10_000).optional(),
 });
@@ -150,6 +154,8 @@ const updateInput = z.object({
   labelEn: labelField,
   labelTh: labelField,
   firstPurchaseOnly: z.boolean().optional(),
+  promoShelf: z.boolean().optional(),
+  maxPerCustomer: z.number().int().min(0).max(1_000).optional(),
   classDays: CLASS_DAYS,
   sortOrder: z.number().int().min(0).max(10_000).optional(),
 });
@@ -287,6 +293,8 @@ export async function createCatalogItem(
         labelEn: input.labelEn,
         labelTh: input.labelTh,
         firstPurchaseOnly: input.firstPurchaseOnly ?? false,
+        promoShelf: input.promoShelf ?? false,
+        maxPerCustomer: input.maxPerCustomer ? input.maxPerCustomer : null,
         classDays: normalizeClassDays(input.classDays),
         active: true,
         sortOrder,
@@ -369,6 +377,8 @@ export async function updateCatalogItem(
       labelEn: input.labelEn,
       labelTh: input.labelTh,
       firstPurchaseOnly: input.firstPurchaseOnly ?? false,
+      promoShelf: input.promoShelf ?? false,
+      maxPerCustomer: input.maxPerCustomer ? input.maxPerCustomer : null,
       classDays: normalizeClassDays(input.classDays),
       sortOrder,
     })

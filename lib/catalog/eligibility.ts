@@ -13,7 +13,7 @@
 // buy screen additionally hides the item so nobody is shown an option that will
 // fail. The hiding is courtesy, the refusal is the rule (CLAUDE.md §8).
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { charges } from "@/lib/db/schema";
 import { mockDataMode } from "@/lib/mock-mode";
@@ -43,4 +43,56 @@ export function isItemPurchasableBy(
   hasPurchasedBefore: boolean,
 ): boolean {
   return !item.firstPurchaseOnly || !hasPurchasedBefore;
+}
+
+// ───────────────────────── per-item purchase limit ─────────────────────────
+//
+// "Buy one get one, once per customer" (owner, 2026-09-13). Without the limit an
+// introductory offer is simply a permanent half-price tariff, so the cap is part of
+// the offer rather than a nicety.
+//
+// A purchase counts while its charge is ALIVE — pending, awaiting review, or paid —
+// so someone cannot open a second checkout while the first is in review and end up
+// with two. A cancelled or rejected charge hands the slot back, exactly like a promo
+// redemption.
+
+/** Charge states that hold a customer's slot on a limited item. */
+const LIVE_CHARGE_STATUSES = ["pending", "awaiting_review", "paid"] as const;
+
+/** How many times `userId` has bought each of `itemIds` (live charges only). */
+export async function countPurchasesByItem(
+  userId: string,
+  itemIds: string[],
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (mockDataMode() || itemIds.length === 0) return out;
+
+  const rows = await getDb()
+    .select({ itemId: charges.packageId, n: sql<number>`count(*)::int` })
+    .from(charges)
+    .where(
+      and(
+        eq(charges.userId, userId),
+        inArray(charges.packageId, itemIds),
+        inArray(charges.status, [...LIVE_CHARGE_STATUSES]),
+      ),
+    )
+    .groupBy(charges.packageId);
+
+  for (const r of rows) out.set(r.itemId, r.n);
+  return out;
+}
+
+/** How many times `userId` has bought `itemId` (live charges only). */
+export async function countPurchasesOf(userId: string, itemId: string): Promise<number> {
+  const counts = await countPurchasesByItem(userId, [itemId]);
+  return counts.get(itemId) ?? 0;
+}
+
+/** Whether `item`'s per-customer limit still leaves room for one more purchase. */
+export function withinPurchaseLimit(
+  item: Pick<CatalogItem, "maxPerCustomer">,
+  alreadyBought: number,
+): boolean {
+  return item.maxPerCustomer === undefined || alreadyBought < item.maxPerCustomer;
 }

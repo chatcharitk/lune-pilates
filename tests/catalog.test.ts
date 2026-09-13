@@ -7,6 +7,7 @@ import {
   sublabelForValidity,
   type CatalogItem,
 } from "@/lib/catalog/packages";
+import { withinPurchaseLimit } from "@/lib/catalog/eligibility";
 import { expiryFromValidity } from "@/lib/catalog/validity";
 import { studioInstant, studioParts } from "@/lib/time";
 
@@ -286,3 +287,27 @@ function expectBilingual(b: CatalogItem["label"]): void {
   expect(typeof b.th).toBe("string");
   expect(b.th.length).toBeGreaterThan(0);
 }
+
+describe("withinPurchaseLimit — one-per-customer offers (2026-09-13)", () => {
+  const limited = { maxPerCustomer: 1 };
+  const unlimited = { maxPerCustomer: undefined };
+
+  it("lets an ordinary package be bought again and again", () => {
+    expect(withinPurchaseLimit(unlimited, 0)).toBe(true);
+    expect(withinPurchaseLimit(unlimited, 9)).toBe(true);
+  });
+
+  it("allows the first purchase of a one-per-customer offer", () => {
+    expect(withinPurchaseLimit(limited, 0)).toBe(true);
+  });
+
+  it("refuses the second — which is what keeps 'buy one get one' introductory", () => {
+    expect(withinPurchaseLimit(limited, 1)).toBe(false);
+    expect(withinPurchaseLimit(limited, 2)).toBe(false);
+  });
+
+  it("honours a cap above one", () => {
+    expect(withinPurchaseLimit({ maxPerCustomer: 3 }, 2)).toBe(true);
+    expect(withinPurchaseLimit({ maxPerCustomer: 3 }, 3)).toBe(false);
+  });
+});

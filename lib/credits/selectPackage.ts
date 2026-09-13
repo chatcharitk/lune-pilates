@@ -362,6 +362,16 @@ export interface CreditBalance {
    * alone would promise a free choice of class that those credits do not buy.
    */
   eventCredits: { days: string[]; classes: number }[];
+  /**
+   * DORMANT credits in this pool (2026-09-13): a bundle's bonus class, whose clock
+   * has not started because the class that unlocks it has not been taken yet.
+   *
+   * They are NOT counted in `classes` — they cannot be booked today, and a balance
+   * that includes them would be a lie in the customer's favour until the moment they
+   * try to use one. But leaving them out entirely means someone who bought "1 + 1"
+   * sees a single class and thinks the free one never arrived.
+   */
+  pendingClasses: number;
 }
 
 /**
@@ -421,30 +431,41 @@ export async function getCreditBalances(
     if (mock.credits <= 0) return [];
     const day = 24 * 3_600_000;
     return [
-      { category: "group", classes: mock.credits, nearestExpiry: new Date(now.getTime() + 40 * day) , eventCredits: [] },
-      { category: "private", classes: 2, nearestExpiry: new Date(now.getTime() + 12 * day) , eventCredits: [] },
-      { category: "duo", classes: 1, nearestExpiry: new Date(now.getTime() + 5 * day) , eventCredits: [] },
+      { category: "group", classes: mock.credits, nearestExpiry: new Date(now.getTime() + 40 * day) , eventCredits: [], pendingClasses: 0 },
+      { category: "private", classes: 2, nearestExpiry: new Date(now.getTime() + 12 * day) , eventCredits: [], pendingClasses: 0 },
+      { category: "duo", classes: 1, nearestExpiry: new Date(now.getTime() + 5 * day) , eventCredits: [], pendingClasses: 0 },
     ];
   }
 
   const db = getDb();
-  const rows = await db
-    .select({
-      category: packages.category,
-      hoursLeft: packages.hoursLeft,
-      expiresAt: packages.expiresAt,
-      classDays: packages.classDays,
-    })
-    .from(packages)
-    .where(
-      and(
-        ownerWhere(viewer),
-        gt(packages.hoursLeft, 0),
-        gt(packages.expiresAt, now),
-        activeByNow(now),
+  const [rows, dormantRows] = await Promise.all([
+    db
+      .select({
+        category: packages.category,
+        hoursLeft: packages.hoursLeft,
+        expiresAt: packages.expiresAt,
+        classDays: packages.classDays,
+      })
+      .from(packages)
+      .where(
+        and(
+          ownerWhere(viewer),
+          gt(packages.hoursLeft, 0),
+          gt(packages.expiresAt, now),
+          activeByNow(now),
+        ),
+      )
+      .orderBy(asc(packages.expiresAt)),
+    // A bundle's bonus class before its anchor has been used: no expiry at all (the
+    // dormant marker), so it is invisible to every query above — deliberately, since
+    // it cannot be spent. Read separately to SHOW it as waiting.
+    db
+      .select({ category: packages.category, hoursLeft: packages.hoursLeft })
+      .from(packages)
+      .where(
+        and(ownerWhere(viewer), gt(packages.hoursLeft, 0), isNull(packages.expiresAt)),
       ),
-    )
-    .orderBy(asc(packages.expiresAt));
+  ]);
 
   const byCategory = new Map<PackageCategory, CreditBalance>();
   for (const r of rows) {
@@ -457,6 +478,7 @@ export async function getCreditBalances(
         classes: 0,
         nearestExpiry: r.expiresAt,
         eventCredits: [],
+        pendingClasses: 0,
       } satisfies CreditBalance);
     row.classes += r.hoursLeft;
     if (r.classDays && r.classDays.length > 0) {
@@ -467,6 +489,20 @@ export async function getCreditBalances(
       if (existing) existing.classes += r.hoursLeft;
       else row.eventCredits.push({ days: r.classDays, classes: r.hoursLeft });
     }
+    byCategory.set(r.category, row);
+  }
+
+  // Fold in the dormant bonus classes, creating a row for a pool that holds nothing
+  // BUT a sleeping class (someone whose paid class is booked but not yet taken).
+  for (const r of dormantRows) {
+    const row = byCategory.get(r.category) ?? {
+      category: r.category,
+      classes: 0,
+      nearestExpiry: null,
+      eventCredits: [],
+      pendingClasses: 0,
+    };
+    row.pendingClasses += r.hoursLeft;
     byCategory.set(r.category, row);
   }
 

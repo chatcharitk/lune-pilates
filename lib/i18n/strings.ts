@@ -1246,12 +1246,47 @@ export const STR = {
     en: "Those credits are only good for the special classes they were bought for. Buy a class to book this one.",
     th: "เครดิตที่มีใช้ได้เฉพาะคลาสพิเศษที่ซื้อไว้ กรุณาซื้อคลาสเพิ่มเพื่อจองคลาสนี้",
   },
+  balance_pending_bonus: {
+    en: "+{n} free waiting — starts once you take your first class",
+    th: "+{n} คลาสแถม รอเริ่มนับหลังเรียนคลาสแรก",
+  },
   balance_event_days: {
     en: "{n} only for classes on {days}",
     th: "{n} คลาส ใช้ได้เฉพาะคลาสวันที่ {days}",
   },
+  // A bundle's two clocks, said on the buy card (2026-09-13). The unit is days for
+  // every promotional bundle so far; a month-long part would need its own key.
+  buy_part_from_purchase: {
+    en: "use within {n} days of buying",
+    th: "ใช้ภายใน {n} วันหลังซื้อ",
+  },
+  buy_part_after_first: {
+    en: "use within {n} days of your first class",
+    th: "ใช้ภายใน {n} วันหลังเรียนคลาสแรก",
+  },
+  err_limit_reached: {
+    en: "You’ve already taken this offer. It’s one per customer.",
+    th: "คุณใช้สิทธิ์ข้อเสนอนี้ไปแล้ว ซื้อได้คนละ 1 ครั้ง",
+  },
+  err_not_eligible: {
+    en: "This offer is for first-time customers.",
+    th: "ข้อเสนอนี้สำหรับลูกค้าใหม่เท่านั้น",
+  },
+  buy_limit_one: { en: "One per customer", th: "ซื้อได้คนละ 1 ครั้ง" },
+  buy_already_bought: { en: "Already bought", th: "ซื้อไปแล้ว" },
+  cat_promo: { en: "Promotions", th: "โปรโมชั่น" },
   buy_class_days: { en: "Only for classes on", th: "ใช้ได้เฉพาะคลาสวันที่" },
   // Event days on a package (2026-09-12).
+  cat_promo_shelf: { en: "Show on the Promotions tab", th: "แสดงในแท็บโปรโมชั่น" },
+  cat_promo_shelf_hint: {
+    en: "Gives the offer its own tab instead of listing it with the ordinary packs. The credits it grants keep their own class type.",
+    th: "ย้ายข้อเสนอนี้ไปอยู่แท็บของตัวเอง แทนที่จะปนกับแพ็กเกจปกติ เครดิตที่ได้ยังเป็นประเภทคลาสเดิม",
+  },
+  cat_max_per_customer: { en: "Purchases per customer", th: "ซื้อได้กี่ครั้งต่อคน" },
+  cat_max_per_customer_hint: {
+    en: "0 = unlimited. Set 1 for a one-per-customer offer.",
+    th: "0 = ไม่จำกัด ใส่ 1 สำหรับข้อเสนอที่ซื้อได้คนละครั้งเดียว",
+  },
   cat_class_days: { en: "Only for classes on", th: "ใช้ได้เฉพาะคลาสวันที่" },
   cat_class_days_hint: {
     en: "Leave empty and the credits work on any day. Add days to sell a special-priced class: the credits then only open those days’ classes, whenever they are bought.",

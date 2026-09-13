@@ -26,6 +26,7 @@ import {
 } from "react";
 import type {
   CatalogCategory,
+  CatalogTabId,
   CatalogItem,
   CatalogTag,
 } from "@/lib/catalog/packages";
@@ -73,7 +74,8 @@ const TAG_KEY: Record<CatalogTag, StrKey> = {
 };
 
 // Category id → the segmented-control tab label key.
-const CAT_TAB_KEY: Record<PackageCategory, StrKey> = {
+const CAT_TAB_KEY: Record<CatalogTabId, StrKey> = {
+  promo: "cat_promo",
   group: "cat_group",
   private: "cat_private",
   duo: "cat_duo",
@@ -140,6 +142,10 @@ function checkoutErrorKey(code: string): StrKey {
       return "err_unknown_package";
     case "TERMS_OUTDATED":
       return "err_terms_outdated";
+    case "LIMIT_REACHED":
+      return "err_limit_reached";
+    case "NOT_ELIGIBLE":
+      return "err_not_eligible";
     default:
       return "err_checkout";
   }
@@ -246,6 +252,8 @@ async function slipToUploadDataUrl(file: File): Promise<string> {
 
 interface CheckoutPanelProps {
   catalog: CatalogCategory[];
+  /** Limited items this customer has already taken — shown, but not buyable. */
+  soldOutForYou: string[];
   /** Whether the viewer is a member with household sharing (display only). */
   isMember: boolean;
   /** The member's house number, for the perk badge (display only). */
@@ -254,11 +262,21 @@ interface CheckoutPanelProps {
   terms: CustomerTerms;
 }
 
-export function CheckoutPanel({ catalog, isMember, house, terms }: CheckoutPanelProps) {
+export function CheckoutPanel({
+  catalog,
+  soldOutForYou,
+  isMember,
+  house,
+  terms,
+}: CheckoutPanelProps) {
   const { t, tt, lang } = useCustomerLang();
   const router = useRouter();
 
-  const [catId, setCatId] = useState<PackageCategory>(catalog[0]?.id ?? "group");
+  // Offers this customer has already taken: still listed (so the shelf doesn't
+  // silently change shape), but not selectable.
+  const soldOut = useMemo(() => new Set(soldOutForYou), [soldOutForYou]);
+
+  const [catId, setCatId] = useState<CatalogTabId>(catalog[0]?.id ?? "group");
   const activeCat = useMemo(
     () => catalog.find((c) => c.id === catId) ?? catalog[0],
     [catalog, catId],
@@ -266,11 +284,18 @@ export function CheckoutPanel({ catalog, isMember, house, terms }: CheckoutPanel
 
   // Default selection per category mirrors the prototype: the popular pack in
   // Group, the first item otherwise.
-  const defaultIdFor = useCallback((cat: CatalogCategory | undefined): string => {
-    if (!cat) return "";
-    const popular = cat.items.find((i) => i.tag === "popular");
-    return (popular ?? cat.items[0])?.id ?? "";
-  }, []);
+  const defaultIdFor = useCallback(
+    (cat: CatalogCategory | undefined): string => {
+      if (!cat) return "";
+      // Never land on an offer they have already taken — the CTA would be dead on
+      // arrival with no explanation of why.
+      const buyable = cat.items.filter((i) => !soldOut.has(i.id));
+      const pool = buyable.length > 0 ? buyable : cat.items;
+      const popular = pool.find((i) => i.tag === "popular");
+      return (popular ?? pool[0])?.id ?? "";
+    },
+    [soldOut],
+  );
 
   const [selectedId, setSelectedId] = useState<string>(() => defaultIdFor(activeCat));
 
@@ -278,8 +303,10 @@ export function CheckoutPanel({ catalog, isMember, house, terms }: CheckoutPanel
     () => activeCat?.items.find((i) => i.id === selectedId) ?? activeCat?.items[0],
     [activeCat, selectedId],
   );
+  /** The selected offer is one this customer has already taken — checkout is off. */
+  const selectedTaken = selected !== undefined && soldOut.has(selected.id);
 
-  function pickCategory(id: PackageCategory) {
+  function pickCategory(id: CatalogTabId) {
     setCatId(id);
     setSelectedId(defaultIdFor(catalog.find((c) => c.id === id)));
   }
@@ -288,7 +315,7 @@ export function CheckoutPanel({ catalog, isMember, house, terms }: CheckoutPanel
   // (aria-controls / aria-labelledby), matching the admin Segmented pattern (A2).
   const baseId = useId();
   const promoFieldId = `${baseId}-promo`;
-  const catTabId = (id: PackageCategory) => `${baseId}-cat-${id}`;
+  const catTabId = (id: CatalogTabId) => `${baseId}-cat-${id}`;
   const panelId = `${baseId}-packages`;
 
   // Roving arrow-key navigation across the category tabs (WAI-ARIA tablist).
@@ -641,6 +668,7 @@ export function CheckoutPanel({ catalog, isMember, house, terms }: CheckoutPanel
                 lang={lang}
                 selected={selectedId === p.id}
                 onSelect={() => setSelectedId(p.id)}
+                takenAlready={soldOut.has(p.id)}
               />
             ))}
           </div>
@@ -750,7 +778,7 @@ export function CheckoutPanel({ catalog, isMember, house, terms }: CheckoutPanel
           <button
             type="button"
             onClick={openTerms}
-            disabled={!selected || phase !== "idle"}
+            disabled={!selected || selectedTaken || phase !== "idle"}
             className="flex h-12 flex-1 items-center justify-center gap-2.5 rounded-lune-sm bg-ink font-body text-base font-semibold text-cream shadow-lift transition-transform active:scale-[0.985] disabled:bg-cream-2 disabled:text-muted disabled:shadow-none"
           >
             {t("pay_promptpay")}
@@ -826,11 +854,14 @@ function PackageCard({
   lang,
   selected,
   onSelect,
+  takenAlready,
 }: {
   item: CatalogItem;
   lang: Lang;
   selected: boolean;
   onSelect: () => void;
+  /** A one-per-customer offer this customer has already had. Shown, not buyable. */
+  takenAlready: boolean;
 }) {
   const { t, tt } = makeT(lang);
   return (
@@ -839,10 +870,13 @@ function PackageCard({
       role="radio"
       aria-checked={selected}
       onClick={onSelect}
+      disabled={takenAlready}
       className={`relative flex w-full items-center gap-3 rounded-lune border-[1.5px] px-4 py-3.5 text-left transition-all ${
-        selected
-          ? "border-taupe bg-surface-2 shadow-lift"
-          : "border-line bg-surface shadow-soft"
+        takenAlready
+          ? "border-line bg-cream-2/40 opacity-60"
+          : selected
+            ? "border-taupe bg-surface-2 shadow-lift"
+            : "border-line bg-surface shadow-soft"
       }`}
     >
       {/* radio dot */}
@@ -864,6 +898,13 @@ function PackageCard({
           <span className="font-head text-[19px] font-semibold leading-[1.3] text-ink">
             {tt(item.label)}
           </span>
+          {/* A limited offer says its limit on the card. Learning about it at the
+              QR screen would be worse than not offering it at all. */}
+          {item.maxPerCustomer !== undefined && (
+            <span className="shrink-0 rounded-full bg-cream-2 px-2.5 py-[3px] font-body text-[10px] font-bold uppercase tracking-[0.05em] text-taupe-deep">
+              {takenAlready ? t("buy_already_bought") : t("buy_limit_one")}
+            </span>
+          )}
           {item.tag && (
             <span
               className={`shrink-0 rounded-full px-2.5 py-[3px] font-body text-[10px] font-bold uppercase tracking-[0.05em] ${
@@ -886,6 +927,29 @@ function PackageCard({
             {t("per_hour")}
           </span>
         </div>
+        {/* A BUNDLE's terms ARE the offer: two balances on two different clocks.
+            Spelling them out here is the difference between "buy one get one" as a
+            promise and as a surprise — the free class expires 7 days after the FIRST
+            class is taken, which nobody would infer from a package name. */}
+        {item.parts && item.parts.length > 1 && (
+          <ul className="mt-2 flex flex-col gap-1">
+            {item.parts.map((part) => (
+              <li
+                key={part.key}
+                className="flex items-baseline gap-1.5 font-body text-[12px] leading-snug text-ink-soft"
+              >
+                <span className="mt-[5px] h-[3px] w-[3px] shrink-0 rounded-full bg-taupe" />
+                <span className="min-w-0">
+                  <span className="font-semibold text-ink">{tt(part.label)}</span>
+                  {" · "}
+                  {part.anchored
+                    ? t("buy_part_after_first").replace("{n}", String(part.validity.amount))
+                    : t("buy_part_from_purchase").replace("{n}", String(part.validity.amount))}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
         {/* EVENT PACKAGE: credits that only open particular days' classes. Said on
             the card itself, beside the price, because it is the whole reason the
             price is what it is — finding out after paying would be a refund. */}

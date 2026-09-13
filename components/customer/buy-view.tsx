@@ -20,6 +20,8 @@ import { formatStudioDate } from "@/lib/time";
 
 export interface BuyViewProps {
   catalog: CatalogCategory[];
+  /** Ids of limited items this customer has already taken (one per customer). */
+  soldOutForYou: string[];
   /** The server-resolved usable pool balance (hours), display only. */
   hours: number;
   /** Soonest expiry across the pool as an ISO instant, or null when empty. */
@@ -34,6 +36,7 @@ export interface BuyViewProps {
 
 export function BuyView({
   catalog,
+  soldOutForYou,
   hours,
   nearestExpiryIso,
   isMember,
@@ -92,7 +95,13 @@ export function BuyView({
         </div>
 
         {/* tabs + cards + promo + perk + sticky bar + checkout sheet */}
-        <CheckoutPanel catalog={catalog} isMember={isMember} house={house} terms={terms} />
+        <CheckoutPanel
+          catalog={catalog}
+          soldOutForYou={soldOutForYou}
+          isMember={isMember}
+          house={house}
+          terms={terms}
+        />
       </div>
     </div>
   );
