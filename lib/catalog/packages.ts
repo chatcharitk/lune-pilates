@@ -340,7 +340,7 @@ const PROMO_META = {
   label: { en: "Promotions", th: "โปรโมชั่น" },
   note: {
     en: "Limited offers · one per customer",
-    th: "ข้อเสนอพิเศษ · ซื้อได้คนละหนึ่งครั้ง",
+    th: "ข้อเสนอพิเศษ · 1 สิทธิ์ต่อ 1 ท่าน",
   },
 } as const;
 

@@ -1268,13 +1268,13 @@ export const STR = {
   },
   err_limit_reached: {
     en: "You’ve already taken this offer. It’s one per customer.",
-    th: "คุณใช้สิทธิ์ข้อเสนอนี้ไปแล้ว ซื้อได้คนละ 1 ครั้ง",
+    th: "คุณใช้สิทธิ์ข้อเสนอนี้ไปแล้ว จำกัด 1 สิทธิ์ต่อ 1 ท่าน",
   },
   err_not_eligible: {
     en: "This offer is for first-time customers.",
     th: "ข้อเสนอนี้สำหรับลูกค้าใหม่เท่านั้น",
   },
-  buy_limit_one: { en: "One per customer", th: "ซื้อได้คนละ 1 ครั้ง" },
+  buy_limit_one: { en: "One per customer", th: "1 สิทธิ์ต่อ 1 ท่าน" },
   buy_already_bought: { en: "Already bought", th: "ซื้อไปแล้ว" },
   cat_promo: { en: "Promotions", th: "โปรโมชั่น" },
   buy_class_days: { en: "Only for classes on", th: "ใช้ได้เฉพาะคลาสวันที่" },
