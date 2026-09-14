@@ -337,7 +337,7 @@ export const STR = {
   three_months: { en: "3 months", th: "3 เดือน" },
   single_visit: { en: "Single visit", th: "ครั้งเดียว" },
   best_value: { en: "Best value", th: "คุ้มที่สุด" },
-  tag_promo: { en: "Trial", th: "ทดลองใช้" },
+  tag_promo: { en: "Trial", th: "ทดลองเล่น" },
   popular: { en: "Most popular", th: "ยอดนิยม" },
   non_transfer: { en: "Non-transferable", th: "โอนสิทธิ์ไม่ได้" },
   non_transfer_note: {
@@ -1140,7 +1140,7 @@ export const STR = {
   cat_tag_none: { en: "No badge", th: "ไม่มีป้าย" },
   cat_tag_popular: { en: "Popular", th: "ยอดนิยม" },
   cat_tag_best_value: { en: "Best value", th: "คุ้มที่สุด" },
-  cat_tag_promo: { en: "Trial", th: "ทดลองใช้" },
+  cat_tag_promo: { en: "Trial", th: "ทดลองเล่น" },
   cat_label_en: { en: "Name (English)", th: "ชื่อ (อังกฤษ)" },
   cat_label_th: { en: "Name (Thai)", th: "ชื่อ (ไทย)" },
   ph_cat_id: { en: "e.g. p20", th: "เช่น p20" },
