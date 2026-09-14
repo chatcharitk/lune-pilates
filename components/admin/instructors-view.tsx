@@ -653,7 +653,7 @@ function InstructorFormDrawer({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={t("ph_instr_name_en")}
-            className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink placeholder:text-muted"
+            className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-sm text-ink placeholder:text-muted"
           />
         </Field>
 
@@ -662,7 +662,7 @@ function InstructorFormDrawer({
             value={nameTh}
             onChange={(e) => setNameTh(e.target.value)}
             placeholder={t("ph_instr_name_th")}
-            className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink placeholder:text-muted"
+            className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-sm text-ink placeholder:text-muted"
           />
         </Field>
 
@@ -671,7 +671,7 @@ function InstructorFormDrawer({
             value={tag}
             onChange={(e) => setTag(e.target.value)}
             placeholder={t("ph_instr_tag")}
-            className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink placeholder:text-muted"
+            className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-sm text-ink placeholder:text-muted"
           />
         </Field>
       </div>

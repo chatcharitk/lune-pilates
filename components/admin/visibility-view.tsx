@@ -337,13 +337,13 @@ function AmountUnitField({
           onChange={(e) => onAmount(e.target.value)}
           inputMode="numeric"
           aria-label={`${label} — ${t("vis_amount")}`}
-          className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3 font-body text-sm font-medium text-ink tabular-nums"
+          className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3 font-body text-sm font-medium text-ink tabular-nums"
         />
         <select
           value={unit}
           onChange={(e) => onUnit(e.target.value as VisibilityUnit)}
           aria-label={`${label} — ${t("vis_unit")}`}
-          className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm font-medium text-ink"
+          className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-sm font-medium text-ink"
         >
           {VISIBILITY_UNITS.map((u) => (
             <option key={u} value={u}>

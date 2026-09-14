@@ -721,7 +721,7 @@ function ItemFormDrawer({
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
-            className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3 font-body text-sm text-ink placeholder:text-muted disabled:bg-cream-2 disabled:text-ink-soft"
+            className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3 font-body text-sm text-ink placeholder:text-muted disabled:bg-cream-2 disabled:text-ink-soft"
           />
         )}
       </Field>
@@ -758,7 +758,7 @@ function ItemFormDrawer({
               value={hours}
               onChange={(e) => setHours(e.target.value)}
               inputMode="numeric"
-              className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3 font-body text-sm font-medium text-ink tabular-nums"
+              className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3 font-body text-sm font-medium text-ink tabular-nums"
             />
           )}
         </Field>
@@ -772,7 +772,7 @@ function ItemFormDrawer({
               value={price}
               onChange={(e) => setPrice(e.target.value)}
               inputMode="numeric"
-              className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3 font-body text-sm font-medium text-ink tabular-nums"
+              className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3 font-body text-sm font-medium text-ink tabular-nums"
             />
           )}
         </Field>
@@ -804,13 +804,13 @@ function ItemFormDrawer({
               value={validityAmount}
               onChange={(e) => setValidityAmount(e.target.value)}
               inputMode="numeric"
-              className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3 font-body text-sm font-medium text-ink tabular-nums"
+              className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3 font-body text-sm font-medium text-ink tabular-nums"
             />
             <select
               aria-label={t("cat_validity")}
               value={validityUnit}
               onChange={(e) => setValidityUnit(e.target.value as ValidityUnit)}
-              className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm font-medium text-ink"
+              className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-sm font-medium text-ink"
             >
               {VALIDITY_UNITS.map((u) => (
                 <option key={u} value={u}>
@@ -848,7 +848,7 @@ function ItemFormDrawer({
             placeholder={t("ph_cat_label_en")}
             maxLength={60}
             required
-            className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3 font-body text-sm text-ink placeholder:text-muted"
+            className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3 font-body text-sm text-ink placeholder:text-muted"
           />
         )}
       </Field>
@@ -864,7 +864,7 @@ function ItemFormDrawer({
             maxLength={60}
             required
             lang="th"
-            className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3 font-body text-sm text-ink placeholder:text-muted"
+            className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3 font-body text-sm text-ink placeholder:text-muted"
           />
         )}
       </Field>
@@ -918,7 +918,7 @@ function ItemFormDrawer({
             max={1000}
             value={maxPerCustomer}
             onChange={(e) => setMaxPerCustomer(e.target.value)}
-            className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3 font-body text-sm text-ink"
+            className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3 font-body text-sm text-ink"
           />
         )}
       </Field>
@@ -970,7 +970,7 @@ function ItemFormDrawer({
             value={dayDraft}
             onChange={(e) => setDayDraft(e.target.value)}
             aria-label={t("cat_class_days_add")}
-            className="h-10 min-w-0 flex-1 rounded-lg border border-line-strong bg-surface px-3 font-body text-[13px] text-ink"
+            className="h-10 min-w-0 flex-1 rounded-lg border border-line-strong bg-surface-2 px-3 font-body text-[13px] text-ink"
           />
           <button
             type="button"
@@ -1171,7 +1171,7 @@ function Select({
       id={id}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm font-medium text-ink"
+      className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-sm font-medium text-ink"
     >
       {options.map((o) => (
         <option key={o.value} value={o.value}>
@@ -1597,7 +1597,7 @@ function LabeledInput({
         value={value}
         lang={lang}
         onChange={(e) => onChange(e.target.value)}
-        className="h-10 w-full rounded-lg border border-line-strong bg-surface px-2.5 font-body text-[13.5px] text-ink"
+        className="h-10 w-full rounded-lg border border-line-strong bg-surface-2 px-2.5 font-body text-[13.5px] text-ink"
       />
       {hint && <p className="mt-1 font-body text-[11px] leading-snug text-muted">{hint}</p>}
     </div>
@@ -1629,7 +1629,7 @@ function LabeledSelect({
         id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-10 w-full rounded-lg border border-line-strong bg-surface px-2 font-body text-[13.5px] text-ink"
+        className="h-10 w-full rounded-lg border border-line-strong bg-surface-2 px-2 font-body text-[13.5px] text-ink"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>

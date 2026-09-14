@@ -186,14 +186,14 @@ export function SaleDetailDrawer({ sale, onClose }: { sale: SalesRow | null; onC
               value={dateValue}
               onChange={(e) => setDateValue(e.target.value)}
               aria-label={t("sales_range_from")}
-              className="h-11 rounded-xl border border-line-strong bg-surface px-3 font-body text-sm text-ink"
+              className="h-11 rounded-xl border border-line-strong bg-surface-2 px-3 font-body text-sm text-ink"
             />
             <input
               type="time"
               value={timeValue}
               onChange={(e) => setTimeValue(e.target.value)}
               aria-label={t("start_time")}
-              className="h-11 rounded-xl border border-line-strong bg-surface px-3 font-body text-sm text-ink"
+              className="h-11 rounded-xl border border-line-strong bg-surface-2 px-3 font-body text-sm text-ink"
             />
             <button
               type="button"
@@ -259,7 +259,7 @@ export function SaleDetailDrawer({ sale, onClose }: { sale: SalesRow | null; onC
                       onChange={(e) => setCancelReason(e.target.value)}
                       placeholder={t("cancel_sale_reason_ph")}
                       maxLength={500}
-                      className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3 font-body text-sm text-ink"
+                      className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3 font-body text-sm text-ink"
                     />
                   </label>
                   <div className="mt-3 flex gap-2">

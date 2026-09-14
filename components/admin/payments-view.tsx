@@ -495,7 +495,7 @@ function SlipReviewDrawer({
                 onChange={(e) => setReason(e.target.value)}
                 placeholder={t("admin_reject_reason_ph")}
                 rows={2}
-                className="w-full resize-none rounded-xl border border-line-strong bg-surface px-3.5 py-2.5 font-body text-sm text-ink placeholder:text-muted"
+                className="w-full resize-none rounded-xl border border-line-strong bg-surface-2 px-3.5 py-2.5 font-body text-sm text-ink placeholder:text-muted"
               />
             </label>
           )}
@@ -829,7 +829,7 @@ function CustomerStep({
           onChange={(e) => setQ(e.target.value)}
           placeholder={t("search_members")}
           aria-label={t("search_members")}
-          className="h-11 w-full rounded-xl border border-line-strong bg-surface px-10 font-body text-sm text-ink placeholder:text-muted"
+          className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-10 font-body text-sm text-ink placeholder:text-muted"
         />
       </div>
 

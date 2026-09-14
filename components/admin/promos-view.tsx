@@ -564,7 +564,7 @@ function PromoDrawer({
               autoCorrect="off"
               spellCheck={false}
               placeholder="GRANDOPEN"
-              className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm uppercase tracking-[0.06em] text-ink disabled:bg-cream-2 disabled:text-ink-soft"
+              className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-sm uppercase tracking-[0.06em] text-ink disabled:bg-cream-2 disabled:text-ink-soft"
             />
           )}
         </PromoField>
@@ -578,7 +578,7 @@ function PromoDrawer({
                 onChange={(e) => setLabelEn(e.target.value)}
                 maxLength={60}
                 placeholder="Grand opening"
-                className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink"
+                className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-sm text-ink"
               />
             )}
           </PromoField>
@@ -591,7 +591,7 @@ function PromoDrawer({
                 maxLength={60}
                 lang="th"
                 placeholder="เปิดร้านใหญ่"
-                className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink"
+                className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-sm text-ink"
               />
             )}
           </PromoField>
@@ -636,7 +636,7 @@ function PromoDrawer({
                           [cat]: { ...prev[cat], kind: e.target.value as "percent" | "fixed" },
                         }))
                       }
-                      className="h-10 shrink-0 rounded-lg border border-line-strong bg-surface px-2 font-body text-[13px] text-ink"
+                      className="h-10 shrink-0 rounded-lg border border-line-strong bg-surface-2 px-2 font-body text-[13px] text-ink"
                     >
                       <option value="fixed">{t("promo_kind_fixed")}</option>
                       <option value="percent">{t("promo_kind_percent")}</option>
@@ -655,7 +655,7 @@ function PromoDrawer({
                           [cat]: { ...prev[cat], value: e.target.value },
                         }))
                       }
-                      className="h-10 min-w-0 flex-1 rounded-lg border border-line-strong bg-surface px-3 font-body text-[13px] text-ink"
+                      className="h-10 min-w-0 flex-1 rounded-lg border border-line-strong bg-surface-2 px-3 font-body text-[13px] text-ink"
                     />
                   </div>
 
@@ -721,7 +721,7 @@ function PromoDrawer({
                                       },
                                     }))
                                   }
-                                  className="h-9 shrink-0 rounded-lg border border-line bg-surface px-2 font-body text-[12.5px] text-ink"
+                                  className="h-9 shrink-0 rounded-lg border border-line bg-surface-2 px-2 font-body text-[12.5px] text-ink"
                                 >
                                   <option value="fixed">{t("promo_kind_fixed")}</option>
                                   <option value="percent">{t("promo_kind_percent")}</option>
@@ -742,7 +742,7 @@ function PromoDrawer({
                                       [item.id]: { ...draft, value: e.target.value },
                                     }))
                                   }
-                                  className="h-9 w-[104px] shrink-0 rounded-lg border border-line bg-surface px-2.5 font-body text-[12.5px] text-ink"
+                                  className="h-9 w-[104px] shrink-0 rounded-lg border border-line bg-surface-2 px-2.5 font-body text-[12.5px] text-ink"
                                 />
                               </div>
                             );
@@ -765,7 +765,7 @@ function PromoDrawer({
                 type="date"
                 value={startsOn}
                 onChange={(e) => setStartsOn(e.target.value)}
-                className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink"
+                className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-sm text-ink"
               />
             )}
           </PromoField>
@@ -776,7 +776,7 @@ function PromoDrawer({
                 type="date"
                 value={endsOn}
                 onChange={(e) => setEndsOn(e.target.value)}
-                className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink"
+                className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-sm text-ink"
               />
             )}
           </PromoField>
@@ -792,7 +792,7 @@ function PromoDrawer({
                 min={0}
                 value={maxTotal}
                 onChange={(e) => setMaxTotal(e.target.value)}
-                className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink"
+                className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-sm text-ink"
               />
             )}
           </PromoField>
@@ -805,7 +805,7 @@ function PromoDrawer({
                 min={1}
                 value={maxPerCustomer}
                 onChange={(e) => setMaxPerCustomer(e.target.value)}
-                className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink"
+                className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-sm text-ink"
               />
             )}
           </PromoField>
@@ -824,7 +824,7 @@ function PromoDrawer({
               value={appliesToItem}
               onChange={(e) => setAppliesToItem(e.target.value)}
               disabled={coveredCategories.length === 0}
-              className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3 font-body text-sm text-ink disabled:opacity-50"
+              className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3 font-body text-sm text-ink disabled:opacity-50"
             >
               <option value="">{t("promo_applies_all")}</option>
               {/* Grouped by format because several packages share a name ("1 class"

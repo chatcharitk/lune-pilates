@@ -448,7 +448,7 @@ function ClassEditor({
           onChange={(e) => setName(e.target.value)}
           placeholder={t("class_name_ph")}
           maxLength={60}
-          className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink placeholder:text-muted"
+          className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-sm text-ink placeholder:text-muted"
         />
       </Field>
 
@@ -577,7 +577,7 @@ function Select({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm font-medium text-ink"
+      className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-sm font-medium text-ink"
     >
       {options.map((o) => (
         <option key={o.value} value={o.value}>

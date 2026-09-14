@@ -188,7 +188,7 @@ export function AddBookingDrawer({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t("search_name_phone")}
-            className="mb-2 h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink placeholder:text-muted"
+            className="mb-2 h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-sm text-ink placeholder:text-muted"
           />
           <ul className="max-h-[38vh] overflow-y-auto rounded-xl border border-line">
             {filtered.length === 0 ? (

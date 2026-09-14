@@ -222,7 +222,7 @@ function TermsField({
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
         rows={14}
-        className="w-full rounded-xl border border-line bg-surface px-3.5 py-3 font-body text-[13px] leading-[1.65] text-ink outline-none focus:border-taupe disabled:opacity-60"
+        className="w-full rounded-xl border border-line bg-surface-2 px-3.5 py-3 font-body text-[13px] leading-[1.65] text-ink outline-none focus:border-taupe disabled:opacity-60"
       />
     </div>
   );

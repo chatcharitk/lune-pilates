@@ -454,7 +454,7 @@ function EditCustomerControl({
           onChange={(e) => setName(e.target.value)}
           placeholder={t("ph_customer_name")}
           disabled={pending}
-          className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink placeholder:text-muted disabled:opacity-60"
+          className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-sm text-ink placeholder:text-muted disabled:opacity-60"
         />
       </Field>
       <Field label={t("phone_label")}>
@@ -464,7 +464,7 @@ function EditCustomerControl({
           inputMode="tel"
           placeholder={t("ph_phone")}
           disabled={pending}
-          className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink placeholder:text-muted disabled:opacity-60"
+          className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-sm text-ink placeholder:text-muted disabled:opacity-60"
         />
       </Field>
       <Field label={t("edit_tier")}>
@@ -503,7 +503,7 @@ function EditCustomerControl({
             placeholder={t("ph_house_number")}
             disabled={pending}
             maxLength={40}
-            className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink placeholder:text-muted disabled:opacity-60"
+            className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-sm text-ink placeholder:text-muted disabled:opacity-60"
           />
           <p className="mt-1 font-body text-[11.5px] leading-snug text-muted">
             {t("edit_house_hint")}
@@ -853,7 +853,7 @@ function AdjustCreditsControl({
                 value={magnitude}
                 onChange={(e) => setMagnitude(e.target.value)}
                 aria-label={t("adjust_amount")}
-                className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink placeholder:text-muted"
+                className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-sm text-ink placeholder:text-muted"
               />
             </div>
           </Field>
@@ -865,7 +865,7 @@ function AdjustCreditsControl({
               onChange={(e) => setNote(e.target.value)}
               placeholder={t("adjust_note_ph")}
               rows={2}
-              className="w-full resize-none rounded-xl border border-line-strong bg-surface px-3.5 py-2.5 font-body text-sm text-ink placeholder:text-muted"
+              className="w-full resize-none rounded-xl border border-line-strong bg-surface-2 px-3.5 py-2.5 font-body text-sm text-ink placeholder:text-muted"
             />
           </Field>
 
@@ -1095,7 +1095,7 @@ function AddCustomerDrawer({
             value={form.name}
             onChange={(e) => set("name", e.target.value)}
             placeholder={t("ph_customer_name")}
-            className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink placeholder:text-muted"
+            className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-sm text-ink placeholder:text-muted"
           />
         </Field>
 
@@ -1105,7 +1105,7 @@ function AddCustomerDrawer({
             onChange={(e) => set("phone", e.target.value)}
             inputMode="tel"
             placeholder={t("ph_phone")}
-            className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink placeholder:text-muted"
+            className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-sm text-ink placeholder:text-muted"
           />
         </Field>
 
@@ -1150,7 +1150,7 @@ function AddCustomerDrawer({
               value={form.houseNumber}
               onChange={(e) => set("houseNumber", e.target.value)}
               placeholder={t("ph_house_number")}
-              className="h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink placeholder:text-muted"
+              className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-sm text-ink placeholder:text-muted"
             />
           </Field>
         )}
@@ -1295,7 +1295,7 @@ function ExpiryControl({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           disabled={pending}
-          className="h-11 min-w-0 flex-1 rounded-xl border border-line-strong bg-surface px-3.5 font-body text-sm text-ink disabled:opacity-60"
+          className="h-11 min-w-0 flex-1 rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-sm text-ink disabled:opacity-60"
         />
         <button
           type="button"
