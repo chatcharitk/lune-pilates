@@ -49,6 +49,17 @@ const LINKS: SettingsLink[] = [
       </>
     ),
   },
+  {
+    href: "/admin/settings/links",
+    titleKey: "settings_links_title",
+    descKey: "settings_links_desc",
+    icon: (
+      <>
+        <path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11.5 4.5" />
+        <path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07l1.33-1.33" />
+      </>
+    ),
+  },
   // Existing routes — see the page doc for why they are linked, not re-homed.
   {
     href: "/admin/visibility",

@@ -657,6 +657,30 @@ export const creditLedger = pgTable(
   ],
 );
 
+// ───────────────────────── uploaded images ─────────────────────────
+// Images the OWNER uploads to get a stable link for (2026-09-17) — the LINE rich
+// menu is the reason: its buttons point at URLs, and the artwork has to live
+// somewhere the studio controls.
+//
+// The bytes sit in the row as a data URL, the same choice instructor photos already
+// make. A handful of images measured in kilobytes does not justify a second storage
+// path with its own credentials and failure modes; R2 stays where the PII lives
+// (payment slips), which is what it was chosen for.
+//
+// The id IS the capability: /api/i/<id> serves the bytes to anyone with the link,
+// which is what "put this URL in the rich menu" requires. Nothing private belongs
+// here — that is the rule this table is used under, not something it can enforce.
+export const uploads = pgTable("uploads", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  /** The owner's own name for it, so a list of links is readable months later. */
+  title: text("title").notNull(),
+  /** Canonical `data:<sniffed mime>;base64,…` — never the caller's own string. */
+  dataUrl: text("data_url").notNull(),
+  mimeType: text("mime_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ───────────────────────── instructors ─────────────────────────
 export const instructors = pgTable("instructors", {
   id: text("id").primaryKey(), // "mai", "ploy", "nina"

@@ -1186,6 +1186,63 @@ export const STR = {
     th: "อายุการใช้งานต้องเป็นจำนวนเต็มระหว่าง 1 ถึง {max} ตามหน่วยที่เลือก",
   },
   // ───────── admin: promo codes ─────────
+  // Settings → Links & images (2026-09-17). The LINE rich menu points its buttons at
+  // URLs, so the owner needs the addresses and somewhere to host artwork.
+  settings_links_title: { en: "Links & images", th: "ลิงก์และรูปภาพ" },
+  settings_links_desc: {
+    en: "Addresses to paste into your LINE rich menu, and images to link to.",
+    th: "ลิงก์สำหรับใส่ใน LINE rich menu และรูปภาพที่ต้องการลิงก์ถึง",
+  },
+  links_pages_title: { en: "Customer screens", th: "หน้าจอลูกค้า" },
+  links_pages_hint: {
+    en: "Paste one of these into a rich-menu button so the button opens that screen.",
+    th: "คัดลอกไปใส่ในปุ่มของ rich menu เพื่อให้ปุ่มนั้นเปิดหน้าจอที่ต้องการ",
+  },
+  links_schedule: { en: "Class schedule", th: "ตารางคลาส" },
+  links_schedule_desc: {
+    en: "The week's classes — what most menus point at",
+    th: "ตารางคลาสทั้งสัปดาห์ — ปุ่มส่วนใหญ่ชี้มาที่นี่",
+  },
+  links_buy: { en: "Buy packages", th: "ซื้อแพ็กเกจ" },
+  links_buy_desc: { en: "Packages and promotions", th: "แพ็กเกจและโปรโมชั่น" },
+  links_bookings: { en: "My bookings", th: "การจองของฉัน" },
+  links_bookings_desc: { en: "What the customer has booked", th: "คลาสที่ลูกค้าจองไว้" },
+  links_home: { en: "Home", th: "หน้าแรก" },
+  links_home_desc: { en: "Balance and next class", th: "คลาสคงเหลือและคลาสถัดไป" },
+  links_profile: { en: "Profile", th: "โปรไฟล์" },
+  links_profile_desc: { en: "Account and household", th: "บัญชีและบ้านเลขที่" },
+  links_images_title: { en: "Images", th: "รูปภาพ" },
+  links_images_hint: {
+    en: "Upload an image to get a link for it. Anyone with the link can view it, so don’t put anything private here.",
+    th: "อัปโหลดรูปเพื่อรับลิงก์ ใครที่มีลิงก์ก็เปิดดูได้ จึงไม่ควรใส่รูปที่เป็นความลับ",
+  },
+  links_upload: { en: "Upload an image", th: "อัปโหลดรูป" },
+  links_images_empty: { en: "No images yet", th: "ยังไม่มีรูป" },
+  links_copy: { en: "Copy", th: "คัดลอก" },
+  links_copied: { en: "Copied", th: "คัดลอกแล้ว" },
+  links_uploaded: { en: "Image uploaded", th: "อัปโหลดรูปแล้ว" },
+  links_delete: { en: "Delete", th: "ลบ" },
+  links_deleted: { en: "Image deleted", th: "ลบรูปแล้ว" },
+  links_delete_confirm: {
+    en: "Delete this image for good? Anything already pointing at its link — a rich-menu button, a printed code — will stop working.",
+    th: "ลบรูปนี้ถาวรหรือไม่? สิ่งที่ชี้ไปยังลิงก์นี้อยู่ เช่น ปุ่มใน rich menu หรือโค้ดที่พิมพ์ไปแล้ว จะใช้ไม่ได้",
+  },
+  err_upload_invalid: {
+    en: "That file isn’t an image we can use. Try a PNG, JPG or WEBP.",
+    th: "ไฟล์นี้ไม่ใช่รูปที่ใช้ได้ กรุณาใช้ PNG, JPG หรือ WEBP",
+  },
+  err_upload_too_large: {
+    en: "That image is too large. The limit is 2 MB.",
+    th: "รูปใหญ่เกินไป จำกัดไม่เกิน 2 MB",
+  },
+  err_upload_save: {
+    en: "Could not save the image. Please try again.",
+    th: "บันทึกรูปไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
+  },
+  err_copy_failed: {
+    en: "Could not copy. Select the link and copy it by hand.",
+    th: "คัดลอกไม่สำเร็จ กรุณาเลือกลิงก์แล้วคัดลอกเอง",
+  },
   settings_promos_title: { en: "Promo codes", th: "โค้ดส่วนลด" },
   settings_promos_desc: {
     en: "Event discounts for pre-opening, soft opening and grand opening.",
