@@ -1511,7 +1511,7 @@ function SlipSubmittedStep({
 
       {/* the package awaiting credit (no balance — credit is granted on approval) */}
       {item && (
-        <div className="mb-3 flex items-center justify-center gap-2 rounded-lune-sm bg-cream-2 px-4 py-3.5">
+        <div className="mb-5 flex items-center justify-center gap-2 rounded-lune-sm bg-cream-2 px-4 py-3.5">
           <Sparkle size={16} className="text-taupe" />
           <span className="font-head text-[18px] font-semibold text-ink">{tt(item.label)}</span>
           <span className="font-body text-[13px] text-muted">
@@ -1520,12 +1520,12 @@ function SlipSubmittedStep({
         </div>
       )}
 
-      {/* live polling indicator — the sheet checks confirmPayment until approve/reject */}
-      <div className="mb-[18px] flex items-center justify-center gap-2 font-body text-[12.5px] text-muted">
-        <Spinner size={14} />
-        <span>{t("slip_checking")}</span>
-      </div>
-
+      {/* The sheet still polls confirmPayment until the front desk approves or
+          rejects, and flips itself to the credited screen when that lands. It no
+          longer SAYS so (owner, 2026-09-21): a spinner labelled "waiting for
+          approval" made an ordinary wait look like something had stalled, on the
+          screen whose job is to reassure. The line above already says what happens
+          next. */}
       <button
         type="button"
         onClick={onDone}
@@ -1681,16 +1681,6 @@ function SlipRejectedStep({
 }
 
 // A spinning ring used as the under-review polling indicator.
-function Spinner({ size = 16 }: { size?: number }) {
-  return (
-    <span
-      className="inline-block animate-spin rounded-full border-2 border-line border-t-taupe"
-      style={{ width: size, height: size }}
-      aria-hidden
-    />
-  );
-}
-
 // An "✕" mark for the rejected screen's status badge (no icon needed in icons.tsx).
 function RejectMark({ size = 34 }: { size?: number }) {
   return (

@@ -462,7 +462,6 @@ export const STR = {
   // slip-review outcome screens — after upload the sheet polls confirmPayment until
   // the studio approves (→ credited "paid", reusing payment_done / payment_sub) or
   // rejects (→ this rejected screen, which lets the customer re-upload).
-  slip_checking: { en: "Checking for approval…", th: "กำลังรอการอนุมัติ…" },
   slip_rejected_title: { en: "Slip needs another look", th: "สลิปต้องตรวจสอบอีกครั้ง" },
   slip_rejected_sub: {
     en: "Please check your transfer, then upload your slip again.",
