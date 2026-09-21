@@ -151,3 +151,49 @@ describe("termsSnapshotFor — what every charge-creation site writes", () => {
     });
   });
 });
+
+describe("itemForCredit — a restriction ADDED after the sale must not reach the buyer", () => {
+  // The owner sells an ordinary 10-class pack, the customer uploads a slip, and
+  // while it sits in review the owner turns that same item into a campaign: a fixed
+  // end date and two event days. Approving must still grant what was BOUGHT.
+  const LIVE_NOW_A_CAMPAIGN: CatalogItem = {
+    ...LIVE_EDITED,
+    expiresOn: "2026-11-30",
+    classDays: ["2026-09-17", "2026-09-21"],
+  };
+
+  it("does not inherit a fixed expiry the charge was not sold with", () => {
+    expect(itemForCredit(LIVE_NOW_A_CAMPAIGN, PAID).expiresOn).toBeUndefined();
+  });
+
+  it("does not inherit event days the charge was not sold with", () => {
+    expect(itemForCredit(LIVE_NOW_A_CAMPAIGN, PAID).classDays).toBeUndefined();
+  });
+
+  it("still honours restrictions that WERE sold", () => {
+    const sold = {
+      ...PAID,
+      expiresOn: "2026-12-31",
+      classDays: ["2026-10-01"],
+    };
+    const out = itemForCredit(LIVE_NOW_A_CAMPAIGN, sold);
+    // The charge's own terms, not the ones the item happens to carry today.
+    expect(out.expiresOn).toBe("2026-12-31");
+    expect(out.classDays).toEqual(["2026-10-01"]);
+  });
+
+  it("leaves a LEGACY charge on the live item, as before", () => {
+    // No snapshot at all: there is nothing else to grant from, and that path is
+    // unchanged by this rule.
+    const legacy = {
+      hours: null,
+      validity: null,
+      validityAmount: null,
+      validityUnit: null,
+      category: null,
+      classDays: null,
+      expiresOn: null,
+    };
+    expect(itemForCredit(LIVE_NOW_A_CAMPAIGN, legacy)).toEqual(LIVE_NOW_A_CAMPAIGN);
+  });
+});

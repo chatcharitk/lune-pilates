@@ -157,6 +157,8 @@ function checkoutErrorKey(code: string): StrKey {
 /** Map an uploadPaymentSlip failure code to friendly, keyed copy. */
 function slipErrorKey(code: UploadPaymentSlipFailureCode): StrKey {
   switch (code) {
+    case "LIMIT_REACHED":
+      return "err_limit_reached";
     case "INVALID_FILE":
       return "err_invalid_file";
     case "TOO_LARGE":

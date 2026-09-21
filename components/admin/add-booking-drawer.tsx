@@ -17,9 +17,20 @@ import type { BookableClass } from "@/lib/schedule/queries";
 import type { ClassType, ReformerPosition } from "@/lib/domain/types";
 import type { StrKey } from "@/lib/i18n";
 import { formatStudioDate, formatStudioTime } from "@/lib/time";
+import { creditCostForClassType } from "@/lib/credits/cost";
 
 // Display-only credit cost per type (server recomputes authoritatively).
-const COST: Record<ClassType, number> = { group: 1, rental: 1, private: 2, duo: 2, trio: 2 };
+// Display-only credit cost per type. Derived from the SAME function the debit uses
+// so the desk can never be shown a cost the server does not charge: this map used to
+// say 2 for private/duo/trio, which stopped being true when one credit became one
+// class for every type (CLAUDE.md §5 inv 1, 2026-09-08).
+const COST: Record<ClassType, number> = {
+  group: creditCostForClassType("group"),
+  rental: creditCostForClassType("rental"),
+  private: creditCostForClassType("private"),
+  duo: creditCostForClassType("duo"),
+  trio: creditCostForClassType("trio"),
+};
 const POSITIONS: ReformerPosition[] = ["left", "middle", "right"];
 const POS_KEY: Record<ReformerPosition, StrKey> = {
   left: "pos_left",
@@ -35,6 +46,9 @@ const ERR: Record<string, StrKey> = {
   POSITION_TAKEN: "err_position_taken",
   INVALID_POSITION: "err_invalid_position",
   CLASS_NOT_FOUND: "err_not_found",
+  // An event package aimed at a class it was not sold for (2026-09-12). Selection
+  // avoids this now, but the in-transaction guard can still raise it in a race.
+  WRONG_CLASS_DAY: "err_wrong_class_day",
 };
 
 export function AddBookingDrawer({

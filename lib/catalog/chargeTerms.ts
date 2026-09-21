@@ -70,13 +70,22 @@ export function itemForCredit(live: CatalogItem, snapshot: ChargeTermsSnapshot):
   const complete = snapshot.hours !== null && snapshot.category !== null && hasValidity;
   if (!complete) return live; // legacy row — pre-snapshot behaviour, see the header
 
+  // RESTRICTIONS ARE TAKEN FROM THE SNAPSHOT, INCLUDING ITS ABSENCE.
+  //
+  // For hours/validity/category a null snapshot means "not recorded" and the live
+  // value is the only thing to fall back on. For class-days and a fixed expiry it
+  // means the opposite: the customer bought terms with NO restriction, and that is
+  // itself a purchased term. Spreading `live` and only overriding when the snapshot
+  // had a value let an owner who later added a campaign date (or event days) to the
+  // item silently shorten — or pin to two days — credits somebody had already paid
+  // for while their slip sat in review. So both are set explicitly here, and an
+  // absent snapshot value CLEARS whatever the live item now carries.
+  const { classDays: _liveDays, expiresOn: _liveExpiry, ...rest } = live;
   return {
-    ...live,
+    ...rest,
     hours: snapshot.hours!,
     validity: validityFromRow(snapshot.validityAmount, snapshot.validityUnit, snapshot.validity),
     category: snapshot.category!,
-    // An empty list is stored as null, so "no days" and "any day" are the same
-    // thing here — and a legacy row (no snapshot at all) keeps the live item's days.
     ...(snapshot.classDays && snapshot.classDays.length > 0
       ? { classDays: snapshot.classDays }
       : {}),

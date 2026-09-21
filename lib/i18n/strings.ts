@@ -1352,6 +1352,10 @@ export const STR = {
     en: "That expiry date has already passed — credits sold with it would be expired the moment they are granted.",
     th: "วันหมดอายุนี้ผ่านไปแล้ว เครดิตที่ขายจะหมดอายุทันทีที่ได้รับ",
   },
+  err_cat_date_order: {
+    en: "Check the dates: the sale must open before it closes, and credits must not expire before the sale ends.",
+    th: "กรุณาตรวจวันที่: วันเริ่มขายต้องมาก่อนวันสิ้นสุด และเครดิตต้องไม่หมดอายุก่อนวันปิดการขาย",
+  },
   cat_expires_on: { en: "Credits expire on", th: "เครดิตหมดอายุวันที่" },
   cat_expires_on_hint: {
     en: "A fixed date, whatever day it was bought — use it for a campaign with a published end date. Leave empty to use the validity above.",

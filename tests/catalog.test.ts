@@ -214,12 +214,21 @@ describe("listPackageCatalog", () => {
     expect(cats.map((c) => c.id)).toEqual(["group", "private", "duo", "trio", "rental"]);
   });
 
-  it("every item's id resolves back through getCatalogItem to an equal item", async () => {
+  it("every item's id resolves back through getCatalogItem to the same terms", async () => {
     const all = (await listPackageCatalog()).flatMap((c) => c.items);
     expect(all.length).toBe(13); // 4 group + 2 1:1 + 2 duo + 2 trio + 3 rental
     for (const item of all) {
-      expect(await getCatalogItem(item.id)).toEqual(item);
+      // toMatchObject, not toEqual: the single-item read also carries `active` and
+      // `sortOrder` (the write paths need `active` to refuse an archived item). Every
+      // field the purchasable list shows must still agree exactly.
+      expect(await getCatalogItem(item.id)).toMatchObject(item);
     }
+  });
+
+  it("reports whether a resolved item is still on the shelf", async () => {
+    // What createCheckout refuses on: an archived item still resolves (old charges
+    // and unspent credits depend on it) but must not be sellable.
+    expect((await getCatalogItem("drop"))?.active).toBe(true);
   });
 
   it("orders items within a category by sortOrder", async () => {
@@ -384,5 +393,29 @@ describe("sublabelForFixedExpiry — one line every surface can repeat", () => {
     // Bangkok but the 29th in the Americas — the sublabel must not drift by a day.
     expect(sublabelForFixedExpiry("2026-11-30").en).toBe("Use until 30 Nov 2026");
     expect(sublabelForFixedExpiry("2026-01-01").en).toBe("Use until 1 Jan 2026");
+  });
+});
+
+describe("date guards on a campaign (audit follow-up, 2026-09-17)", () => {
+  // These are the shapes the zod schema must refuse before anything is stored: a
+  // date that matches the pattern but is not a day, and dates that contradict.
+  it("rejects a date that does not exist", () => {
+    expect(expiryFromFixedDay("2026-02-31")).toBeNull();
+    expect(expiryFromFixedDay("2026-13-01")).toBeNull();
+    expect(expiryFromFixedDay("2026-11-30")).not.toBeNull();
+  });
+
+  it("orders as strings exactly as it orders as days", () => {
+    // datesOutOfOrder compares zero-padded YYYY-MM-DD lexically; confirm that is
+    // the same answer the instants give, including across a year boundary.
+    const pairs: [string, string][] = [
+      ["2026-09-30", "2026-10-30"],
+      ["2026-12-31", "2027-01-01"],
+      ["2026-01-09", "2026-01-10"],
+    ];
+    for (const [a, b] of pairs) {
+      expect(a < b).toBe(true);
+      expect(expiryFromFixedDay(a)!.getTime() < expiryFromFixedDay(b)!.getTime()).toBe(true);
+    }
   });
 });

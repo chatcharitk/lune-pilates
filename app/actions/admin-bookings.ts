@@ -341,11 +341,18 @@ export async function adminBookForCustomer(
 
   // Pick the package to debit for THE CUSTOMER (not the admin) — cost-aware,
   // recomputed from their pool; never a client-supplied id (§8).
+  // The CLASS's day is passed so an event package — credits sold for particular
+  // days' classes — is only offered for a class it can actually settle. Without it
+  // selection would hand back the event package (it is preferred, being the
+  // narrowest credit) and the guard inside the transaction would then refuse the
+  // booking outright, leaving the desk unable to book a customer who has perfectly
+  // good ordinary credits sitting beside it.
   const packageId = await selectUsablePackageForUser(
     input.userId,
     cls.type,
     now,
     creditCostForClassType(cls.type),
+    cls.startsAt,
   );
   if (!packageId) {
     // Either the user doesn't exist or they have no usable package in this pool.

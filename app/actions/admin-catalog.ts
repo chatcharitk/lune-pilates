@@ -115,11 +115,31 @@ const labelField = z.string().trim().min(1).max(60);
  * instead. Days are normalised (sorted, de-duplicated) so the stored list has one
  * shape and the UI never shows the same day twice.
  */
-/** A Bangkok day, or "" for "no bound" (the fields are optional dates). */
-const YMD_OR_BLANK = z.union([z.literal(""), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)]).optional();
+/**
+ * A Bangkok day, or "" for "no bound" (the fields are optional dates).
+ *
+ * Shape alone is not enough: "2026-02-31" matches the pattern but is not a day, and
+ * the two readers then disagree about it — crediting silently falls back to the
+ * relative validity while the buy card renders today's date. Requiring it to
+ * round-trip means a date that reaches storage always means what it says.
+ */
+const YMD_OR_BLANK = z
+  .union([
+    z.literal(""),
+    z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .refine((v) => expiryFromFixedDay(v) !== null, { message: "not a real date" }),
+  ])
+  .optional();
 
 const CLASS_DAYS = z
-  .array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/))
+  .array(
+    z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .refine((v) => expiryFromFixedDay(v) !== null, { message: "not a real date" }),
+  )
   .max(31)
   .optional();
 
@@ -191,6 +211,25 @@ function expiryAlreadyPassed(expiresOn: string | null, now: Date): boolean {
   return last !== null && last.getTime() <= now.getTime();
 }
 
+/**
+ * Dates that contradict each other: a window that closes before it opens, or credits
+ * that expire before the sale even ends (every buyer after that date would be sold
+ * something already dead). Both are typos rather than intentions.
+ */
+function datesOutOfOrder(input: {
+  saleStartsOn?: string;
+  saleEndsOn?: string;
+  expiresOn?: string;
+}): boolean {
+  const start = blankToNull(input.saleStartsOn);
+  const end = blankToNull(input.saleEndsOn);
+  const expiry = blankToNull(input.expiresOn);
+  if (start && end && start > end) return true;
+  // String comparison is safe and exact for zero-padded "YYYY-MM-DD".
+  if (expiry && end && expiry < end) return true;
+  return false;
+}
+
 /** An optional date field: "" and absent both mean "no bound". */
 function blankToNull(ymd: string | undefined): string | null {
   return ymd && ymd !== "" ? ymd : null;
@@ -228,6 +267,8 @@ export type CreateCatalogItemFailureCode =
   | "DUPLICATE_ID"
   /** A fixed expiry date that has already passed — the credits would be born dead. */
   | "EXPIRY_IN_PAST"
+  /** The sale window closes before it opens, or the credits die before it closes. */
+  | "BAD_DATE_ORDER"
   | MockNoDbCode;
 
 export type CreateCatalogItemResult =
@@ -240,6 +281,7 @@ export type UpdateCatalogItemFailureCode =
   | "UNKNOWN_ITEM"
   | "CATEGORY_IMMUTABLE"
   | "EXPIRY_IN_PAST"
+  | "BAD_DATE_ORDER"
   | MockNoDbCode;
 
 export type UpdateCatalogItemResult =
@@ -247,6 +289,8 @@ export type UpdateCatalogItemResult =
   | { ok: false; code: UpdateCatalogItemFailureCode };
 
 export type ArchiveCatalogItemFailureCode =
+  /** Restoring a campaign whose fixed expiry has passed — it would sell dead credits. */
+  | "EXPIRY_IN_PAST"
   | "UNAUTHORIZED"
   | "INVALID_INPUT"
   | "UNKNOWN_ITEM"
@@ -300,6 +344,7 @@ export async function createCatalogItem(
   if (expiryAlreadyPassed(blankToNull(input.expiresOn), new Date())) {
     return { ok: false, code: "EXPIRY_IN_PAST" };
   }
+  if (datesOutOfOrder(input)) return { ok: false, code: "BAD_DATE_ORDER" };
 
   // Mock-data dev mode: the input is fully validated above, but there is no database
   // to write to. Report MOCK_NO_DB rather than a fake success — see MockNoDbCode.
@@ -412,6 +457,7 @@ export async function updateCatalogItem(
   if (current.active && expiryAlreadyPassed(blankToNull(input.expiresOn), new Date())) {
     return { ok: false, code: "EXPIRY_IN_PAST" };
   }
+  if (datesOutOfOrder(input)) return { ok: false, code: "BAD_DATE_ORDER" };
 
   const sortOrder = input.sortOrder ?? current.sortOrder;
 
@@ -463,6 +509,15 @@ export async function archiveCatalogItem(rawId: string): Promise<ArchiveCatalogI
 /** Put an archived item back on sale. */
 export async function restoreCatalogItem(rawId: string): Promise<ArchiveCatalogItemResult> {
   if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
+
+  // Putting a campaign back on sale re-opens the question the save path already
+  // asks: is its fixed expiry still ahead of us? Without this, restore is the way
+  // around that guard, and the shop reopens selling credits that are already dead.
+  const existing = (await listAllCatalogItems()).find((i) => i.id === rawId.trim());
+  if (existing && expiryAlreadyPassed(existing.expiresOn ?? null, new Date())) {
+    return { ok: false, code: "EXPIRY_IN_PAST" };
+  }
+
   return await setActive(rawId, true);
 }
 

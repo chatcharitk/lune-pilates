@@ -531,14 +531,16 @@ export async function loadCatalogMap(): Promise<Map<string, CatalogItem>> {
  * Resolves ARCHIVED items too, deliberately: historical charges (charges.package_id)
  * and unspent credits (packages.type) reference ids that may since have been
  * archived, and they must keep resolving to their label/hours/category forever.
- * Gating what is PURCHASABLE is `listPackageCatalog`'s job, not this one's.
+ * Gating what is PURCHASABLE is `listPackageCatalog`'s job, not this one's — but the
+ * `active` flag comes back with the item so a WRITE path (createCheckout) can refuse
+ * an archived one without a second read.
  */
-export async function getCatalogItem(id: string): Promise<CatalogItem | undefined> {
+export async function getCatalogItem(id: string): Promise<AdminCatalogItem | undefined> {
   if (!id) return undefined;
 
   if (mockDataMode()) {
     const seed = SEED_CATALOG.find((s) => s.id === id);
-    return seed ? toCatalogItem(seed) : undefined;
+    return seed ? { ...toCatalogItem(seed), active: true, sortOrder: seed.sortOrder } : undefined;
   }
 
   const db = getDb();
@@ -551,7 +553,7 @@ export async function getCatalogItem(id: string): Promise<CatalogItem | undefine
   if (anyRow.length > 0) return undefined; // table is populated → genuinely unknown id
 
   const seed = SEED_CATALOG.find((s) => s.id === id);
-  return seed ? toCatalogItem(seed) : undefined;
+  return seed ? { ...toCatalogItem(seed), active: true, sortOrder: seed.sortOrder } : undefined;
 }
 
 /**

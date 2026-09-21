@@ -36,7 +36,7 @@ import { getDb } from "@/lib/db/client";
 import { charges, paymentSlips } from "@/lib/db/schema";
 import { getCatalogItem, type CatalogItem } from "@/lib/catalog/packages";
 import { termsSnapshotFor } from "@/lib/catalog/chargeTerms";
-import { isOnSale } from "@/lib/catalog/validity";
+import { expiryFromFixedDay, isOnSale } from "@/lib/catalog/validity";
 import { componentsForItem, isBundle, totalHours } from "@/lib/catalog/components";
 import {
   countPurchasesOf,
@@ -176,10 +176,21 @@ export async function createCheckout(raw: CreateCheckoutInput): Promise<CreateCh
     return { ok: false, code: "NOT_ELIGIBLE" };
   }
 
-  // SALE WINDOW. An offer with a closing date stops being buyable when it closes,
-  // without anyone having to remember to archive it. The buy screen hides a closed
-  // item; this is what actually refuses it.
-  if (!isOnSale(item, new Date())) {
+  // WHAT MAY BE BOUGHT AT ALL, re-decided here rather than trusted from the screen
+  // that offered it. All three refusals share one code: a customer does not need to
+  // know which of the owner's switches is off, only that it is not for sale.
+  const now = new Date();
+  //  - archived. getCatalogItem resolves archived items ON PURPOSE (old charges and
+  //    unspent credits must keep resolving), so "off the shelf" has to be checked.
+  //  - outside its sale window.
+  //  - past its own fixed expiry: without a closing date, an item with expires_on
+  //    stays buyable forever and would credit a package that is dead on arrival.
+  const fixedExpiry = item.expiresOn ? expiryFromFixedDay(item.expiresOn) : null;
+  if (
+    !item.active ||
+    !isOnSale(item, now) ||
+    (fixedExpiry !== null && fixedExpiry.getTime() <= now.getTime())
+  ) {
     return { ok: false, code: "NOT_ON_SALE" };
   }
 
@@ -360,6 +371,8 @@ export type UploadPaymentSlipFailureCode =
   | "INVALID_FILE"
   // The decoded image exceeds 5 MB.
   | "TOO_LARGE"
+  /** A one-per-customer offer already claimed by another of this customer's charges. */
+  | "LIMIT_REACHED"
   // The charge is already approved/credited — no further slips accepted.
   | "ALREADY_PAID";
 
@@ -423,6 +436,21 @@ export async function uploadPaymentSlip(
   // can (re)upload while still under review.
   if (intent.status === "paid") {
     return { ok: false, code: "ALREADY_PAID" };
+  }
+
+  // PER-CUSTOMER LIMIT, re-checked at the moment the slot is actually claimed.
+  // Checkout no longer counts an unpaid QR (a customer who looks and closes the app
+  // must not lose their one trial), so the slot is taken HERE — which also closes
+  // the gap where two checkouts were opened side by side and both were paid.
+  const limitedItem = await getCatalogItem(intent.packageId);
+  if (limitedItem?.maxPerCustomer !== undefined) {
+    const already = await countPurchasesOf(viewer.id, intent.packageId);
+    // This charge counts itself once it reaches awaiting_review, so a RE-upload for
+    // the same charge must not be read as a second purchase.
+    const mine = intent.status === "awaiting_review" ? 1 : 0;
+    if (!withinPurchaseLimit(limitedItem, already - mine)) {
+      return { ok: false, code: "LIMIT_REACHED" };
+    }
   }
 
   // Validate the file SERVER-SIDE — sniff the real type + enforce the 5 MB cap.

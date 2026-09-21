@@ -56,8 +56,22 @@ export function isItemPurchasableBy(
 // with two. A cancelled or rejected charge hands the slot back, exactly like a promo
 // redemption.
 
-/** Charge states that hold a customer's slot on a limited item. */
-const LIVE_CHARGE_STATUSES = ["pending", "awaiting_review", "paid"] as const;
+/**
+ * Charge states that hold a customer's slot on a limited item.
+ *
+ * `pending` is deliberately NOT here, which is where this parts company with promo
+ * redemption counting. A pending charge is just an unpaid QR: a customer who opens
+ * the trial, looks at the code and closes the app has paid nothing, and nothing ever
+ * releases that row. Counting it would spend their one slot on a purchase that never
+ * happened and tell them "already bought" the next time they tried — the exact
+ * moment the campaign is meant to be converting them.
+ *
+ * A promo code counts pending because ITS risk runs the other way: an uncounted
+ * pending charge could oversell a "first 30" cap across DIFFERENT customers. Here the
+ * cap is per customer, so the costly mistake is the lockout, not a rare second trial
+ * that the front desk sees as two slips from one person before approving either.
+ */
+const LIVE_CHARGE_STATUSES = ["awaiting_review", "paid"] as const;
 
 /** How many times `userId` has bought each of `itemIds` (live charges only). */
 export async function countPurchasesByItem(
