@@ -145,6 +145,8 @@ function checkoutErrorKey(code: string): StrKey {
       return "err_terms_outdated";
     case "LIMIT_REACHED":
       return "err_limit_reached";
+    case "NOT_ON_SALE":
+      return "err_not_on_sale";
     case "NOT_ELIGIBLE":
       return "err_not_eligible";
     default:
@@ -926,7 +928,14 @@ function PackageCard({
         {/* Same reasoning for the validity · per-class line: it wraps as a whole
             rather than overflowing, but each half stays intact on its own line. */}
         <div className="mt-[7px] flex flex-wrap items-center gap-x-2 gap-y-0.5 font-body text-[12.5px] leading-[1.5] text-muted">
-          <span className="whitespace-nowrap">{tt(item.sublabel)}</span>
+          {/* A campaign with a fixed end date says the DATE. "Valid 30 days" would
+              be a different promise for every buyer, and the wrong one for all but
+              the first. */}
+          <span className="whitespace-nowrap">
+            {item.expiresOn
+              ? `${t("buy_use_until")} ${dayLabel(item.expiresOn, lang)}`
+              : tt(item.sublabel)}
+          </span>
           <span className="h-[3px] w-[3px] shrink-0 rounded-full bg-line-strong" />
           <span className="whitespace-nowrap">
             {thb(item.perHour)}
@@ -955,6 +964,13 @@ function PackageCard({
               </li>
             ))}
           </ul>
+        )}
+        {/* A closing date belongs on the card: it is the reason to buy today rather
+            than a detail to find out about later. */}
+        {item.saleEndsOn && (
+          <p className="mt-1.5 font-body text-[12px] leading-snug text-taupe-deep">
+            {t("buy_sale_ends")} {dayLabel(item.saleEndsOn, lang)}
+          </p>
         )}
         {/* EVENT PACKAGE: credits that only open particular days' classes. Said on
             the card itself, beside the price, because it is the whole reason the

@@ -8,7 +8,7 @@ import {
   type CatalogItem,
 } from "@/lib/catalog/packages";
 import { withinPurchaseLimit } from "@/lib/catalog/eligibility";
-import { expiryFromValidity } from "@/lib/catalog/validity";
+import { expiryFromFixedDay, expiryFromValidity, isOnSale } from "@/lib/catalog/validity";
 import { studioInstant, studioParts } from "@/lib/time";
 
 // ───────────────────────── validity → expiry ─────────────────────────
@@ -309,5 +309,62 @@ describe("withinPurchaseLimit — one-per-customer offers (2026-09-13)", () => {
   it("honours a cap above one", () => {
     expect(withinPurchaseLimit({ maxPerCustomer: 3 }, 2)).toBe(true);
     expect(withinPurchaseLimit({ maxPerCustomer: 3 }, 3)).toBe(false);
+  });
+});
+
+describe("isOnSale — a campaign's own window (2026-09-17)", () => {
+  const item = { saleStartsOn: "2026-09-30", saleEndsOn: "2026-10-30" };
+  // Bangkok is UTC+7, so a Bangkok day runs from 17:00 UTC the previous day.
+  const justBefore = new Date("2026-09-29T16:59:59Z"); // 29 Sep 23:59:59 +07
+  const firstMinute = new Date("2026-09-29T17:00:00Z"); // 30 Sep 00:00 +07
+  const lastMinute = new Date("2026-10-30T16:59:59Z"); // 30 Oct 23:59:59 +07
+  const justAfter = new Date("2026-10-30T17:00:00Z"); // 31 Oct 00:00 +07
+
+  it("is closed before the first day", () => {
+    expect(isOnSale(item, justBefore)).toBe(false);
+  });
+
+  it("opens at the first minute of the opening day, Bangkok time", () => {
+    expect(isOnSale(item, firstMinute)).toBe(true);
+  });
+
+  it("stays open for the WHOLE closing day", () => {
+    expect(isOnSale(item, lastMinute)).toBe(true);
+  });
+
+  it("closes once that day is over", () => {
+    expect(isOnSale(item, justAfter)).toBe(false);
+  });
+
+  it("treats a missing bound as unbounded on that side", () => {
+    expect(isOnSale({ saleEndsOn: "2026-10-30" }, justBefore)).toBe(true);
+    expect(isOnSale({ saleStartsOn: "2026-09-30" }, justAfter)).toBe(true);
+    expect(isOnSale({}, justAfter)).toBe(true);
+  });
+
+  it("sells rather than hides when a stored bound is malformed", () => {
+    // Failing the other way would take an item off the shelf with nothing to show
+    // why; the owner's intent in typing a date was to sell.
+    expect(isOnSale({ saleStartsOn: "not-a-date" }, justBefore)).toBe(true);
+  });
+});
+
+describe("expiryFromFixedDay — a published end date", () => {
+  it("is the LAST instant of that Bangkok day, so the whole day is usable", () => {
+    const end = expiryFromFixedDay("2026-11-30");
+    expect(end?.toISOString()).toBe("2026-11-30T16:59:59.999Z"); // 30 Nov 23:59:59.999 +07
+  });
+
+  it("gives every buyer the same deadline, whenever they bought", () => {
+    // The point of the feature: relative validity would give a 30 Oct buyer a
+    // different (later) deadline than a 30 Sep buyer.
+    expect(expiryFromFixedDay("2026-11-30")?.getTime()).toBe(
+      expiryFromFixedDay("2026-11-30")?.getTime(),
+    );
+  });
+
+  it("refuses a date that does not exist", () => {
+    expect(expiryFromFixedDay("2026-02-31")).toBeNull();
+    expect(expiryFromFixedDay("nonsense")).toBeNull();
   });
 });

@@ -73,3 +73,55 @@ export function expiryFromValidity(amount: number, unit: ValidityUnit, now: Date
   // on the last usable instant of the expiry day itself.
   return new Date(studioEndOfDay(lastDay).getTime() - 1);
 }
+
+/** A Bangkok "YYYY-MM-DD", or null when the string is absent or malformed. */
+function parseYmd(ymd: string): { y: number; m: number; d: number } | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd.trim());
+  if (!m) return null;
+  return { y: Number(m[1]), m: Number(m[2]), d: Number(m[3]) };
+}
+
+/**
+ * The LAST usable instant of a fixed Bangkok expiry day ("YYYY-MM-DD"), or null when
+ * the string is unusable.
+ *
+ * The same inclusive reading as `expiryFromValidity`: "expires on 30 November" means
+ * the whole of the 30th is still bookable, so the instant is 30 Nov 23:59:59.999 +07.
+ */
+export function expiryFromFixedDay(ymd: string): Date | null {
+  const parts = parseYmd(ymd);
+  if (!parts) return null;
+  const day = studioInstant(parts.y, parts.m - 1, parts.d, 12, 0);
+  // Reject a date that does not exist (31 Feb rolls forward in Date.UTC).
+  const back = studioParts(day);
+  if (back.year !== parts.y || back.month0 !== parts.m - 1 || back.day !== parts.d) return null;
+  return new Date(studioEndOfDay(day).getTime() - 1);
+}
+
+/**
+ * Whether an item whose sale window is `startsOn`..`endsOn` (either may be null) may
+ * be bought at `now`. Both bounds are INCLUSIVE Bangkok days, so an offer that runs
+ * "30 Sep – 30 Oct" is buyable from the first minute of the 30th of September to the
+ * last of the 30th of October.
+ *
+ * A malformed stored bound is treated as NO bound rather than as a closed shop: the
+ * owner's intent when they typed it was to sell, and failing the other way would
+ * quietly take an item off the shelf with nothing to show why.
+ */
+export function isOnSale(
+  item: { saleStartsOn?: string | null; saleEndsOn?: string | null },
+  now: Date,
+): boolean {
+  if (item.saleStartsOn) {
+    const parts = parseYmd(item.saleStartsOn);
+    if (parts) {
+      const opens = studioStartOfDay(studioInstant(parts.y, parts.m - 1, parts.d, 12, 0));
+      if (now.getTime() < opens.getTime()) return false;
+    }
+  }
+  if (item.saleEndsOn) {
+    const closes = expiryFromFixedDay(item.saleEndsOn);
+    if (closes && now.getTime() > closes.getTime()) return false;
+  }
+  return true;
+}

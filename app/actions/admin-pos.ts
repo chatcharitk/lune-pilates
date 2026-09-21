@@ -253,6 +253,7 @@ async function sellForCash(params: {
       validityUnit: charges.validityUnit,
       category: charges.category,
       classDays: charges.classDays,
+      expiresOn: charges.expiresOn,
     })
     .from(charges)
     .where(eq(charges.chargeId, chargeId))

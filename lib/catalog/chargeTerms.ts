@@ -46,6 +46,8 @@ export interface ChargeTermsSnapshot {
   category: PackageCategory | null;
   /** Event days the charge was sold under; null = any day (2026-09-12). */
   classDays: string[] | null;
+  /** The fixed expiry day it was sold with; null = the relative validity (2026-09-17). */
+  expiresOn: string | null;
 }
 
 /**
@@ -78,6 +80,7 @@ export function itemForCredit(live: CatalogItem, snapshot: ChargeTermsSnapshot):
     ...(snapshot.classDays && snapshot.classDays.length > 0
       ? { classDays: snapshot.classDays }
       : {}),
+    ...(snapshot.expiresOn ? { expiresOn: snapshot.expiresOn } : {}),
   };
 }
 
@@ -93,6 +96,7 @@ export function termsSnapshotFor(item: CatalogItem): {
   validityUnit: ValidityUnit;
   category: PackageCategory;
   classDays: string[] | null;
+  expiresOn: string | null;
 } {
   return {
     hours: item.hours,
@@ -101,6 +105,7 @@ export function termsSnapshotFor(item: CatalogItem): {
     validityUnit: item.validity.unit,
     category: item.category,
     classDays: item.classDays && item.classDays.length > 0 ? item.classDays : null,
+    expiresOn: item.expiresOn ?? null,
   };
 }
 

@@ -35,7 +35,7 @@ import { and, asc, eq, ne } from "drizzle-orm";
 import { getDb, type Database } from "@/lib/db/client";
 import { charges, creditLedger, packages } from "@/lib/db/schema";
 import type { CatalogItem } from "@/lib/catalog/packages";
-import { expiryFromValidity } from "@/lib/catalog/validity";
+import { expiryFromFixedDay, expiryFromValidity } from "@/lib/catalog/validity";
 import {
   componentsForItem,
   topoSortComponents,
@@ -308,9 +308,18 @@ export async function creditPackage(params: {
         // Purchase-anchored → stamp the expiry now. Anchored to a sibling → DORMANT:
         // no expiry (so it is invisible to every bookable/balance query and cannot
         // be spent), carrying the window to apply once its anchor is used.
+        // A FIXED expiry day (2026-09-17) replaces the relative validity for
+        // everything this purchase starts counting now: a campaign that says "usable
+        // until 30 November" means that date, not 30 days from whenever it was
+        // bought. Anchored components keep their own window — theirs starts at a
+        // class, not at the purchase, so a fixed campaign date would cut it short.
+        //
+        // `item` here is the charge's frozen snapshot, so the date honoured is the
+        // one the customer bought under.
+        const fixed = item.expiresOn ? expiryFromFixedDay(item.expiresOn) : null;
         const expiresAt = anchored
           ? null
-          : expiryFromValidity(c.validity.amount, c.validity.unit, now);
+          : (fixed ?? expiryFromValidity(c.validity.amount, c.validity.unit, now));
 
         const [pkg] = await tx
           .insert(packages)

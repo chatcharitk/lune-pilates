@@ -532,6 +532,10 @@ function ItemFormDrawer({
   // Promotional shelf + per-customer cap (2026-09-13).
   const [promoShelf, setPromoShelf] = useState(false);
   const [maxPerCustomer, setMaxPerCustomer] = useState("0");
+  // Sale window + a fixed expiry day (2026-09-17). Empty = unbounded / use validity.
+  const [saleStartsOn, setSaleStartsOn] = useState("");
+  const [saleEndsOn, setSaleEndsOn] = useState("");
+  const [expiresOn, setExpiresOn] = useState("");
   const [dayDraft, setDayDraft] = useState("");
   const [labelEn, setLabelEn] = useState("");
   const [labelTh, setLabelTh] = useState("");
@@ -553,6 +557,9 @@ function ItemFormDrawer({
     setClassDays(item?.classDays ?? []);
     setPromoShelf(item?.promoShelf ?? false);
     setMaxPerCustomer(String(item?.maxPerCustomer ?? 0));
+    setSaleStartsOn(item?.saleStartsOn ?? "");
+    setSaleEndsOn(item?.saleEndsOn ?? "");
+    setExpiresOn(item?.expiresOn ?? "");
     setDayDraft("");
     setLabelEn(item?.label.en ?? "");
     setLabelTh(item?.label.th ?? "");
@@ -612,6 +619,9 @@ function ItemFormDrawer({
       firstPurchaseOnly,
       promoShelf,
       maxPerCustomer: Math.max(0, Number.parseInt(maxPerCustomer, 10) || 0),
+      saleStartsOn,
+      saleEndsOn,
+      expiresOn,
       classDays,
     };
 
@@ -887,6 +897,46 @@ function ItemFormDrawer({
           </span>
         </span>
       </label>
+
+      {/* WHEN IT IS ON SALE, and a fixed end date for what it grants. Both empty on
+          an ordinary package: it sells until archived, and its credits run the
+          relative validity above. A campaign usually wants all three. */}
+      <div className="grid gap-3.5 sm:grid-cols-2">
+        <Field label={t("cat_sale_starts")} hint={t("cat_sale_window_hint")}>
+          {(id) => (
+            <input
+              id={id}
+              type="date"
+              value={saleStartsOn}
+              onChange={(e) => setSaleStartsOn(e.target.value)}
+              className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3 font-body text-sm text-ink"
+            />
+          )}
+        </Field>
+        <Field label={t("cat_sale_ends")}>
+          {(id) => (
+            <input
+              id={id}
+              type="date"
+              value={saleEndsOn}
+              onChange={(e) => setSaleEndsOn(e.target.value)}
+              className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3 font-body text-sm text-ink"
+            />
+          )}
+        </Field>
+      </div>
+
+      <Field label={t("cat_expires_on")} hint={t("cat_expires_on_hint")}>
+        {(id) => (
+          <input
+            id={id}
+            type="date"
+            value={expiresOn}
+            onChange={(e) => setExpiresOn(e.target.value)}
+            className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3 font-body text-sm text-ink"
+          />
+        )}
+      </Field>
 
       {/* PROMOTIONAL SHELF + the cap that keeps an introductory offer introductory.
           The shelf is display only: a 1+1 group pack still grants GROUP credits, so

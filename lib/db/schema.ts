@@ -164,6 +164,22 @@ export const catalogItems = pgTable(
     labelEn: text("label_en").notNull(),
     labelTh: text("label_th").notNull(),
     active: boolean("active").notNull().default(true),
+    // ON SALE BETWEEN (2026-09-17). Bangkok days "YYYY-MM-DD", both inclusive. The
+    // item is purchasable only inside the window: outside it the buy screen hides it
+    // and createCheckout refuses. Null on either side = unbounded that way, which is
+    // every ordinary package. A launch offer has a closing date and nobody should
+    // have to remember to archive it by hand.
+    saleStartsOn: text("sale_starts_on"),
+    saleEndsOn: text("sale_ends_on"),
+    // EXPIRES ON (2026-09-17). A FIXED Bangkok day the credits die on, whatever day
+    // they were bought — "usable until 30 November" rather than "30 days from
+    // purchase". When set it overrides validity_amount/unit for everything this item
+    // grants at purchase. Null = the ordinary relative validity beside it.
+    //
+    // The two cannot both apply, and this one wins: a campaign with a published end
+    // date means that date, not a rolling window that would let a late buyer use
+    // classes into December.
+    expiresOn: text("expires_on"),
     // PROMOTIONAL SHELF (2026-09-13). A "buy one get one" package sits on its own
     // tab in the buy screen rather than inside its format's tab: it is a different
     // KIND of offer, and burying it among the ordinary packs was the owner's
@@ -395,6 +411,9 @@ export const charges = pgTable("charges", {
   validityAmount: integer("validity_amount"),
   validityUnit: text("validity_unit"), // 'day' | 'month'
   category: packageCategory("category"),
+  // EXPIRES-ON snapshot (2026-09-17): the fixed end date the credits were sold
+  // with, frozen for the same reason as the hours/validity beside it.
+  expiresOn: text("expires_on"),
   // EVENT DAYS snapshot (2026-09-12): the days whose classes the credits this charge
   // grants may be booked into, frozen the same way and for the same reason as the
   // hours/validity above — an owner editing the item while a slip sits in review

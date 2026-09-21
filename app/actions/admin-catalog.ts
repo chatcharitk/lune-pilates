@@ -113,6 +113,9 @@ const labelField = z.string().trim().min(1).max(60);
  * instead. Days are normalised (sorted, de-duplicated) so the stored list has one
  * shape and the UI never shows the same day twice.
  */
+/** A Bangkok day, or "" for "no bound" (the fields are optional dates). */
+const YMD_OR_BLANK = z.union([z.literal(""), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)]).optional();
+
 const CLASS_DAYS = z
   .array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/))
   .max(31)
@@ -134,6 +137,11 @@ const createInput = z.object({
   promoShelf: z.boolean().optional(),
   /** Purchases allowed per customer, ever. 0 / absent = unlimited. */
   maxPerCustomer: z.number().int().min(0).max(1_000).optional(),
+  /** When the item may be BOUGHT (inclusive Bangkok days). Blank = unbounded. */
+  saleStartsOn: YMD_OR_BLANK,
+  saleEndsOn: YMD_OR_BLANK,
+  /** A fixed expiry day for what it grants. Blank = the relative validity. */
+  expiresOn: YMD_OR_BLANK,
   classDays: CLASS_DAYS,
   sortOrder: z.number().int().min(0).max(10_000).optional(),
 });
@@ -156,11 +164,21 @@ const updateInput = z.object({
   firstPurchaseOnly: z.boolean().optional(),
   promoShelf: z.boolean().optional(),
   maxPerCustomer: z.number().int().min(0).max(1_000).optional(),
+  /** When the item may be BOUGHT (inclusive Bangkok days). Blank = unbounded. */
+  saleStartsOn: YMD_OR_BLANK,
+  saleEndsOn: YMD_OR_BLANK,
+  /** A fixed expiry day for what it grants. Blank = the relative validity. */
+  expiresOn: YMD_OR_BLANK,
   classDays: CLASS_DAYS,
   sortOrder: z.number().int().min(0).max(10_000).optional(),
 });
 const updateInputChecked = withValidityInRange(updateInput);
 export type UpdateCatalogItemInput = z.infer<typeof updateInput>;
+
+/** An optional date field: "" and absent both mean "no bound". */
+function blankToNull(ymd: string | undefined): string | null {
+  return ymd && ymd !== "" ? ymd : null;
+}
 
 /** Sorted, de-duplicated days — or null for "any day", the ordinary package. */
 function normalizeClassDays(days: string[] | undefined): string[] | null {
@@ -295,6 +313,9 @@ export async function createCatalogItem(
         firstPurchaseOnly: input.firstPurchaseOnly ?? false,
         promoShelf: input.promoShelf ?? false,
         maxPerCustomer: input.maxPerCustomer ? input.maxPerCustomer : null,
+        saleStartsOn: blankToNull(input.saleStartsOn),
+        saleEndsOn: blankToNull(input.saleEndsOn),
+        expiresOn: blankToNull(input.expiresOn),
         classDays: normalizeClassDays(input.classDays),
         active: true,
         sortOrder,
@@ -379,6 +400,9 @@ export async function updateCatalogItem(
       firstPurchaseOnly: input.firstPurchaseOnly ?? false,
       promoShelf: input.promoShelf ?? false,
       maxPerCustomer: input.maxPerCustomer ? input.maxPerCustomer : null,
+      saleStartsOn: blankToNull(input.saleStartsOn),
+      saleEndsOn: blankToNull(input.saleEndsOn),
+      expiresOn: blankToNull(input.expiresOn),
       classDays: normalizeClassDays(input.classDays),
       sortOrder,
     })

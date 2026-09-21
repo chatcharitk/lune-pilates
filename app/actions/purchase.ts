@@ -36,6 +36,7 @@ import { getDb } from "@/lib/db/client";
 import { charges, paymentSlips } from "@/lib/db/schema";
 import { getCatalogItem, type CatalogItem } from "@/lib/catalog/packages";
 import { termsSnapshotFor } from "@/lib/catalog/chargeTerms";
+import { isOnSale } from "@/lib/catalog/validity";
 import { componentsForItem, isBundle, totalHours } from "@/lib/catalog/components";
 import {
   countPurchasesOf,
@@ -112,6 +113,8 @@ export type CreateCheckoutFailureCode =
   | "NOT_ELIGIBLE"
   /** A limited offer this customer has already taken (2026-09-13). */
   | "LIMIT_REACHED"
+  /** Bought outside the item's sale window (2026-09-17). */
+  | "NOT_ON_SALE"
   /**
    * The promo code could not be applied. The specific reason travels alongside in
    * `promoRefusal` so the buy screen can say "that code has run out" rather than a
@@ -171,6 +174,13 @@ export async function createCheckout(raw: CreateCheckoutInput): Promise<CreateCh
   // Checked here rather than trusted from the client, which only ever sends an item id.
   if (item.firstPurchaseOnly && !isItemPurchasableBy(item, await hasEverPurchased(viewer.id))) {
     return { ok: false, code: "NOT_ELIGIBLE" };
+  }
+
+  // SALE WINDOW. An offer with a closing date stops being buyable when it closes,
+  // without anyone having to remember to archive it. The buy screen hides a closed
+  // item; this is what actually refuses it.
+  if (!isOnSale(item, new Date())) {
+    return { ok: false, code: "NOT_ON_SALE" };
   }
 
   // PER-CUSTOMER LIMIT. "Buy one get one, once per customer" (2026-09-13): a live

@@ -25,6 +25,7 @@ import type { PackageCategory } from "@/lib/domain/types";
 import { getDb } from "@/lib/db/client";
 import { catalogItems } from "@/lib/db/schema";
 import { mockDataMode } from "@/lib/mock-mode";
+import { isOnSale } from "./validity";
 // Bundle parts for the buy card. components.ts imports only TYPES from this file,
 // so this direction carries no cycle at runtime.
 import { loadComponentsMap, sortComponents } from "./components";
@@ -154,6 +155,14 @@ export interface CatalogItem {
   promoShelf?: boolean;
   /** How many times one customer may buy this, ever. Absent = unlimited. */
   maxPerCustomer?: number;
+  /** Bangkok days bounding when the item may be BOUGHT; absent = unbounded. */
+  saleStartsOn?: string;
+  saleEndsOn?: string;
+  /**
+   * A FIXED Bangkok day the credits expire on, whatever day they were bought
+   * (2026-09-17). Overrides `validity` at purchase. Absent = the relative validity.
+   */
+  expiresOn?: string;
   /**
    * What a BUNDLE grants, in order, for the buy card — "1:1 class · use within 14
    * days", "Free group class · use within 7 days of the first class". Absent for an
@@ -398,6 +407,9 @@ interface CatalogRow {
   classDays: string[] | null;
   promoShelf: boolean;
   maxPerCustomer: number | null;
+  saleStartsOn: string | null;
+  saleEndsOn: string | null;
+  expiresOn: string | null;
   active: boolean;
   firstPurchaseOnly: boolean;
   sortOrder: number;
@@ -419,6 +431,9 @@ function rowToAdminItem(r: CatalogRow): AdminCatalogItem {
     ...(r.classDays && r.classDays.length > 0 ? { classDays: r.classDays } : {}),
     ...(r.promoShelf ? { promoShelf: true } : {}),
     ...(r.maxPerCustomer !== null ? { maxPerCustomer: r.maxPerCustomer } : {}),
+    ...(r.saleStartsOn ? { saleStartsOn: r.saleStartsOn } : {}),
+    ...(r.saleEndsOn ? { saleEndsOn: r.saleEndsOn } : {}),
+    ...(r.expiresOn ? { expiresOn: r.expiresOn } : {}),
     active: r.active,
     firstPurchaseOnly: r.firstPurchaseOnly,
     sortOrder: r.sortOrder,
@@ -446,6 +461,9 @@ const SELECT_COLUMNS = {
   classDays: catalogItems.classDays,
   promoShelf: catalogItems.promoShelf,
   maxPerCustomer: catalogItems.maxPerCustomer,
+  saleStartsOn: catalogItems.saleStartsOn,
+  saleEndsOn: catalogItems.saleEndsOn,
+  expiresOn: catalogItems.expiresOn,
   active: catalogItems.active,
   firstPurchaseOnly: catalogItems.firstPurchaseOnly,
   sortOrder: catalogItems.sortOrder,
@@ -529,14 +547,18 @@ export async function listPackageCatalog(
    * viewer supplied means show everything, which is what the admin/preview reads
    * want. Hiding is courtesy; the server-side gate in createCheckout is the rule.
    */
-  opts: { hasPurchasedBefore?: boolean } = {},
+  opts: { hasPurchasedBefore?: boolean; now?: Date } = {},
 ): Promise<CatalogCategory[]> {
   const all = await listAllCatalogItems();
   const hasPurchasedBefore = opts.hasPurchasedBefore ?? false;
 
+  const now = opts.now ?? new Date();
   const visible = all
     .filter((i) => i.active)
-    .filter((i) => !i.firstPurchaseOnly || !hasPurchasedBefore);
+    .filter((i) => !i.firstPurchaseOnly || !hasPurchasedBefore)
+    // Outside its sale window an item is not on the shelf at all. createCheckout
+    // refuses it too; hiding is the courtesy, the refusal is the rule.
+    .filter((i) => isOnSale(i, now));
 
   // A bundle's terms go on its card, so load the parts of every bundle on show in
   // ONE read rather than per item.
@@ -559,6 +581,8 @@ export async function listPackageCatalog(
     ...(i.classDays && i.classDays.length > 0 ? { classDays: i.classDays } : {}),
     ...(i.promoShelf ? { promoShelf: true } : {}),
     ...(i.maxPerCustomer !== undefined ? { maxPerCustomer: i.maxPerCustomer } : {}),
+    ...(i.saleEndsOn ? { saleEndsOn: i.saleEndsOn } : {}),
+    ...(i.expiresOn ? { expiresOn: i.expiresOn } : {}),
     ...(partsByItem.has(i.id) ? { parts: partsByItem.get(i.id)! } : {}),
   });
 

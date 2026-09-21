@@ -1331,11 +1331,28 @@ export const STR = {
     en: "This offer is for first-time customers.",
     th: "ข้อเสนอนี้สำหรับลูกค้าใหม่เท่านั้น",
   },
+  buy_use_until: { en: "Use until", th: "ใช้ได้ถึง" },
+  buy_sale_ends: { en: "On sale until", th: "ซื้อได้ถึง" },
+  err_not_on_sale: {
+    en: "This offer isn’t on sale right now.",
+    th: "ข้อเสนอนี้ยังไม่เปิดขาย หรือปิดการขายแล้ว",
+  },
   buy_limit_one: { en: "One per customer", th: "1 สิทธิ์ต่อ 1 ท่าน" },
   buy_already_bought: { en: "Already bought", th: "ซื้อไปแล้ว" },
   cat_promo: { en: "Promotions", th: "โปรโมชั่น" },
   buy_class_days: { en: "Only for classes on", th: "ใช้ได้เฉพาะคลาสวันที่" },
   // Event days on a package (2026-09-12).
+  cat_sale_starts: { en: "On sale from", th: "เริ่มขายวันที่" },
+  cat_sale_ends: { en: "On sale until", th: "ขายถึงวันที่" },
+  cat_sale_window_hint: {
+    en: "Leave empty to sell until you archive it. The last day counts in full.",
+    th: "เว้นว่างไว้เพื่อขายจนกว่าจะเก็บถาวร วันสุดท้ายขายได้ทั้งวัน",
+  },
+  cat_expires_on: { en: "Credits expire on", th: "เครดิตหมดอายุวันที่" },
+  cat_expires_on_hint: {
+    en: "A fixed date, whatever day it was bought — use it for a campaign with a published end date. Leave empty to use the validity above.",
+    th: "วันหมดอายุตายตัว ไม่ว่าจะซื้อวันไหน เหมาะกับแคมเปญที่ประกาศวันสิ้นสุดไว้ เว้นว่างไว้เพื่อใช้อายุการใช้งานด้านบน",
+  },
   cat_promo_shelf: { en: "Show on the Promotions tab", th: "แสดงในแท็บโปรโมชั่น" },
   cat_promo_shelf_hint: {
     en: "Gives the offer its own tab instead of listing it with the ordinary packs. The credits it grants keep their own class type.",
