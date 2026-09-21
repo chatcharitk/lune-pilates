@@ -26,6 +26,7 @@ import { getDb } from "@/lib/db/client";
 import { catalogItems } from "@/lib/db/schema";
 import { mockDataMode } from "@/lib/mock-mode";
 import { isOnSale } from "./validity";
+import { formatStudioDate, studioDayFromYmd } from "@/lib/time";
 // Bundle parts for the buy card. components.ts imports only TYPES from this file,
 // so this direction carries no cycle at runtime.
 import { loadComponentsMap, sortComponents } from "./components";
@@ -219,6 +220,23 @@ export interface AdminCatalogItem extends CatalogItem {
  * English drops the trailing "s"). Thai uses วัน (day) / เดือน (month) with no count
  * word when amount is 1, matching the prototype's phrasing.
  */
+/**
+ * The sublabel for an item with a FIXED expiry day — "Use until 30 Nov 2026".
+ *
+ * This REPLACES the validity sublabel rather than sitting beside it, because for
+ * such an item the relative validity is not what the customer gets: saying "valid 1
+ * day" beside a campaign that runs to 30 November is not a rounding error, it is a
+ * different promise. Deriving it here means every surface that renders a sublabel —
+ * the buy card, the PromptPay receipt, the admin list — tells the same truth without
+ * each having to remember the special case.
+ */
+export function sublabelForFixedExpiry(ymd: string): Bilingual {
+  const day = studioDayFromYmd(ymd);
+  const fmt = (lang: "en" | "th") =>
+    formatStudioDate(day, lang, { day: "numeric", month: "short", year: "numeric" });
+  return { en: `Use until ${fmt("en")}`, th: `ใช้ได้ถึง ${fmt("th")}` };
+}
+
 export function sublabelForValidity(validity: Validity): Bilingual {
   const { amount, unit } = validity;
   if (unit === "day") {
@@ -428,6 +446,8 @@ function rowToAdminItem(r: CatalogRow): AdminCatalogItem {
   };
   return {
     ...toCatalogItem(seed),
+    // A fixed end date replaces the "valid N days" line everywhere it is shown.
+    ...(r.expiresOn ? { sublabel: sublabelForFixedExpiry(r.expiresOn) } : {}),
     ...(r.classDays && r.classDays.length > 0 ? { classDays: r.classDays } : {}),
     ...(r.promoShelf ? { promoShelf: true } : {}),
     ...(r.maxPerCustomer !== null ? { maxPerCustomer: r.maxPerCustomer } : {}),

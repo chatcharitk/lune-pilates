@@ -110,6 +110,8 @@ function createErrorKey(code: CreateCatalogItemFailureCode): StrKey {
       return "err_cat_forbidden";
     case "DUPLICATE_ID":
       return "err_cat_id_taken";
+    case "EXPIRY_IN_PAST":
+      return "err_cat_expiry_past";
     case "MOCK_NO_DB":
       return "err_cat_mock_no_db";
     default:
@@ -125,6 +127,8 @@ function updateErrorKey(code: UpdateCatalogItemFailureCode): StrKey {
       return "err_cat_unknown";
     case "CATEGORY_IMMUTABLE":
       return "err_cat_category_immutable";
+    case "EXPIRY_IN_PAST":
+      return "err_cat_expiry_past";
     case "MOCK_NO_DB":
       return "err_cat_mock_no_db";
     default:

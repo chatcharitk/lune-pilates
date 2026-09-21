@@ -1348,6 +1348,10 @@ export const STR = {
     en: "Leave empty to sell until you archive it. The last day counts in full.",
     th: "เว้นว่างไว้เพื่อขายจนกว่าจะเก็บถาวร วันสุดท้ายขายได้ทั้งวัน",
   },
+  err_cat_expiry_past: {
+    en: "That expiry date has already passed — credits sold with it would be expired the moment they are granted.",
+    th: "วันหมดอายุนี้ผ่านไปแล้ว เครดิตที่ขายจะหมดอายุทันทีที่ได้รับ",
+  },
   cat_expires_on: { en: "Credits expire on", th: "เครดิตหมดอายุวันที่" },
   cat_expires_on_hint: {
     en: "A fixed date, whatever day it was bought — use it for a campaign with a published end date. Leave empty to use the validity above.",

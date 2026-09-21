@@ -928,14 +928,10 @@ function PackageCard({
         {/* Same reasoning for the validity · per-class line: it wraps as a whole
             rather than overflowing, but each half stays intact on its own line. */}
         <div className="mt-[7px] flex flex-wrap items-center gap-x-2 gap-y-0.5 font-body text-[12.5px] leading-[1.5] text-muted">
-          {/* A campaign with a fixed end date says the DATE. "Valid 30 days" would
-              be a different promise for every buyer, and the wrong one for all but
-              the first. */}
-          <span className="whitespace-nowrap">
-            {item.expiresOn
-              ? `${t("buy_use_until")} ${dayLabel(item.expiresOn, lang)}`
-              : tt(item.sublabel)}
-          </span>
+          {/* The sublabel already says "Use until <date>" for an item with a fixed
+              end date (lib/catalog/packages.ts), so every surface that renders it —
+              here, the PromptPay receipt, the admin list — agrees. */}
+          <span className="whitespace-nowrap">{tt(item.sublabel)}</span>
           <span className="h-[3px] w-[3px] shrink-0 rounded-full bg-line-strong" />
           <span className="whitespace-nowrap">
             {thb(item.perHour)}

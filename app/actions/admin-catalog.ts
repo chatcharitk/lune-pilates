@@ -44,12 +44,14 @@ import {
   legacyValidityText,
   listAllCatalogItems,
   perHourFor,
+  sublabelForFixedExpiry,
   sublabelForValidity,
   type AdminCatalogItem,
   type CatalogTag,
   type Validity,
 } from "@/lib/catalog/packages";
 import {
+  expiryFromFixedDay,
   isValidityAmountInRange,
   MAX_VALIDITY_AMOUNT,
 } from "@/lib/catalog/validity";
@@ -175,6 +177,20 @@ const updateInput = z.object({
 const updateInputChecked = withValidityInRange(updateInput);
 export type UpdateCatalogItemInput = z.infer<typeof updateInput>;
 
+/**
+ * A fixed expiry that has ALREADY passed would credit a package that is expired the
+ * moment it is granted — money taken for nothing. A typo in the year is all it takes,
+ * so it is refused rather than warned about.
+ *
+ * Only for an item that is (or is becoming) purchasable: an archived campaign keeps
+ * its historical date, and the owner must still be able to rename or tidy it.
+ */
+function expiryAlreadyPassed(expiresOn: string | null, now: Date): boolean {
+  if (!expiresOn) return false;
+  const last = expiryFromFixedDay(expiresOn);
+  return last !== null && last.getTime() <= now.getTime();
+}
+
 /** An optional date field: "" and absent both mean "no bound". */
 function blankToNull(ymd: string | undefined): string | null {
   return ymd && ymd !== "" ? ymd : null;
@@ -210,6 +226,8 @@ export type CreateCatalogItemFailureCode =
   | "UNAUTHORIZED"
   | "INVALID_INPUT"
   | "DUPLICATE_ID"
+  /** A fixed expiry date that has already passed — the credits would be born dead. */
+  | "EXPIRY_IN_PAST"
   | MockNoDbCode;
 
 export type CreateCatalogItemResult =
@@ -221,6 +239,7 @@ export type UpdateCatalogItemFailureCode =
   | "INVALID_INPUT"
   | "UNKNOWN_ITEM"
   | "CATEGORY_IMMUTABLE"
+  | "EXPIRY_IN_PAST"
   | MockNoDbCode;
 
 export type UpdateCatalogItemResult =
@@ -276,6 +295,11 @@ export async function createCatalogItem(
   const parsed = createInputChecked.safeParse(raw);
   if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
   const input = parsed.data;
+
+  // A new item is born on sale, so a fixed expiry must still be ahead of us.
+  if (expiryAlreadyPassed(blankToNull(input.expiresOn), new Date())) {
+    return { ok: false, code: "EXPIRY_IN_PAST" };
+  }
 
   // Mock-data dev mode: the input is fully validated above, but there is no database
   // to write to. Report MOCK_NO_DB rather than a fake success — see MockNoDbCode.
@@ -381,6 +405,12 @@ export async function updateCatalogItem(
   // GUARDRAIL 2 — the credit bucket a booking debits can never move.
   if (input.category !== undefined && input.category !== current.category) {
     return { ok: false, code: "CATEGORY_IMMUTABLE" };
+  }
+
+  // Refuse a past expiry only while the item is ON SALE: an archived campaign keeps
+  // its historical date, and the owner must still be able to rename or tidy it.
+  if (current.active && expiryAlreadyPassed(blankToNull(input.expiresOn), new Date())) {
+    return { ok: false, code: "EXPIRY_IN_PAST" };
   }
 
   const sortOrder = input.sortOrder ?? current.sortOrder;
@@ -605,6 +635,8 @@ function synthesizeItem(
     tag?: CatalogTag | null;
     labelEn: string;
     labelTh: string;
+    /** A fixed end date replaces the validity sublabel in the echo, as it does on read. */
+    expiresOn?: string;
   },
   active: boolean,
   sortOrder: number,
@@ -619,7 +651,9 @@ function synthesizeItem(
     validity,
     ...(input.tag ? { tag: input.tag } : {}),
     label: { en: input.labelEn, th: input.labelTh },
-    sublabel: sublabelForValidity(validity),
+    sublabel: input.expiresOn
+      ? sublabelForFixedExpiry(input.expiresOn)
+      : sublabelForValidity(validity),
     active,
     sortOrder,
   };

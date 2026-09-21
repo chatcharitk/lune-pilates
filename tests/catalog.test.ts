@@ -4,6 +4,7 @@ import {
   getCatalogItem,
   listPackageCatalog,
   loadCatalogMap,
+  sublabelForFixedExpiry,
   sublabelForValidity,
   type CatalogItem,
 } from "@/lib/catalog/packages";
@@ -366,5 +367,22 @@ describe("expiryFromFixedDay — a published end date", () => {
   it("refuses a date that does not exist", () => {
     expect(expiryFromFixedDay("2026-02-31")).toBeNull();
     expect(expiryFromFixedDay("nonsense")).toBeNull();
+  });
+});
+
+describe("sublabelForFixedExpiry — one line every surface can repeat", () => {
+  it("names the date in both languages", () => {
+    const s = sublabelForFixedExpiry("2026-11-30");
+    expect(s.en).toBe("Use until 30 Nov 2026");
+    // Thai renders the Buddhist era, as everywhere else in the app.
+    expect(s.th).toContain("ใช้ได้ถึง");
+    expect(s.th).toContain("2569");
+  });
+
+  it("reads the day in Bangkok, not the runtime's timezone", () => {
+    // A naive `new Date("2026-11-30")` is midnight UTC, which is already the 30th in
+    // Bangkok but the 29th in the Americas — the sublabel must not drift by a day.
+    expect(sublabelForFixedExpiry("2026-11-30").en).toBe("Use until 30 Nov 2026");
+    expect(sublabelForFixedExpiry("2026-01-01").en).toBe("Use until 1 Jan 2026");
   });
 });
