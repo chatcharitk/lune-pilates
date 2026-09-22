@@ -25,6 +25,7 @@ import {
   Users,
 } from "./icons";
 import { BookingPanel } from "./booking-panel";
+import { LevelBadge } from "./level-badge";
 
 export interface ClassDetailViewProps {
   detail: ClassDetail;
@@ -85,6 +86,9 @@ export function ClassDetailView({ detail, cost, balanceBefore, usesPositions }: 
                 {tt(detail.typeMeta.short)}
               </span>
             </span>
+            {/* The level the customer is about to book into, beside the format
+                pill — before the CTA, not after it. */}
+            <LevelBadge level={detail.level} size="md" />
           </div>
 
           {/* title */}

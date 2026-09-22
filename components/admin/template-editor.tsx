@@ -24,7 +24,8 @@ import {
 } from "@/app/actions/schedule";
 import type { TemplateSlot } from "@/lib/admin/schedule-template";
 import type { InstructorOption } from "@/lib/admin/instructors";
-import { CAPACITY, type ClassType } from "@/lib/domain/types";
+import { CAPACITY, CLASS_LEVELS, type ClassLevel, type ClassType } from "@/lib/domain/types";
+import { LEVEL_KEY } from "./level-options";
 import type { StrKey } from "@/lib/i18n";
 
 const TYPES: ClassType[] = ["group", "private", "duo", "trio"]; // rental hidden 2026-07-20
@@ -265,6 +266,8 @@ function SlotFormDrawer({
   const [dayOfWeek, setDayOfWeek] = useState<number>(1);
   const [type, setType] = useState<ClassType>("group");
   const [name, setName] = useState<string>("");
+  // "" = not stated. A level set here rides onto every class this slot generates.
+  const [level, setLevel] = useState<string>("");
   const [time, setTime] = useState<string>("07:00");
   const [durationMin, setDurationMin] = useState<number>(60);
   const [capacity, setCapacity] = useState<number>(CAPACITY.group);
@@ -277,6 +280,7 @@ function SlotFormDrawer({
     setDayOfWeek(state.dayOfWeek);
     setType(slot?.type ?? "group");
     setName(slot?.name ?? "");
+    setLevel(slot?.level ?? "");
     setTime(slot?.time ?? "07:00");
     setDurationMin(slot?.durationMin ?? 60);
     setCapacity(slot?.capacity ?? CAPACITY.group);
@@ -296,8 +300,26 @@ function SlotFormDrawer({
     startTransition(async () => {
       const cap = Math.min(capacity, maxCap);
       const res = isEdit
-        ? await updateTemplateSlot({ id: slot!.id, time, type, durationMin, capacity: cap, instructorId, name: name.trim() || null })
-        : await createTemplateSlot({ dayOfWeek, time, type, durationMin, capacity: cap, instructorId, name: name.trim() || null });
+        ? await updateTemplateSlot({
+            id: slot!.id,
+            time,
+            type,
+            durationMin,
+            capacity: cap,
+            instructorId,
+            name: name.trim() || null,
+            level: level as "" | ClassLevel,
+          })
+        : await createTemplateSlot({
+            dayOfWeek,
+            time,
+            type,
+            durationMin,
+            capacity: cap,
+            instructorId,
+            name: name.trim() || null,
+            level: level as "" | ClassLevel,
+          });
       if (res.ok) {
         onSaved(isEdit ? "toast_template_updated" : "toast_template_added");
         router.refresh();
@@ -389,6 +411,19 @@ function SlotFormDrawer({
           placeholder={t("class_name_ph")}
           maxLength={60}
           className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3 font-body text-sm text-ink placeholder:text-muted"
+        />
+      </Field>
+
+      {/* The level every class generated from this slot is born with. A per-week
+          edit can still change one class without touching the template. */}
+      <Field label={t("level_label")}>
+        <Select
+          value={level}
+          onChange={setLevel}
+          options={[
+            { value: "", label: t("level_none") },
+            ...CLASS_LEVELS.map((l) => ({ value: l, label: t(LEVEL_KEY[l]) })),
+          ]}
         />
       </Field>
 

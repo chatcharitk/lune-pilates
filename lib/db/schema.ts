@@ -29,6 +29,10 @@ export const packageCategory = pgEnum("package_category", [
 ]);
 export const classType = pgEnum("class_type", ["group", "private", "duo", "trio", "rental"]);
 export const classStatus = pgEnum("class_status", ["draft", "published", "cancelled"]);
+// How hard a class is (2026-09-21). NULL on a class means the owner did not say —
+// every class that exists today — and nothing is shown, rather than guessing a level
+// and putting a beginner in the wrong room.
+export const classLevel = pgEnum("class_level", ["basic", "intermediate", "advance"]);
 export const bookingStatus = pgEnum("booking_status", ["booked", "cancelled"]);
 export const waitlistStatus = pgEnum("waitlist_status", ["waiting", "offered", "claimed", "expired"]);
 export const reformerPosition = pgEnum("reformer_position", ["left", "middle", "right"]);
@@ -755,6 +759,8 @@ export const classTemplates = pgTable("class_templates", {
   name: text("name"),
   capacity: integer("capacity").notNull(),
   instructorId: text("instructor_id").references(() => instructors.id),
+  /** Difficulty, copied onto every class this slot generates. Null = unstated. */
+  level: classLevel("level"),
   active: boolean("active").notNull().default(true),
 });
 
@@ -769,6 +775,12 @@ export const classInstances = pgTable("class_instances", {
   name: text("name"),
   capacity: integer("capacity").notNull(),
   instructorId: text("instructor_id").references(() => instructors.id),
+  /**
+   * Difficulty shown to the customer when they pick a class (2026-09-21). Set at
+   * creation, or inherited from the template the class was generated from. Null =
+   * unstated, and then nothing is shown — a missing level must not read as "basic".
+   */
+  level: classLevel("level"),
   status: classStatus("status").notNull().default("draft"),
   publishedAt: timestamp("published_at", { withTimezone: true }),
   // computed on publish; members see at publishedAt, guests at publicVisibleAt

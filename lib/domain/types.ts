@@ -13,6 +13,16 @@ export type UserTier = "member" | "guest";
  */
 export type PackageCategory = "group" | "private" | "duo" | "trio" | "rental";
 export type ClassType = "group" | "private" | "duo" | "trio" | "rental";
+
+/**
+ * How hard a class is (2026-09-21). Null/absent everywhere means the owner has not
+ * said — the customer is then shown NOTHING, because guessing "basic" for an
+ * unlabelled class is how a beginner ends up in an advanced room.
+ */
+export type ClassLevel = "basic" | "intermediate" | "advance";
+
+/** Display order, easiest first — the picker and any legend follow it. */
+export const CLASS_LEVELS: readonly ClassLevel[] = ["basic", "intermediate", "advance"] as const;
 export type ClassStatus = "draft" | "published" | "cancelled";
 export type BookingStatus = "booked" | "cancelled";
 export type WaitlistStatus = "waiting" | "offered" | "claimed" | "expired";

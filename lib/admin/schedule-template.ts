@@ -16,7 +16,7 @@
 import { asc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { classTemplates, instructors } from "@/lib/db/schema";
-import type { ClassType } from "@/lib/domain/types";
+import type { ClassLevel, ClassType } from "@/lib/domain/types";
 import { effectiveCapacity } from "@/lib/domain/types";
 import {
   instructorMetaFor,
@@ -40,6 +40,8 @@ export interface TemplateSlot {
   typeMeta: ClassTypeMeta;
   /** Optional custom class name; null → show the type label. */
   name: string | null;
+  /** Difficulty stamped onto every class this slot generates; null = unstated. */
+  level: ClassLevel | null;
   durationMin: number;
   capacity: number;
   instructorId: string | null;
@@ -53,6 +55,8 @@ export interface TemplateBaselineSlot extends BaselineSlot {
   instructorId: string | null;
   /** Optional custom class name copied onto generated instances; null for baseline. */
   name: string | null;
+  /** Difficulty copied onto generated instances; null = unstated. */
+  level: ClassLevel | null;
 }
 
 const byDowThenTime = (a: { dayOfWeek: number; time: string }, b: { dayOfWeek: number; time: string }) =>
@@ -81,6 +85,7 @@ export async function getScheduleTemplate(): Promise<TemplateSlot[]> {
       time: classTemplates.time,
       type: classTemplates.type,
       name: classTemplates.name,
+      level: classTemplates.level,
       durationMin: classTemplates.durationMin,
       capacity: classTemplates.capacity,
       instructorId: classTemplates.instructorId,
@@ -100,6 +105,7 @@ export async function getScheduleTemplate(): Promise<TemplateSlot[]> {
     type: r.type,
     typeMeta: metaFor(r.type),
     name: r.name,
+    level: r.level,
     durationMin: r.durationMin,
     capacity: effectiveCapacity(r.capacity, r.type),
     instructorId: r.instructorId,
@@ -136,6 +142,7 @@ export async function getTemplateSlotsByDow(): Promise<Map<number, TemplateBasel
       time: classTemplates.time,
       type: classTemplates.type,
       name: classTemplates.name,
+      level: classTemplates.level,
       durationMin: classTemplates.durationMin,
       capacity: classTemplates.capacity,
       instructorId: classTemplates.instructorId,
@@ -157,6 +164,7 @@ export async function getTemplateSlotsByDow(): Promise<Map<number, TemplateBasel
       templateId: r.id,
       instructorId: r.instructorId,
       name: r.name,
+      level: r.level,
     };
     const list = map.get(r.dayOfWeek) ?? [];
     list.push(slot);
@@ -180,6 +188,7 @@ function mockTemplateSlot(slot: BaselineSlot, i: number): TemplateSlot {
     type: slot.type,
     typeMeta: metaFor(slot.type),
     name: null,
+    level: null,
     durationMin: slot.durationMin,
     capacity: slot.capacity,
     instructorId: null,
@@ -191,7 +200,7 @@ function mockTemplateSlot(slot: BaselineSlot, i: number): TemplateSlot {
 function groupBaselineFallback(): Map<number, TemplateBaselineSlot[]> {
   const map = new Map<number, TemplateBaselineSlot[]>();
   for (const s of BASELINE_SLOTS) {
-    const slot: TemplateBaselineSlot = { ...s, templateId: null, instructorId: null, name: null };
+    const slot: TemplateBaselineSlot = { ...s, templateId: null, instructorId: null, name: null, level: null };
     const list = map.get(s.dayOfWeek) ?? [];
     list.push(slot);
     map.set(s.dayOfWeek, list);

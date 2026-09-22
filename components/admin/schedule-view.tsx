@@ -24,11 +24,13 @@ import {
 import type { AdminScheduleClass, AdminWeekSchedule } from "@/lib/admin/schedule";
 import type { TemplateSlot } from "@/lib/admin/schedule-template";
 import type { InstructorOption } from "@/lib/admin/instructors";
-import { CAPACITY, type ClassType } from "@/lib/domain/types";
+import { CAPACITY, CLASS_LEVELS, type ClassLevel, type ClassType } from "@/lib/domain/types";
+import { LEVEL_KEY } from "./level-options";
 import type { StrKey } from "@/lib/i18n";
 import { addDays, formatStudioDate, studioParts, studioStartOfDay } from "@/lib/time";
 
 const TYPES: ClassType[] = ["group", "private", "duo", "trio"]; // rental hidden 2026-07-20
+
 const TIME_OPTIONS = [
   "07:00", "07:30", "08:00", "09:00", "09:30", "10:00", "11:00", "12:00",
   "13:00", "16:00", "17:00", "17:30", "18:00", "18:30", "19:00",
@@ -241,6 +243,11 @@ export function ScheduleView({
                           >
                             {c.name || tt(c.typeMeta.label)}
                           </span>
+                          {c.level && (
+                            <span className="shrink-0 rounded-full bg-cream-2 px-2 py-0.5 font-body text-[10px] font-bold text-taupe-deep">
+                              {t(LEVEL_KEY[c.level])}
+                            </span>
+                          )}
                           {cancelled && (
                             <span className="shrink-0 rounded-full bg-rose/20 px-2 py-0.5 font-body text-[10px] font-bold text-[#a56a52]">
                               {t("status_cancelled")}
@@ -338,6 +345,8 @@ function ClassEditor({
 
   const [type, setType] = useState<ClassType>(c?.type ?? "group");
   const [name, setName] = useState<string>(c?.name ?? "");
+  // "" = not stated, which is how a class with no level is stored and shown.
+  const [level, setLevel] = useState<string>(c?.level ?? "");
   const [time, setTime] = useState<string>(c?.time ?? "07:00");
   const [durationMin, setDurationMin] = useState<number>(c?.durationMin ?? 60);
   const [instructorId, setInstructorId] = useState<string | null>(c?.instructorId ?? null);
@@ -357,8 +366,26 @@ function ClassEditor({
     setErrorKey(null);
     startTransition(async () => {
       const res = isNew
-        ? await createClass({ date: dayDate, time, type, durationMin, capacity, instructorId, name: name.trim() || null })
-        : await updateClass({ id: c!.id, time, type, durationMin, capacity, instructorId, name: name.trim() || null });
+        ? await createClass({
+            date: dayDate,
+            time,
+            type,
+            durationMin,
+            capacity,
+            instructorId,
+            name: name.trim() || null,
+            level: level as "" | ClassLevel,
+          })
+        : await updateClass({
+            id: c!.id,
+            time,
+            type,
+            durationMin,
+            capacity,
+            instructorId,
+            name: name.trim() || null,
+            level: level as "" | ClassLevel,
+          });
       if (res.ok) onSaved();
       else setErrorKey(FAILURE_STR[res.code] ?? "err_generic");
     });
@@ -449,6 +476,20 @@ function ClassEditor({
           placeholder={t("class_name_ph")}
           maxLength={60}
           className="h-11 w-full rounded-xl border border-line-strong bg-surface-2 px-3.5 font-body text-sm text-ink placeholder:text-muted"
+        />
+      </Field>
+
+      {/* DIFFICULTY (2026-09-21). "Not stated" is the default and stays first: most
+          classes have no level, and the customer is shown nothing for those rather
+          than a guessed one. */}
+      <Field label={t("level_label")} hint={t("level_hint")}>
+        <Select
+          value={level}
+          onChange={setLevel}
+          options={[
+            { value: "", label: t("level_none") },
+            ...CLASS_LEVELS.map((l) => ({ value: l, label: t(LEVEL_KEY[l]) })),
+          ]}
         />
       </Field>
 
@@ -555,11 +596,21 @@ function ClassEditor({
 
 // ───────────────────────── small presentational bits ─────────────────────────
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  /** One line under the control, for a setting whose effect isn't obvious. */
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="mb-4">
       <label className="mb-2 block font-body text-xs font-semibold tracking-wide text-ink-soft">{label}</label>
       {children}
+      {hint && <p className="mt-1.5 font-body text-[11.5px] leading-snug text-muted">{hint}</p>}
     </div>
   );
 }

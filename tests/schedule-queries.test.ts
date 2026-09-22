@@ -2,6 +2,8 @@
 // DATABASE_URL so they exercise the mock path the UI renders against.
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { CLASS_LEVELS } from "@/lib/domain/types";
+import { STR } from "@/lib/i18n/strings";
 import {
   getClassDetail,
   listBookableClasses,
@@ -97,5 +99,24 @@ describe("getClassDetail (no-DB mock)", () => {
     const detail = await getClassDetail("s3", { tier: "member" });
     expect(detail?.capacity).toBe(1);
     expect(detail?.positions).toEqual([{ position: "middle", taken: false }]);
+  });
+});
+
+describe("class level (2026-09-21)", () => {
+  // The rule that matters: an unstated level is NOT "basic". It travels as null all
+  // the way to the badge, which renders nothing for it — a beginner must never be
+  // told a class is basic because nobody said otherwise.
+  it("keeps the three levels in easiest-first order", () => {
+    expect(CLASS_LEVELS).toEqual(["basic", "intermediate", "advance"]);
+  });
+
+  it("has a label for every level, in both languages", () => {
+    for (const level of CLASS_LEVELS) {
+      const key = `level_${level}` as const;
+      expect(STR[key].en.length).toBeGreaterThan(0);
+      expect(STR[key].th.length).toBeGreaterThan(0);
+      // The Thai label must actually be Thai, not an untranslated copy.
+      expect(STR[key].th).not.toBe(STR[key].en);
+    }
   });
 });

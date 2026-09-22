@@ -14,7 +14,7 @@
 import { and, asc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { bookings, classInstances, instructors } from "@/lib/db/schema";
-import type { ClassStatus, ClassType } from "@/lib/domain/types";
+import type { ClassLevel, ClassStatus, ClassType } from "@/lib/domain/types";
 import { effectiveCapacity } from "@/lib/domain/types";
 import {
   instructorMetaFor,
@@ -48,6 +48,8 @@ export interface AdminScheduleClass {
   typeMeta: ClassTypeMeta;
   /** Optional custom class name; null → show the type label. */
   name: string | null;
+  /** Difficulty shown to customers; null = unstated (nothing is shown). */
+  level: ClassLevel | null;
   instructorId: string | null;
   instructor: InstructorMeta | null;
   capacity: number;
@@ -143,6 +145,7 @@ function shape(row: {
   durationMin: number;
   type: ClassType;
   name: string | null;
+  level: ClassLevel | null;
   capacity: number;
   status: ClassStatus;
   instructorId: string | null;
@@ -159,6 +162,7 @@ function shape(row: {
     type: row.type,
     typeMeta: metaFor(row.type),
     name: row.name,
+    level: row.level,
     instructorId: row.instructorId,
     instructor: instructorMetaFor(
       row.instructorId,
@@ -245,6 +249,7 @@ export async function getWeekSchedule(
       durationMin: classInstances.durationMin,
       type: classInstances.type,
       name: classInstances.name,
+      level: classInstances.level,
       capacity: classInstances.capacity,
       status: classInstances.status,
       instructorId: classInstances.instructorId,
@@ -309,6 +314,7 @@ function mockWeekSchedule(weekStart: Date): AdminWeekSchedule {
         id: mockUuid(n++),
         startsAt: startsAt.toISOString(),
         time: slot.time,
+        level: null,
         durationMin: slot.durationMin,
         type: "group",
         typeMeta: metaFor("group"),
@@ -329,6 +335,7 @@ function mockWeekSchedule(weekStart: Date): AdminWeekSchedule {
       id: mockUuid(n++),
       startsAt: startsAt.toISOString(),
       time: a.time,
+      level: null,
       durationMin: a.type === "group" ? 60 : 50,
       type: a.type,
       typeMeta: metaFor(a.type),
@@ -345,7 +352,7 @@ function mockWeekSchedule(weekStart: Date): AdminWeekSchedule {
   // getTemplateSlotsByDow's no-DB return), so the mock screen's diff is unchanged.
   const templateByDow = new Map<number, TemplateBaselineSlot[]>();
   for (const s of BASELINE_SLOTS) {
-    const slot: TemplateBaselineSlot = { ...s, templateId: null, instructorId: null, name: null };
+    const slot: TemplateBaselineSlot = { ...s, templateId: null, instructorId: null, name: null, level: null };
     const list = templateByDow.get(s.dayOfWeek) ?? [];
     list.push(slot);
     templateByDow.set(s.dayOfWeek, list);

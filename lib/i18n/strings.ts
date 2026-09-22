@@ -1185,6 +1185,17 @@ export const STR = {
     th: "อายุการใช้งานต้องเป็นจำนวนเต็มระหว่าง 1 ถึง {max} ตามหน่วยที่เลือก",
   },
   // ───────── admin: promo codes ─────────
+  // Class difficulty (2026-09-21). Shown on the schedule card and the class screen;
+  // a class with no level shows nothing at all.
+  level_basic: { en: "Basic", th: "พื้นฐาน" },
+  level_intermediate: { en: "Intermediate", th: "ระดับกลาง" },
+  level_advance: { en: "Advance", th: "ระดับสูง" },
+  level_label: { en: "Level", th: "ระดับ" },
+  level_none: { en: "Not stated", th: "ไม่ระบุ" },
+  level_hint: {
+    en: "Shown to customers when they pick this class. Leave unstated and nothing is shown.",
+    th: "แสดงให้ลูกค้าเห็นตอนเลือกคลาส ถ้าไม่ระบุจะไม่แสดงอะไร",
+  },
   // Settings → Links & images (2026-09-17). The LINE rich menu points its buttons at
   // URLs, so the owner needs the addresses and somewhere to host artwork.
   settings_links_title: { en: "Links & images", th: "ลิงก์และรูปภาพ" },

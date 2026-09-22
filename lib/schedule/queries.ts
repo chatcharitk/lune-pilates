@@ -14,7 +14,7 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { bookings, classInstances, instructors } from "@/lib/db/schema";
 import type { Bilingual } from "@/lib/i18n";
-import type { ClassType, ReformerPosition } from "@/lib/domain/types";
+import type { ClassLevel, ClassType, ReformerPosition } from "@/lib/domain/types";
 import { CAPACITY, effectiveCapacity } from "@/lib/domain/types";
 import type { SessionUser } from "@/lib/auth/session";
 import { selectUsablePackageRow } from "@/lib/credits/selectPackage";
@@ -53,6 +53,8 @@ export interface BookableClass {
   typeMeta: ClassTypeMeta;
   /** Optional custom class name; null → show the type label. */
   name: string | null;
+  /** Difficulty, or null when the owner did not state one (then show nothing). */
+  level: ClassLevel | null;
   instructor: InstructorMeta | null;
   capacity: number;
   booked: number;
@@ -271,6 +273,7 @@ export async function listBookableClasses(args: ListBookableArgs): Promise<Booka
       durationMin: classInstances.durationMin,
       type: classInstances.type,
       name: classInstances.name,
+      level: classInstances.level,
       capacity: classInstances.capacity,
       status: classInstances.status,
       membersVisibleAt: classInstances.membersVisibleAt,
@@ -319,6 +322,7 @@ export async function listBookableClasses(args: ListBookableArgs): Promise<Booka
         type: r.type,
         typeMeta: metaFor(r.type),
         name: r.name,
+        level: r.level,
         instructor: instructorMetaFor(
           r.instructorId,
           r.instructorName ?? undefined,
@@ -360,6 +364,7 @@ export async function getClassDetail(
         durationMin: classInstances.durationMin,
         type: classInstances.type,
         name: classInstances.name,
+      level: classInstances.level,
         capacity: classInstances.capacity,
         status: classInstances.status,
         membersVisibleAt: classInstances.membersVisibleAt,
@@ -408,6 +413,7 @@ export async function getClassDetail(
     durationMin: cls.durationMin,
     type: cls.type,
     typeMeta: metaFor(cls.type),
+    level: cls.level,
     name: cls.name ?? null,
     instructor: instructorMetaFor(
       cls.instructorId,
@@ -492,6 +498,7 @@ function mockToBookable(weekStart: Date, seed: MockSessionSeed): BookableClass {
   const seatsLeft = Math.max(0, capacity - booked);
   return {
     id: seed.id,
+    level: null,
     startsAt: mockStartsAt(weekStart, seed).toISOString(),
     durationMin: seed.dur,
     type: seed.type,

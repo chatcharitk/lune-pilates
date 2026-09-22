@@ -26,6 +26,7 @@ import {
   type WeekDay,
 } from "./schedule-helpers";
 import { ChevronLeft, ChevronRight, Sparkle } from "./icons";
+import { LevelBadge } from "./level-badge";
 
 const PODS: PartOfDay[] = ["morning", "afternoon", "evening"];
 
@@ -309,6 +310,9 @@ function SessionRow({ c, lang }: { c: BookableClass; lang: Lang }) {
           <span className="font-body text-[11px] font-semibold uppercase tracking-[0.05em] text-muted">
             {tt(c.typeMeta.short)}
           </span>
+          {/* Difficulty sits beside the format, where the eye already is when
+              scanning the week. Renders nothing when the class has no level. */}
+          <LevelBadge level={c.level} />
         </div>
         <div className="font-head text-[17px] font-semibold leading-[1.1] text-ink">
           {c.name || tt(c.typeMeta.label)}

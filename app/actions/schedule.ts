@@ -43,6 +43,16 @@ import { mockDataMode } from "@/lib/mock-mode";
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const CLASS_TYPE = z.enum(["group", "private", "duo", "trio", "rental"]);
+/**
+ * Difficulty. Optional everywhere, and "" is accepted as "not stated" so a form can
+ * clear it: an absent level renders as nothing rather than defaulting to basic.
+ */
+const CLASS_LEVEL = z.union([z.literal(""), z.enum(["basic", "intermediate", "advance"])]).optional();
+
+/** "" / absent → null, which is how "unstated" is stored. */
+function levelOrNull(level: string | undefined): "basic" | "intermediate" | "advance" | null {
+  return level === "basic" || level === "intermediate" || level === "advance" ? level : null;
+}
 
 /** ISO day of week (1=Mon … 7=Sun) of an instant, in Bangkok (studio) time. */
 function isoDow(date: Date): number {
@@ -65,6 +75,7 @@ const createInput = z.object({
   instructorId: z.string().nullable().optional(),
   // Optional custom class name; blank → null (the type label is shown).
   name: z.string().trim().max(60).nullable().optional(),
+  level: CLASS_LEVEL,
 });
 export type CreateClassInput = z.infer<typeof createInput>;
 
@@ -126,6 +137,7 @@ export async function createClass(raw: CreateClassInput): Promise<CreateClassRes
       durationMin: input.durationMin,
       type: input.type,
       name: input.name?.trim() || null,
+      level: levelOrNull(input.level),
       capacity: effectiveCapacity(input.capacity, input.type),
       instructorId,
       status: "published",
@@ -154,6 +166,7 @@ const updateInput = z.object({
   instructorId: z.string().nullable().optional(),
   // Optional custom class name; blank → null (the type label is shown).
   name: z.string().trim().max(60).nullable().optional(),
+  level: CLASS_LEVEL,
 });
 export type UpdateClassInput = z.infer<typeof updateInput>;
 
@@ -223,6 +236,7 @@ export async function updateClass(raw: UpdateClassInput): Promise<UpdateClassRes
       durationMin: input.durationMin,
       type: input.type,
       name: input.name?.trim() || null,
+      level: levelOrNull(input.level),
       capacity: cap,
       instructorId,
       ...(existing.status === "published"
@@ -483,6 +497,9 @@ export async function generateWeekFromBaseline(raw: WeekInput): Promise<Generate
         durationMin: slot.durationMin,
         type: slot.type,
         name: slot.name ?? null,
+        // The template's level rides onto every class it generates; a per-week edit
+        // can still change one class without touching the template (invariant 5).
+        level: slot.level ?? null,
         capacity: slot.capacity,
         instructorId: slot.instructorId ?? null,
         // Born published (live immediately) — invariant 4 stamps per instance.
@@ -616,6 +633,7 @@ const createTemplateInput = z.object({
   capacity: z.number().int().min(1),
   instructorId: z.string().min(1).nullable().optional(),
   name: z.string().trim().max(60).nullable().optional(),
+  level: CLASS_LEVEL,
 });
 export type CreateTemplateSlotInput = z.infer<typeof createTemplateInput>;
 
@@ -655,6 +673,7 @@ export async function createTemplateSlot(
       time: input.time,
       type: input.type,
       name: input.name?.trim() || null,
+      level: levelOrNull(input.level),
       durationMin: input.durationMin,
       capacity: effectiveCapacity(input.capacity, input.type),
       instructorId,
@@ -674,6 +693,7 @@ const updateTemplateInput = z.object({
   capacity: z.number().int().min(1),
   instructorId: z.string().min(1).nullable().optional(),
   name: z.string().trim().max(60).nullable().optional(),
+  level: CLASS_LEVEL,
 });
 export type UpdateTemplateSlotInput = z.infer<typeof updateTemplateInput>;
 
@@ -710,6 +730,7 @@ export async function updateTemplateSlot(
       time: input.time,
       type: input.type,
       name: input.name?.trim() || null,
+      level: levelOrNull(input.level),
       durationMin: input.durationMin,
       capacity: effectiveCapacity(input.capacity, input.type),
       instructorId,
