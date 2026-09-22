@@ -31,10 +31,29 @@ import { addDays, formatStudioDate, studioParts, studioStartOfDay } from "@/lib/
 
 const TYPES: ClassType[] = ["group", "private", "duo", "trio"]; // rental hidden 2026-07-20
 
-const TIME_OPTIONS = [
-  "07:00", "07:30", "08:00", "09:00", "09:30", "10:00", "11:00", "12:00",
-  "13:00", "16:00", "17:00", "17:30", "18:00", "18:30", "19:00",
-];
+/**
+ * Every half hour the studio might open a class, 06:00–21:30.
+ *
+ * This used to be a hand-written list carried over from the design prototype's
+ * sample week, which is why 14:00 and 15:00 simply did not exist: nothing was wrong
+ * with the afternoon, those times just were not in the sample. A generated range has
+ * no such holes, and the weekly template already accepts any time — the two should
+ * not disagree about when a class may start.
+ */
+const TIME_OPTIONS: string[] = Array.from({ length: (22 - 6) * 2 }, (_, i) => {
+  const minutes = 6 * 60 + i * 30;
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+});
+
+/**
+ * The list to show for `current`, which may be a time the range does not contain —
+ * the template accepts any minute, so an existing class can sit at 14:15. Dropping
+ * it would silently move the class on save; it is inserted in order instead.
+ */
+function timeOptionsFor(current: string): string[] {
+  if (TIME_OPTIONS.includes(current)) return TIME_OPTIONS;
+  return [...TIME_OPTIONS, current].sort();
+}
 const DURATIONS = [30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90];
 
 const DOW_KEYS: StrKey[] = [
@@ -495,7 +514,11 @@ function ClassEditor({
 
       <div className="grid grid-cols-2 gap-3.5">
         <Field label={t("start_time")}>
-          <Select value={time} onChange={setTime} options={TIME_OPTIONS.map((v) => ({ value: v, label: v }))} />
+          <Select
+            value={time}
+            onChange={setTime}
+            options={timeOptionsFor(time).map((v) => ({ value: v, label: v }))}
+          />
         </Field>
         <Field label={t("duration")}>
           <Select
