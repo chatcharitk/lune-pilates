@@ -356,7 +356,7 @@ function WaitlistCard({
       {/* class header */}
       <div className="mb-3.5 flex flex-wrap items-center gap-2">
         <Dot type={cls.type} size={8} />
-        <h2 className="font-head text-base font-semibold text-ink">{tt(cls.typeMeta.label)}</h2>
+        <h2 className="font-head text-base font-semibold text-ink">{cls.name || tt(cls.typeMeta.label)}</h2>
         <span className="font-body text-[13px] text-muted">
           {dayTime(cls.startsAt, cls.time, lang)}
         </span>
@@ -591,7 +591,7 @@ function BookingDrawer({
               <div className="flex flex-wrap items-center gap-2">
                 <Dot type={booking.class.type} />
                 <span className="font-head text-[15px] font-semibold text-ink">
-                  {tt(booking.class.typeMeta.label)}
+                  {booking.class.name || tt(booking.class.typeMeta.label)}
                 </span>
                 {booking.class.instructor && (
                   <span className="inline-flex items-center gap-1.5 font-body text-[12.5px] text-ink-soft">

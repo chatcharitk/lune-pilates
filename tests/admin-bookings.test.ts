@@ -33,6 +33,7 @@ const now = new Date("2026-06-20T06:00:00+07:00"); // 06:00 local on the mock da
 function bookingRow(over: Partial<AdminBookingRow> = {}): AdminBookingRow {
   return {
     bookingId: "00000000-0000-4000-8000-000000000001",
+    className: null,
     userId: "00000000-0000-4000-8000-0000000000a1",
     customerName: "Pim Srisai",
     customerPhone: "081 234 5678",

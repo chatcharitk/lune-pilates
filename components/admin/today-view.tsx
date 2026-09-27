@@ -98,7 +98,7 @@ export function TodayView({ overview }: { overview: AdminTodayOverview }) {
                     <div className="mb-1.5 flex flex-wrap items-center gap-2">
                       <Dot type={c.type} />
                       <span className="font-head text-[15px] font-semibold text-ink">
-                        {tt(c.typeMeta.label)}
+                        {c.name || tt(c.typeMeta.label)}
                       </span>
                       {c.instructor && (
                         <span className="inline-flex items-center gap-1.5 font-body text-[12.5px] text-ink-soft">

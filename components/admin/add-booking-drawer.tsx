@@ -245,7 +245,7 @@ export function AddBookingDrawer({
               <Dot type={cls.type} size={9} />
               <div className="min-w-0 flex-1">
                 <span className="block truncate font-head text-sm font-semibold text-ink">
-                  {tt(cls.typeMeta.label)}
+                  {cls.name || tt(cls.typeMeta.label)}
                 </span>
                 <span className="block truncate font-body text-xs text-muted">{classLabel(cls)}</span>
               </div>
@@ -278,7 +278,7 @@ export function AddBookingDrawer({
                       <Dot type={c.type} size={8} />
                       <div className="min-w-0 flex-1">
                         <span className="block truncate font-body text-[13.5px] font-semibold text-ink">
-                          {tt(c.typeMeta.label)}
+                          {c.name || tt(c.typeMeta.label)}
                         </span>
                         <span className="block truncate font-body text-xs text-muted">{classLabel(c)}</span>
                       </div>

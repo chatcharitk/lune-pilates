@@ -286,7 +286,7 @@ function CardSummary({
         </span>
       </div>
       <div className="font-head text-[21px] font-semibold leading-[1.1] text-ink">
-        {tt(entry.typeMeta.label)}
+        {entry.name || tt(entry.typeMeta.label)}
       </div>
       <div className="mt-[7px] flex items-center gap-1.5 font-body text-[13px] text-ink-soft">
         <Clock size={14} />

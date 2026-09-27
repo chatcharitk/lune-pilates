@@ -200,7 +200,7 @@ function CancelContent({
             </span>
           </div>
           <div className="font-head text-[19px] font-semibold leading-[1.1] text-ink">
-            {tt(booking.typeMeta.label)}
+            {booking.name || tt(booking.typeMeta.label)}
           </div>
           <div className="mt-1 font-body text-[12.5px] text-ink-soft">
             {dateStr} · {timeRange}

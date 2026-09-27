@@ -63,6 +63,8 @@ export interface AdminBookingClass {
   classInstanceId: string;
   type: ClassType;
   typeMeta: ClassTypeMeta;
+  /** Custom class name ("Essential Reformer"); null → show the type label. */
+  name: string | null;
   startsAt: string; // ISO 8601
   /** Local "HH:MM" of startsAt, for the row's "day · time" line. */
   time: string;
@@ -130,6 +132,8 @@ export interface AdminWaitlistClass {
   classInstanceId: string;
   type: ClassType;
   typeMeta: ClassTypeMeta;
+  /** Custom class name ("Essential Reformer"); null → show the type label. */
+  name: string | null;
   startsAt: string; // ISO 8601
   time: string; // local "HH:MM"
   instructor: InstructorMeta | null;
@@ -189,6 +193,8 @@ export interface AdminBookingRow {
   house: string | null;
   classInstanceId: string;
   type: ClassType;
+  /** The class's custom name; null → the type label is shown. */
+  className: string | null;
   startsAt: Date;
   instructorId: string | null;
   instructorName: string | null;
@@ -234,6 +240,7 @@ export function toAdminBooking(row: AdminBookingRow, now: Date): AdminBooking {
       classInstanceId: row.classInstanceId,
       type: row.type,
       typeMeta: metaFor(row.type),
+      name: row.className ?? null,
       startsAt: row.startsAt.toISOString(),
       time: hhmm(row.startsAt),
       instructor: instructorMetaFor(
@@ -360,6 +367,7 @@ export async function getAdminBookings(
       house: households.houseNumber,
       classInstanceId: bookings.classInstanceId,
       type: classInstances.type,
+      className: classInstances.name,
       startsAt: classInstances.startsAt,
       instructorId: classInstances.instructorId,
       instructorName: instructors.name,
@@ -390,6 +398,7 @@ export async function getAdminBookings(
         house: r.house ?? null,
         classInstanceId: r.classInstanceId,
         type: r.type,
+        className: r.className,
         startsAt: r.startsAt,
         instructorId: r.instructorId,
         instructorName: r.instructorName,
@@ -431,6 +440,7 @@ export async function getAdminWaitlist(now: Date = new Date()): Promise<AdminWai
       holdExpiresAt: waitlist.holdExpiresAt,
       classInstanceId: waitlist.classInstanceId,
       type: classInstances.type,
+      className: classInstances.name,
       startsAt: classInstances.startsAt,
       instructorId: classInstances.instructorId,
       instructorName: instructors.name,
@@ -458,6 +468,7 @@ export async function getAdminWaitlist(now: Date = new Date()): Promise<AdminWai
         classInstanceId: r.classInstanceId,
         type: r.type,
         typeMeta: metaFor(r.type),
+        name: r.className ?? null,
         startsAt: r.startsAt.toISOString(),
         time: hhmm(r.startsAt),
         instructor: instructorMetaFor(
@@ -585,6 +596,7 @@ function mockAdminBookingsOverview(
     const startsAt = mockStartsAt(now, seed.dayOffset, seed.time);
     const instr = instructorMetaFor(seed.type === "group" ? null : "mai");
     return {
+      className: null,
       bookingId: mockUuid(i + 1),
       userId: mem.id,
       customerName: mem.name,
@@ -649,6 +661,7 @@ function mockAdminBookingsOverview(
       classInstanceId: seed.classInstanceId,
       type: seed.type,
       typeMeta: metaFor(seed.type),
+      name: null,
       startsAt: startsAt.toISOString(),
       time: seed.time,
       instructor: instructorMetaFor(seed.instr),

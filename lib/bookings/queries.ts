@@ -60,6 +60,8 @@ export interface MyBooking {
   classInstanceId: string;
   type: ClassType;
   typeMeta: ClassTypeMeta;
+  /** Custom class name ("Essential Reformer"); null → show the type label. */
+  name: string | null;
   startsAt: string; // ISO 8601
   durationMin: number;
   instructor: InstructorMeta | null;
@@ -81,6 +83,8 @@ export const PAST_BOOKINGS_LIMIT = 20;
 
 /** Fields needed to shape one `MyBooking`, independent of the data source. */
 export interface BookingRow {
+  /** The class's custom name; null → the type label is shown. */
+  name?: string | null;
   bookingId: string;
   classInstanceId: string;
   type: ClassType;
@@ -113,6 +117,7 @@ export function toMyBooking(row: BookingRow, now: Date): MyBooking {
     classInstanceId: row.classInstanceId,
     type: row.type,
     typeMeta: metaFor(row.type),
+    name: row.name ?? null,
     startsAt: row.startsAt.toISOString(),
     durationMin: row.durationMin,
     instructor: instructorMetaFor(
@@ -172,6 +177,7 @@ export async function listMyBookings(
       bookingId: bookings.id,
       classInstanceId: bookings.classInstanceId,
       type: classInstances.type,
+      name: classInstances.name,
       startsAt: classInstances.startsAt,
       durationMin: classInstances.durationMin,
       instructorId: classInstances.instructorId,
@@ -225,6 +231,7 @@ export async function getNextBooking(
       bookingId: bookings.id,
       classInstanceId: bookings.classInstanceId,
       type: classInstances.type,
+      name: classInstances.name,
       startsAt: classInstances.startsAt,
       durationMin: classInstances.durationMin,
       instructorId: classInstances.instructorId,

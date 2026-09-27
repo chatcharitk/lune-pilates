@@ -123,7 +123,7 @@ export function ClassRosterDrawer({
       open={classId !== null}
       onClose={onClose}
       title={
-        roster ? `${tt(roster.typeMeta.label)} · ${formatStudioTime(new Date(roster.startsAt))}` : t("roster")
+        roster ? `${roster.name || tt(roster.typeMeta.label)} · ${formatStudioTime(new Date(roster.startsAt))}` : t("roster")
       }
     >
       {loading && !roster ? (

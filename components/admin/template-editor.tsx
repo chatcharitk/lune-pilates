@@ -544,7 +544,7 @@ function RemoveSlotDrawer({
           <p className="font-body text-[14px] leading-relaxed text-ink">
             {t("remove_slot_confirm")
               .replace("{time}", slot.time)
-              .replace("{type}", tt(slot.typeMeta.label))}
+              .replace("{type}", slot.name || tt(slot.typeMeta.label))}
           </p>
           {errorKey && (
             <p

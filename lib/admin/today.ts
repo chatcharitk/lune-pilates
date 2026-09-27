@@ -62,6 +62,8 @@ export interface AdminTodayClass {
   durationMin: number;
   type: ClassType;
   typeMeta: ClassTypeMeta;
+  /** Custom class name ("Essential Reformer"); null → show the type label. */
+  name: string | null;
   instructor: InstructorMeta | null;
   /** Effective (hard-capped) capacity — the same one the booking debit uses. */
   capacity: number;
@@ -152,6 +154,7 @@ export async function getTodayOverview(
       startsAt: classInstances.startsAt,
       durationMin: classInstances.durationMin,
       type: classInstances.type,
+      name: classInstances.name,
       capacity: classInstances.capacity,
       instructorId: classInstances.instructorId,
       instructorName: instructors.name,
@@ -258,6 +261,7 @@ export async function getTodayOverview(
       durationMin: c.durationMin,
       type: c.type,
       typeMeta: metaFor(c.type),
+      name: c.name ?? null,
       instructor: instructorMetaFor(
         c.instructorId,
         c.instructorName ?? undefined,
@@ -371,6 +375,7 @@ function mockTodayOverview(dayStart: Date, scopeInstructorId?: string): AdminTod
       durationMin: seed.dur,
       type: seed.type,
       typeMeta: metaFor(seed.type),
+      name: null,
       instructor: instructorMetaFor(seed.instr),
       capacity,
       booked: roster.length,

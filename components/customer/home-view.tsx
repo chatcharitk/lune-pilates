@@ -317,7 +317,7 @@ export function HomeView({
                 </span>
               </div>
               <p className="font-head text-[17px] font-semibold leading-[1.1] text-ink">
-                {tt(next.typeMeta.label)}
+                {next.name || tt(next.typeMeta.label)}
               </p>
               <p className="mt-1.5 flex items-center gap-1.5 font-body text-[13px] text-ink-soft">
                 <Clock size={14} className="shrink-0 text-muted" />
