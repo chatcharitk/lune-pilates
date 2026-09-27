@@ -9,15 +9,19 @@
 
 import type { ClassType } from "@/lib/domain/types";
 
+// Replaced 2026-09-27 with the owner's own photos of the finished studio: the reformer
+// row for group classes, the full room for every private format. New file names
+// rather than overwriting studio-1/2, so a browser holding the old image cached is
+// not left showing it under the old URL.
 const BY_TYPE: Record<ClassType, string> = {
-  group: "/studio/studio-2.jpg",
-  private: "/studio/studio-1.jpg",
-  duo: "/studio/studio-1.jpg",
-  trio: "/studio/studio-1.jpg",
+  group: "/studio/studio-group.jpg",
+  private: "/studio/studio-private.jpg",
+  duo: "/studio/studio-private.jpg",
+  trio: "/studio/studio-private.jpg",
   rental: "/studio/studio-3.jpg",
 };
 
 /** The studio photo for a class type. */
 export function studioImage(type: ClassType): string {
-  return BY_TYPE[type] ?? "/studio/studio-1.jpg";
+  return BY_TYPE[type] ?? "/studio/studio-private.jpg";
 }
