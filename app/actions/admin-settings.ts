@@ -24,7 +24,12 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getDb } from "@/lib/db/client";
 import { studioSettings, termsVersions } from "@/lib/db/schema";
-import { loadActiveTerms, loadTermsHistory, type TermsVersion } from "@/lib/settings/terms";
+import {
+  loadActiveTerms,
+  loadTermsHistory,
+  type TermsKind,
+  type TermsVersion,
+} from "@/lib/settings/terms";
 import {
   loadStudioInfo,
   STUDIO_SETTINGS_ID,
@@ -50,10 +55,10 @@ export type ListTermsResult =
  * The active terms plus the full published history (newest first) for the editor.
  * Owner-only: the history is an audit trail of what customers were bound to.
  */
-export async function listTerms(): Promise<ListTermsResult> {
+export async function listTerms(kind: TermsKind = "purchase"): Promise<ListTermsResult> {
   if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
 
-  const [active, history] = await Promise.all([loadActiveTerms(), loadTermsHistory()]);
+  const [active, history] = await Promise.all([loadActiveTerms(kind), loadTermsHistory(kind)]);
   return { ok: true, active, history };
 }
 
@@ -64,6 +69,8 @@ export async function listTerms(): Promise<ListTermsResult> {
 const TERMS_MAX_CHARS = 40_000;
 
 const publishTermsInput = z.object({
+  /** Which document. Absent = purchase, so the existing editor is unchanged. */
+  kind: z.enum(["purchase", "booking"]).optional(),
   bodyEn: z.string().trim().min(1).max(TERMS_MAX_CHARS),
   bodyTh: z.string().trim().min(1).max(TERMS_MAX_CHARS),
 });
@@ -102,7 +109,8 @@ export async function publishTerms(raw: PublishTermsInput): Promise<PublishTerms
 
   if (mockDataMode()) return { ok: false, code: "MOCK_NO_DB" };
 
-  const active = await loadActiveTerms();
+  const kind: TermsKind = input.kind ?? "purchase";
+  const active = await loadActiveTerms(kind);
   if (active.bodyEn === input.bodyEn && active.bodyTh === input.bodyTh) {
     return { ok: false, code: "UNCHANGED" };
   }
@@ -120,7 +128,9 @@ export async function publishTerms(raw: PublishTermsInput): Promise<PublishTerms
       // number the studio shows and records ambiguous — two customers told they
       // accepted "v1" having read different text. Every number stays unique to one
       // body this way.
-      version: sql`(select coalesce(max(${termsVersions.version}), 1) + 1 from ${termsVersions})`,
+      // PER KIND: each document numbers its own versions, and both seeds occupy v1.
+      kind,
+      version: sql`(select coalesce(max(${termsVersions.version}), 1) + 1 from ${termsVersions} where ${termsVersions.kind} = ${kind})`,
       bodyEn: input.bodyEn,
       bodyTh: input.bodyTh,
       publishedByAdminId: session.id,
@@ -130,8 +140,9 @@ export async function publishTerms(raw: PublishTermsInput): Promise<PublishTerms
   if (!row) return { ok: false, code: "INVALID_INPUT" };
 
   revalidateSettings();
-  // The customer buy screen reads the active terms server-side.
-  revalidatePath("/buy");
+  // The customer buy screen reads the active purchase terms server-side; the class
+  // screens read the booking rules the same way.
+  revalidatePath(kind === "booking" ? "/schedule" : "/buy");
 
   return {
     ok: true,

@@ -197,3 +197,21 @@ describe("itemForCredit — a restriction ADDED after the sale must not reach th
     expect(itemForCredit(LIVE_NOW_A_CAMPAIGN, legacy)).toEqual(LIVE_NOW_A_CAMPAIGN);
   });
 });
+
+describe("booking terms seed (2026-09-27)", () => {
+  it("states the same cancellation window the server enforces", async () => {
+    // The first rule is the only one the app ENFORCES; if FREE_CANCEL_HOURS ever
+    // changes, this rule must change with it or customers are told the wrong thing.
+    const { SEED_BOOKING_TERMS } = await import("@/lib/settings/terms");
+    const { FREE_CANCEL_HOURS } = await import("@/lib/domain/types");
+    expect(SEED_BOOKING_TERMS.bodyTh).toContain(`${FREE_CANCEL_HOURS} ชม.`);
+    expect(SEED_BOOKING_TERMS.bodyEn).toContain(`${FREE_CANCEL_HOURS} hours`);
+  });
+
+  it("is a separate document from the purchase terms", async () => {
+    const { SEED_BOOKING_TERMS, SEED_TERMS, seedTermsFor } = await import("@/lib/settings/terms");
+    expect(SEED_BOOKING_TERMS.id).not.toBe(SEED_TERMS.id);
+    expect(seedTermsFor("booking")).toBe(SEED_BOOKING_TERMS);
+    expect(seedTermsFor("purchase")).toBe(SEED_TERMS);
+  });
+});

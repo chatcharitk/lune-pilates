@@ -5,6 +5,7 @@
 // language from the CustomerLangProvider and renders the screen + booking flow.
 
 import { notFound } from "next/navigation";
+import { hasAcceptedTerms, loadActiveTerms } from "@/lib/settings/terms";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getClassDetail, getUsableBalance } from "@/lib/schedule/queries";
 import { creditCostForClassType } from "@/lib/credits/cost";
@@ -49,12 +50,24 @@ export default async function ClassDetailPage({
     new Date(detail.startsAt),
   );
 
+  // The studio's booking rules, and whether this customer already accepted this
+  // version — decided here on the server so the sheet asks for a tick only when the
+  // booking would otherwise be refused for want of one.
+  const terms = await loadActiveTerms("booking");
+  const accepted = await hasAcceptedTerms(viewer.id, terms.id);
+
   return (
     <ClassDetailView
       detail={detail}
       cost={cost}
       balanceBefore={balanceBefore}
       usesPositions={classUsesPositions(detail.capacity)}
+      bookingTerms={{
+        id: terms.id,
+        version: terms.version,
+        body: { en: terms.bodyEn, th: terms.bodyTh },
+        accepted,
+      }}
     />
   );
 }

@@ -12,12 +12,19 @@
 // empty-table/no-DB fallback, so the buy flow can never be blocked by an unseeded
 // database (a customer must always have SOMETHING to read and accept).
 
-import { desc } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
-import { termsVersions } from "@/lib/db/schema";
+import { termsAcceptances, termsVersions } from "@/lib/db/schema";
 import { mockDataMode } from "@/lib/mock-mode";
 
-/** One published, immutable revision of the purchase terms. */
+/**
+ * Which document (2026-09-27). `purchase` is accepted at checkout, once per charge.
+ * `booking` is the studio's class rules, accepted when booking, once per user per
+ * version.
+ */
+export type TermsKind = "purchase" | "booking";
+
+/** One published, immutable revision of a terms document. */
 export interface TermsVersion {
   /** The row id a charge stores as its consent record. */
   id: string;
@@ -115,21 +122,39 @@ export const SEED_TERMS: TermsVersion = {
 };
 
 /**
- * The ACTIVE terms version — the highest `version` in the table, or SEED_TERMS
- * when the table is empty / there is no database. Never returns null: the buy
- * flow always has terms to display and bind a consent to.
+ * The seed booking rules — the owner's own four, word for word in Thai (2026-09-27).
+ *
+ * The cancellation clause restates FREE_CANCEL_HOURS (6), which the server enforces;
+ * the other three are conduct at the studio, which the app cannot enforce and can
+ * only make sure every customer has read. Editable from Settings → Booking terms.
  */
-export async function loadActiveTerms(): Promise<TermsVersion> {
-  if (mockDataMode()) return SEED_TERMS;
+export const SEED_BOOKING_TERMS: TermsVersion = {
+  id: "00000000-0000-0000-0000-000000000002",
+  version: 1,
+  publishedAt: new Date("2026-09-27T00:00:00Z"),
+  publishedByAdminId: null,
+  bodyEn: [
+    "• Cancel at least 6 hours before your class starts and the class is returned to your balance.",
+    "• Please arrive at the studio 10 minutes before your class begins.",
+    "• If you arrive more than 10 minutes late, the studio reserves the right not to admit you to the class, for your own safety.",
+    "• Wear grip socks throughout the class.",
+  ].join("\n"),
+  bodyTh: [
+    "• ยกเลิกคลาสก่อนคลาสเริ่ม 6 ชม. จะไม่ถูกตัดคลาส",
+    "• กรุณาถึงสตูก่อนคลาสเริ่ม 10 นาที",
+    "• กรณีที่เข้าคลาสช้าเกิน 10 นาที ขอสงวนสิทธิ์ไม่อนุญาตให้เข้าคลาส เพื่อความปลอดภัยของตัวผู้เล่น",
+    "• สวมถุงเท้ากันลื่นตลอดการเข้าคลาส",
+  ].join("\n"),
+};
 
-  const db = getDb();
-  const [row] = await db
-    .select()
-    .from(termsVersions)
-    .orderBy(desc(termsVersions.version))
-    .limit(1);
+/** The fallback for a document nobody has published yet. */
+export function seedTermsFor(kind: TermsKind): TermsVersion {
+  return kind === "booking" ? SEED_BOOKING_TERMS : SEED_TERMS;
+}
 
-  if (!row) return SEED_TERMS;
+type TermsRow = typeof termsVersions.$inferSelect;
+
+function rowToTerms(row: TermsRow): TermsVersion {
   return {
     id: row.id,
     version: row.version,
@@ -141,21 +166,101 @@ export async function loadActiveTerms(): Promise<TermsVersion> {
 }
 
 /**
- * Every published version, newest first — the admin history list. Returns the
- * seed alone when nothing has been published yet.
+ * The ACTIVE version of `kind` — its highest `version`, or its seed when none has
+ * been published / there is no database. Never returns null: a customer always has
+ * something to read and accept.
+ *
+ * FILTERED BY KIND, which is the whole point: the table now holds two documents,
+ * and "the highest version in the table" would let a booking-rules v4 quietly
+ * become the terms every checkout binds its consent to.
  */
-export async function loadTermsHistory(): Promise<TermsVersion[]> {
-  if (mockDataMode()) return [SEED_TERMS];
+export async function loadActiveTerms(kind: TermsKind = "purchase"): Promise<TermsVersion> {
+  if (mockDataMode()) return seedTermsFor(kind);
 
-  const db = getDb();
-  const rows = await db.select().from(termsVersions).orderBy(desc(termsVersions.version));
-  if (rows.length === 0) return [SEED_TERMS];
-  return rows.map((row) => ({
-    id: row.id,
-    version: row.version,
-    bodyEn: row.bodyEn,
-    bodyTh: row.bodyTh,
-    publishedAt: row.publishedAt,
-    publishedByAdminId: row.publishedByAdminId,
-  }));
+  const [row] = await getDb()
+    .select()
+    .from(termsVersions)
+    .where(eq(termsVersions.kind, kind))
+    .orderBy(desc(termsVersions.version))
+    .limit(1);
+
+  return row ? rowToTerms(row) : seedTermsFor(kind);
+}
+
+/** Every published version of `kind`, newest first — the admin history list. */
+export async function loadTermsHistory(kind: TermsKind = "purchase"): Promise<TermsVersion[]> {
+  if (mockDataMode()) return [seedTermsFor(kind)];
+
+  const rows = await getDb()
+    .select()
+    .from(termsVersions)
+    .where(eq(termsVersions.kind, kind))
+    .orderBy(desc(termsVersions.version));
+  return rows.length === 0 ? [seedTermsFor(kind)] : rows.map(rowToTerms);
+}
+
+/**
+ * Whether `userId` has accepted this exact version. A seed version (no row) can never
+ * have been recorded, so it always reads false — the customer is asked, and the
+ * acceptance is recorded against the version the owner actually published.
+ */
+export async function hasAcceptedTerms(userId: string, termsVersionId: string): Promise<boolean> {
+  if (mockDataMode()) return false;
+  const [row] = await getDb()
+    .select({ userId: termsAcceptances.userId })
+    .from(termsAcceptances)
+    .where(
+      and(
+        eq(termsAcceptances.userId, userId),
+        eq(termsAcceptances.termsVersionId, termsVersionId),
+      ),
+    )
+    .limit(1);
+  return row !== undefined;
+}
+
+/**
+ * Record that `userId` accepted `termsVersionId`. Idempotent: accepting twice is a
+ * no-op, so a retried booking cannot fail on the consent write.
+ */
+export async function recordTermsAcceptance(userId: string, termsVersionId: string): Promise<void> {
+  if (mockDataMode()) return;
+  await getDb()
+    .insert(termsAcceptances)
+    .values({ userId, termsVersionId })
+    .onConflictDoNothing();
+}
+
+export type BookingTermsGate =
+  | { ok: true }
+  /** No acceptance on file and none sent with this request. */
+  | { ok: false; code: "TERMS_NOT_ACCEPTED" }
+  /** The customer accepted a version the owner has since replaced. */
+  | { ok: false; code: "TERMS_OUTDATED" };
+
+/**
+ * Decide whether `userId` may book under the CURRENT booking rules, recording their
+ * acceptance when this request carries it.
+ *
+ * - Already accepted this version → through, with nothing sent (the regular case).
+ * - Sent the current version's id → recorded now, then through.
+ * - Sent an older id → TERMS_OUTDATED: the owner published new rules while the
+ *   customer had the sheet open, and they have not seen the new text.
+ * - Sent nothing → TERMS_NOT_ACCEPTED.
+ *
+ * The screen asks first; this is what makes asking mean something (CLAUDE.md §8).
+ */
+export async function gateBookingTerms(
+  userId: string,
+  sentVersionId: string | undefined,
+): Promise<BookingTermsGate> {
+  const terms = await loadActiveTerms("booking");
+  if (await hasAcceptedTerms(userId, terms.id)) return { ok: true };
+  if (sentVersionId === undefined) return { ok: false, code: "TERMS_NOT_ACCEPTED" };
+  if (sentVersionId !== terms.id) return { ok: false, code: "TERMS_OUTDATED" };
+  // The seed has no row to reference, so it cannot be recorded — the customer is
+  // simply asked again next time, until the owner publishes the rules as a real
+  // version (which Settings does on first save).
+  if (terms.id !== SEED_BOOKING_TERMS.id) await recordTermsAcceptance(userId, terms.id);
+  return { ok: true };
 }

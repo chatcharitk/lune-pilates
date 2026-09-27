@@ -26,6 +26,7 @@ import {
 } from "./icons";
 import { BookingPanel } from "./booking-panel";
 import { LevelBadge } from "./level-badge";
+import type { CustomerBookingTerms } from "./booking-terms-sheet";
 
 export interface ClassDetailViewProps {
   detail: ClassDetail;
@@ -35,9 +36,17 @@ export interface ClassDetailViewProps {
   balanceBefore: number | null;
   /** Whether this class type assigns reformer positions (multi-seat). */
   usesPositions: boolean;
+  /** The studio's booking rules and whether this customer has accepted them. */
+  bookingTerms: CustomerBookingTerms;
 }
 
-export function ClassDetailView({ detail, cost, balanceBefore, usesPositions }: ClassDetailViewProps) {
+export function ClassDetailView({
+  detail,
+  cost,
+  balanceBefore,
+  usesPositions,
+  bookingTerms,
+}: ClassDetailViewProps) {
   const { t, tt, lang } = useCustomerLang();
 
   const start = hhmm(detail.startsAt);
@@ -124,6 +133,7 @@ export function ClassDetailView({ detail, cost, balanceBefore, usesPositions }: 
           usesPositions={usesPositions}
           dateStr={dateStr}
           timeRange={timeRange}
+          bookingTerms={bookingTerms}
         />
 
         {/* instructor — read-only. For instructor-selectable types (private/duo/

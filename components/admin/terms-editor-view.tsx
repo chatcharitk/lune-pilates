@@ -52,9 +52,15 @@ function publishErrorKey(code: PublishTermsFailureCode): StrKey {
 export function TermsEditorView({
   active,
   history,
+  kind = "purchase",
 }: {
   active: ActiveTermsProps;
   history: TermsHistoryEntry[];
+  /**
+   * Which document this edits (2026-09-27): the purchase terms accepted at checkout,
+   * or the class rules accepted when booking. Same editor, same append-only history.
+   */
+  kind?: "purchase" | "booking";
 }) {
   const { t, lang } = useAdminLang();
   const router = useRouter();
@@ -82,7 +88,7 @@ export function TermsEditorView({
     setErrorKey(null);
     startTransition(async () => {
       try {
-        const res = await publishTerms({ bodyEn: bodyEn.trim(), bodyTh: bodyTh.trim() });
+        const res = await publishTerms({ kind, bodyEn: bodyEn.trim(), bodyTh: bodyTh.trim() });
         if (res.ok) {
           flash("terms_published");
           router.refresh();
@@ -99,10 +105,10 @@ export function TermsEditorView({
     <div>
       <div className="mb-5 max-w-2xl">
         <h1 className="font-head text-2xl font-semibold tracking-tight text-ink">
-          {t("settings_terms_title")}
+          {t(kind === "booking" ? "settings_booking_terms_title" : "settings_terms_title")}
         </h1>
         <p className="mt-1 font-body text-[13.5px] leading-relaxed text-muted">
-          {t("settings_terms_desc")}
+          {t(kind === "booking" ? "settings_booking_terms_desc" : "settings_terms_desc")}
         </p>
       </div>
 
@@ -118,7 +124,7 @@ export function TermsEditorView({
       {/* the append-only guarantee, stated where the owner is about to publish */}
       <div className="mb-5 max-w-2xl rounded-xl border border-line bg-cream-2 px-4 py-3">
         <p className="m-0 font-body text-[12.5px] leading-relaxed text-ink-soft">
-          {t("terms_editor_note")}
+          {t(kind === "booking" ? "booking_terms_editor_note" : "terms_editor_note")}
         </p>
         <p className="m-0 mt-2 font-body text-[12px] text-muted">
           {t("terms_active_version")}: <span className="font-semibold text-ink">v{active.version}</span>{" "}

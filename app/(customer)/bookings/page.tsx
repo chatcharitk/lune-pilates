@@ -8,6 +8,7 @@
 // a cancel returns come from the backend, never a client clock or balance.
 
 import { getCurrentUser } from "@/lib/auth/session";
+import { hasAcceptedTerms, loadActiveTerms } from "@/lib/settings/terms";
 import { listMyBookings } from "@/lib/bookings/queries";
 import { listMyWaitlist } from "@/lib/waitlist/queries";
 import { BookingsView } from "@/components/customer/bookings-view";
@@ -26,5 +27,20 @@ export default async function BookingsPage() {
     listMyWaitlist(viewer),
   ]);
 
-  return <BookingsView bookings={bookings} waitlist={waitlist} />;
+  // Claiming an offered seat is a booking, so the same rules sheet applies there.
+  const terms = await loadActiveTerms("booking");
+  const accepted = await hasAcceptedTerms(viewer.id, terms.id);
+
+  return (
+    <BookingsView
+      bookings={bookings}
+      waitlist={waitlist}
+      bookingTerms={{
+        id: terms.id,
+        version: terms.version,
+        body: { en: terms.bodyEn, th: terms.bodyTh },
+        accepted,
+      }}
+    />
+  );
 }

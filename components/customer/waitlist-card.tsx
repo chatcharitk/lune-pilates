@@ -27,6 +27,7 @@ import type { MyWaitlistEntry } from "@/lib/waitlist/queries";
 import { makeT, type Lang } from "@/lib/i18n";
 import type { StrKey } from "@/lib/i18n/strings";
 import { classDateLabel, endTime, hhmm, TYPE_DOT } from "./schedule-helpers";
+import { BookingTermsSheet, type CustomerBookingTerms } from "./booking-terms-sheet";
 import { Bell, Check, Clock, Info } from "./icons";
 
 type ConfirmPhase = "idle" | "submitting" | "done" | "error";
@@ -46,6 +47,10 @@ function confirmErrorKey(code: ConfirmWaitlistFailureCode): StrKey {
       return "err_offer_no_credits";
     case "WRONG_CLASS_DAY":
       return "err_wrong_class_day";
+    case "TERMS_OUTDATED":
+      return "err_booking_terms_outdated";
+    case "TERMS_NOT_ACCEPTED":
+      return "err_booking_terms_required";
     case "NOT_FOUND":
       return "err_cancel_not_found";
     case "NOT_VISIBLE":
@@ -73,13 +78,30 @@ function fmtMmSs(secondsLeft: number): string {
   return `${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
 }
 
-export function WaitlistCard({ lang, entry }: { lang: Lang; entry: MyWaitlistEntry }) {
+export function WaitlistCard({
+  lang,
+  entry,
+  bookingTerms,
+}: {
+  lang: Lang;
+  entry: MyWaitlistEntry;
+  /** Claiming a seat is a booking, so it goes through the same rules sheet. */
+  bookingTerms: CustomerBookingTerms;
+}) {
   const { t, tt } = makeT(lang);
   const dateStr = tt(classDateLabel(entry.startsAt));
   const timeRange = `${hhmm(entry.startsAt)}–${endTime(entry.startsAt, entry.durationMin)}`;
 
   if (entry.status === "offered" && entry.holdExpiresAt) {
-    return <OfferedCard lang={lang} entry={entry} dateStr={dateStr} timeRange={timeRange} />;
+    return (
+      <OfferedCard
+        lang={lang}
+        entry={entry}
+        dateStr={dateStr}
+        timeRange={timeRange}
+        bookingTerms={bookingTerms}
+      />
+    );
   }
 
   // waiting / expired (and any offered row with no hold) share the calm card shell.
@@ -114,14 +136,17 @@ function OfferedCard({
   entry,
   dateStr,
   timeRange,
+  bookingTerms,
 }: {
   lang: Lang;
   entry: MyWaitlistEntry;
   dateStr: string;
   timeRange: string;
+  bookingTerms: CustomerBookingTerms;
 }) {
   const { t, tt } = makeT(lang);
   const router = useRouter();
+  const [termsOpen, setTermsOpen] = useState(false);
   // Non-null on this path (the parent only renders OfferedCard when holdExpiresAt
   // is set), but TS doesn't know that — guard for a safe fallback.
   const deadline = entry.holdExpiresAt ? new Date(entry.holdExpiresAt).getTime() : 0;
@@ -154,11 +179,12 @@ function OfferedCard({
   const elapsed = secondsLeft <= 0;
   const submitting = phase === "submitting";
 
-  async function confirm() {
+  async function confirm(bookingTermsVersionId: string | undefined) {
     setPhase("submitting");
     setFailCode(null);
     try {
-      const res = await confirmWaitlistOffer({ waitlistId: entry.waitlistId });
+      const res = await confirmWaitlistOffer({ waitlistId: entry.waitlistId, bookingTermsVersionId });
+      setTermsOpen(false);
       if (res.ok) {
         setPhase("done");
         // The waitlist entry has become a real booking — re-fetch the server
@@ -167,10 +193,12 @@ function OfferedCard({
       } else {
         setFailCode(res.code);
         setPhase("error");
+        if (res.code === "TERMS_OUTDATED" || res.code === "TERMS_NOT_ACCEPTED") router.refresh();
       }
     } catch {
       // A thrown action (network blip) → the keyed generic error state
       // (INVALID_INPUT → err_generic), never an unhandled rejection.
+      setTermsOpen(false);
       setFailCode("INVALID_INPUT");
       setPhase("error");
     }
@@ -200,6 +228,14 @@ function OfferedCard({
 
   return (
     <article className="rounded-lune border border-taupe/40 bg-surface-2 px-[18px] py-4 shadow-soft ring-1 ring-taupe/25">
+      <BookingTermsSheet
+        open={termsOpen}
+        lang={lang}
+        terms={bookingTerms}
+        submitting={submitting}
+        onConfirm={(versionId) => void confirm(versionId)}
+        onClose={() => setTermsOpen(false)}
+      />
       {/* highlighted "A spot opened!" header */}
       <div className="mb-2.5 flex items-center gap-1.5">
         <span className="grid h-6 w-6 place-items-center rounded-full bg-sage/20 text-sage-deep">
@@ -249,7 +285,7 @@ function OfferedCard({
       {/* confirm — disabled once the countdown elapses (the server still re-checks) */}
       <button
         type="button"
-        onClick={confirm}
+        onClick={() => setTermsOpen(true)}
         disabled={submitting || elapsed}
         className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-lune-sm bg-ink font-body text-[15px] font-semibold text-cream shadow-lift transition-transform active:scale-[0.985] disabled:bg-cream-2 disabled:text-muted disabled:shadow-none"
       >

@@ -29,12 +29,19 @@ import { emit } from "@/lib/events/bus";
 import { registerNotificationHandlers } from "@/lib/events/notifications";
 import { offerNextWaitlistSeat } from "@/lib/waitlist/queries";
 import { eq } from "drizzle-orm";
+import { gateBookingTerms } from "@/lib/settings/terms";
 
 // ───────────────────────── book ─────────────────────────
 
 const bookClassInput = z.object({
   classInstanceId: z.string().uuid(),
   position: z.enum(["left", "middle", "right"]).optional(),
+  /**
+   * The booking-rules version the customer just ticked, when they ticked one. Absent
+   * for a customer who accepted the current rules before — the server checks that
+   * record itself rather than taking the screen's word for it.
+   */
+  bookingTermsVersionId: z.string().min(1).max(64).optional(),
 });
 export type BookClassInput = z.infer<typeof bookClassInput>;
 
@@ -46,7 +53,11 @@ export type BookActionFailureCode =
   | BookFailureCode
   | "INVALID_INPUT"
   | "CLASS_NOT_FOUND"
-  | "NO_USABLE_PACKAGE";
+  | "NO_USABLE_PACKAGE"
+  /** The studio's booking rules have not been accepted (2026-09-27). */
+  | "TERMS_NOT_ACCEPTED"
+  /** Accepted, but the owner has since published new rules. */
+  | "TERMS_OUTDATED";
 
 export type BookResult =
   | { ok: true; bookingId: string; hoursLeft: number; freeCancelHours: number }
@@ -66,6 +77,11 @@ export async function bookClass(raw: BookClassInput): Promise<BookResult> {
   const now = new Date();
 
   const viewer = await getCurrentUser();
+
+  // BOOKING RULES. Checked before anything is debited, and decided here — the sheet
+  // that asked is a courtesy, this is the rule.
+  const termsGate = await gateBookingTerms(viewer.id, input.bookingTermsVersionId);
+  if (!termsGate.ok) return { ok: false, code: termsGate.code };
 
   // Resolve the class meta server-side so we pick the correct package category
   // and can validate the requested seat against the class's real capacity.

@@ -28,6 +28,18 @@ const LINKS: SettingsLink[] = [
     ),
   },
   {
+    href: "/admin/settings/booking-terms",
+    titleKey: "settings_booking_terms_title",
+    descKey: "settings_booking_terms_desc",
+    icon: (
+      <>
+        <rect x="4" y="4" width="16" height="17" rx="2" />
+        <path d="M8 2v4M16 2v4M4 10h16" />
+        <path d="m9 15 2 2 4-4" />
+      </>
+    ),
+  },
+  {
     href: "/admin/settings/studio",
     titleKey: "settings_studio_title",
     descKey: "settings_studio_desc",

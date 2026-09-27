@@ -16,6 +16,7 @@
 // guard are resolved/recomputed server-side. No client balance/price is trusted.
 
 import { and, eq, sql } from "drizzle-orm";
+import { gateBookingTerms } from "@/lib/settings/terms";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/client";
@@ -195,6 +196,8 @@ export async function joinWaitlist(raw: JoinWaitlistInput): Promise<JoinWaitlist
 
 const confirmInput = z.object({
   waitlistId: z.string().uuid(),
+  /** Booking-rules version ticked on this confirm, if any — see bookClass. */
+  bookingTermsVersionId: z.string().min(1).max(64).optional(),
 });
 export type ConfirmWaitlistOfferInput = z.infer<typeof confirmInput>;
 
@@ -213,6 +216,9 @@ export type ConfirmWaitlistFailureCode =
   | "OFFER_LOST"
   | "CLASS_NOT_FOUND"
   | "NO_USABLE_PACKAGE"
+  // Claiming a seat IS a booking, so the studio's rules apply to it too.
+  | "TERMS_NOT_ACCEPTED"
+  | "TERMS_OUTDATED"
   // Every booking-path failure except CLASS_FULL (which is mapped to OFFER_LOST).
   | Exclude<BookFailureCode, "CLASS_FULL">;
 
@@ -243,10 +249,16 @@ export async function confirmWaitlistOffer(
   if (!parsed.success) {
     return { ok: false, code: "INVALID_INPUT" };
   }
-  const { waitlistId } = parsed.data;
+  const { waitlistId, bookingTermsVersionId } = parsed.data;
   const now = new Date();
 
   const viewer = await getCurrentUser();
+
+  // Claiming a freed seat is a booking, so it answers to the same rules as one —
+  // otherwise the waitlist would be a way to book without ever seeing them.
+  const termsGate = await gateBookingTerms(viewer.id, bookingTermsVersionId);
+  if (!termsGate.ok) return { ok: false, code: termsGate.code };
+
   const db = getDb();
 
   // 1) Lock + gate the offer in its own short transaction. We resolve the class

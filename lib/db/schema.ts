@@ -14,6 +14,7 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
+  unique,
 } from "drizzle-orm/pg-core";
 
 export const userTier = pgEnum("user_tier", ["member", "guest"]);
@@ -337,18 +338,47 @@ export const visibilityWindows = pgTable(
 // The ACTIVE version is simply the highest `version`. SEED_TERMS
 // (lib/settings/terms.ts) is the empty-table/no-DB fallback, mirroring the
 // catalog_items / visibility_windows pattern.
-export const termsVersions = pgTable("terms_versions", {
+export const termsVersions = pgTable(
+  "terms_versions",
+  {
   id: uuid("id").primaryKey().defaultRandom(),
-  // Monotonic, human-facing version number ("v3"). UNIQUE so two concurrent
+  // WHICH document (2026-09-27): 'purchase' — accepted at checkout — or 'booking' —
+  // the class rules accepted when booking. Same append-only mechanics for both.
+  kind: text("kind").notNull().default("purchase"),
+  // Monotonic, human-facing version number ("v3"), UNIQUE PER KIND so two concurrent
   // publishes can never mint the same version — the loser retries.
-  version: integer("version").notNull().unique(),
+  version: integer("version").notNull(),
   bodyEn: text("body_en").notNull(),
   bodyTh: text("body_th").notNull(),
   // The owner who published it (free-text staff id, mirrors payment_slips'
   // reviewed_by_admin_id). Null for the seeded/imported first version.
   publishedByAdminId: text("published_by_admin_id"),
   publishedAt: timestamp("published_at", { withTimezone: true }).notNull().defaultNow(),
-});
+  },
+  (t) => [
+    unique("terms_versions_kind_version_key").on(t.kind, t.version),
+    check("terms_versions_kind_valid", sql`${t.kind} in ('purchase','booking')`),
+  ],
+);
+
+// Who has accepted which terms version (2026-09-27). Booking terms are accepted ONCE
+// per user per version — re-ticking the same rules on every class trains people to
+// tick without reading — so the record lives here rather than on each booking. A
+// purchase keeps its own per-charge record (charges.terms_version_id), because each
+// purchase is a separate agreement.
+export const termsAcceptances = pgTable(
+  "terms_acceptances",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    termsVersionId: uuid("terms_version_id")
+      .notNull()
+      .references(() => termsVersions.id),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.termsVersionId] })],
+);
 
 // ───────────────────────── studio info (single row) ─────────────────────────
 // Owner-editable studio identity shown to customers (address, phone, hours). A

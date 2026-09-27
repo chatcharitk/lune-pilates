@@ -1185,6 +1185,38 @@ export const STR = {
     th: "อายุการใช้งานต้องเป็นจำนวนเต็มระหว่าง 1 ถึง {max} ตามหน่วยที่เลือก",
   },
   // ───────── admin: promo codes ─────────
+  // The studio's booking rules, shown when booking (2026-09-27).
+  booking_terms_title: { en: "Before you book", th: "ข้อกำหนดและเงื่อนไข" },
+  booking_terms_intro: {
+    en: "Please read the studio’s class rules and tick to accept before booking.",
+    th: "กรุณาอ่านข้อกำหนดของสตูดิโอ และติ๊กยอมรับก่อนจองคลาส",
+  },
+  booking_terms_reminder: {
+    en: "A quick reminder of the studio’s class rules.",
+    th: "ทบทวนข้อกำหนดของสตูดิโอก่อนจองคลาส",
+  },
+  booking_terms_agree: {
+    en: "I have read and accept the class rules",
+    th: "ฉันได้อ่านและยอมรับข้อกำหนดและเงื่อนไข",
+  },
+  booking_terms_confirm: { en: "Confirm booking", th: "ยืนยันการจอง" },
+  err_booking_terms_outdated: {
+    en: "The studio has just updated its class rules. Please read them again.",
+    th: "สตูดิโอเพิ่งปรับข้อกำหนดใหม่ กรุณาอ่านอีกครั้ง",
+  },
+  err_booking_terms_required: {
+    en: "Please accept the class rules to book.",
+    th: "กรุณายอมรับข้อกำหนดก่อนจองคลาส",
+  },
+  booking_terms_editor_note: {
+    en: "Publishing saves a new version, and every customer is asked to read and accept it again on their next booking. Bookings already made are not affected.",
+    th: "การเผยแพร่จะบันทึกเป็นเวอร์ชันใหม่ และลูกค้าทุกคนจะต้องอ่านและยอมรับใหม่อีกครั้งในการจองครั้งถัดไป การจองที่ทำไปแล้วไม่ได้รับผลกระทบ",
+  },
+  settings_booking_terms_title: { en: "Booking terms", th: "ข้อกำหนดการจองคลาส" },
+  settings_booking_terms_desc: {
+    en: "The class rules customers accept when they book.",
+    th: "ข้อกำหนดที่ลูกค้ายอมรับตอนจองคลาส",
+  },
   // Class difficulty (2026-09-21). Shown on the schedule card and the class screen;
   // a class with no level shows nothing at all.
   level_basic: { en: "Basic", th: "พื้นฐาน" },

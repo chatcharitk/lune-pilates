@@ -25,6 +25,7 @@ import { makeT, type Lang } from "@/lib/i18n";
 import type { StrKey } from "@/lib/i18n/strings";
 import { classDateLabel, POSITION_KEY, windowHoursLabel } from "./schedule-helpers";
 import { ArrowRight, Bell, Check, Info, Clock } from "./icons";
+import { BookingTermsSheet, type CustomerBookingTerms } from "./booking-terms-sheet";
 
 interface BookingPanelProps {
   lang: Lang;
@@ -43,6 +44,8 @@ interface BookingPanelProps {
   dateStr: string;
   /** "HH:MM–HH:MM" time range. */
   timeRange: string;
+  /** The studio's current booking rules, and whether this customer accepted them. */
+  bookingTerms: CustomerBookingTerms;
 }
 
 type Phase = "idle" | "submitting" | "booked" | "error";
@@ -61,6 +64,10 @@ function errorKey(code: BookActionFailureCode): StrKey {
       return "err_no_package";
     case "WRONG_CLASS_DAY":
       return "err_wrong_class_day";
+    case "TERMS_OUTDATED":
+      return "err_booking_terms_outdated";
+    case "TERMS_NOT_ACCEPTED":
+      return "err_booking_terms_required";
     case "CLASS_FULL":
     case "POSITION_TAKEN":
       return "err_full";
@@ -114,6 +121,7 @@ export function BookingPanel({
   usesPositions,
   dateStr,
   timeRange,
+  bookingTerms,
 }: BookingPanelProps) {
   const { t, tt } = makeT(lang);
   const router = useRouter();
@@ -130,6 +138,8 @@ export function BookingPanel({
   // The free-cancel window (hours, always 5) the server LOCKED for THIS booking,
   // surfaced on the success screen so the policy notice is accurate per booking.
   const [freeCancelHours, setFreeCancelHours] = useState<number | null>(null);
+  // The rules sheet opens on every Book tap and doubles as the confirm step.
+  const [termsOpen, setTermsOpen] = useState(false);
 
   // Waitlist join state (full-class path) — the queue position comes from the
   // server join result, never computed here.
@@ -167,7 +177,7 @@ export function BookingPanel({
   // instant it opens, so the CTA is a disabled "not open yet" state showing that date.
   const rentalLocked = detail.rentalOpensAt !== null;
 
-  async function submit() {
+  async function submit(bookingTermsVersionId: string | undefined) {
     setPhase("submitting");
     setFailCode(null);
     const position: ReformerPosition | undefined =
@@ -175,7 +185,8 @@ export function BookingPanel({
         ? detail.positions[selected].position
         : undefined;
     try {
-      const res = await bookClass({ classInstanceId: detail.id, position });
+      const res = await bookClass({ classInstanceId: detail.id, position, bookingTermsVersionId });
+      setTermsOpen(false);
       if (res.ok) {
         setBalanceAfter(res.hoursLeft);
         setFreeCancelHours(res.freeCancelHours);
@@ -183,10 +194,14 @@ export function BookingPanel({
       } else {
         setFailCode(res.code);
         setPhase("error");
+        // New rules were published while the sheet was open: fetch them, so the
+        // next tap shows the text the server will actually hold them to.
+        if (res.code === "TERMS_OUTDATED" || res.code === "TERMS_NOT_ACCEPTED") router.refresh();
       }
     } catch {
       // A thrown action (network blip / unexpected server error) must surface the
       // keyed generic error, not reject unhandled. INVALID_INPUT → err_generic.
+      setTermsOpen(false);
       setFailCode("INVALID_INPUT");
       setPhase("error");
     }
@@ -390,6 +405,16 @@ export function BookingPanel({
   // ───────── seat picker + CTA (idle / submitting / error) ─────────
   return (
     <div className="px-[18px] pb-10">
+      {/* The studio's rules, and the confirm step: the Book button opens this, and
+          only the button inside it books. */}
+      <BookingTermsSheet
+        open={termsOpen}
+        lang={lang}
+        terms={bookingTerms}
+        submitting={phase === "submitting"}
+        onConfirm={(versionId) => void submit(versionId)}
+        onClose={() => setTermsOpen(false)}
+      />
       {/* reformer position picker */}
       {usesPositions && (
         <div className="mt-4 rounded-lune-sm border border-line bg-surface-2 px-4 pb-4 pt-3.5 shadow-soft">
@@ -502,7 +527,7 @@ export function BookingPanel({
           ) : (
             <button
               type="button"
-              onClick={submit}
+              onClick={() => setTermsOpen(true)}
               disabled={phase === "submitting"}
               className="flex h-12 w-full items-center justify-center gap-2.5 rounded-lune-sm bg-ink font-body text-base font-semibold text-cream shadow-lift transition-transform active:scale-[0.985] disabled:bg-cream-2 disabled:text-muted disabled:shadow-none"
             >

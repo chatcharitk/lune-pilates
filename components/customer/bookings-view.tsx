@@ -23,14 +23,18 @@ import {
 import { Check, Clock, Info, Users } from "./icons";
 import { CancelSheet } from "./cancel-sheet";
 import { WaitlistCard } from "./waitlist-card";
+import type { CustomerBookingTerms } from "./booking-terms-sheet";
 
 type Tab = "upcoming" | "past";
 
 export function BookingsView({
   bookings,
   waitlist,
+  bookingTerms,
 }: {
   bookings: MyBookings;
+  /** Claiming an offered waitlist seat books it, so the rules sheet needs these. */
+  bookingTerms: CustomerBookingTerms;
   /**
    * The viewer's live waitlist entries (waiting/offered; stale offers already
    * downgraded to expired server-side). Shown in their own section on the
@@ -144,7 +148,7 @@ export function BookingsView({
             </h2>
             <div className="flex flex-col gap-3">
               {waitlist.map((w) => (
-                <WaitlistCard key={w.waitlistId} lang={lang} entry={w} />
+                <WaitlistCard key={w.waitlistId} lang={lang} entry={w} bookingTerms={bookingTerms} />
               ))}
             </div>
           </section>
