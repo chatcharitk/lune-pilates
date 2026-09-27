@@ -52,6 +52,8 @@ export interface AdminInstructorClass {
   time: string;
   type: ClassType;
   typeMeta: ClassTypeMeta;
+  /** Custom class name ("Essential Reformer"); null → show the type label. */
+  name: string | null;
   /** Live booked count (source of truth = bookings table). */
   booked: number;
   /** Effective (hard-capped) capacity — the same one the booking debit uses. */
@@ -219,6 +221,7 @@ export async function getAdminInstructors(now: Date = new Date()): Promise<Admin
         id: classInstances.id,
         startsAt: classInstances.startsAt,
         type: classInstances.type,
+        name: classInstances.name,
         capacity: classInstances.capacity,
         instructorId: classInstances.instructorId,
         booked: bookedCount,
@@ -254,6 +257,7 @@ export async function getAdminInstructors(now: Date = new Date()): Promise<Admin
       time: hhmm(c.startsAt),
       type: c.type,
       typeMeta: metaFor(c.type),
+      name: c.name ?? null,
       booked: c.booked ?? 0,
       capacity,
     });
@@ -383,6 +387,7 @@ function mockAdminInstructors(dayStart: Date): AdminInstructor[] {
       time: g.time,
       type: g.type,
       typeMeta: metaFor(g.type),
+      name: null,
       booked: Math.min(g.booked, effectiveCapacity(99, g.type)),
       capacity: effectiveCapacity(99, g.type),
     }));

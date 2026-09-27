@@ -307,7 +307,7 @@ function InstructorCard({
               </span>
               <Dot type={c.type} size={7} />
               <span className="min-w-0 flex-1 truncate font-body text-[13.5px] font-semibold text-ink">
-                {tt(c.typeMeta.short)}
+                {c.name || tt(c.typeMeta.short)}
               </span>
               <span className="shrink-0 font-body text-[12.5px] text-muted tabular-nums">
                 {c.booked}/{c.capacity}
