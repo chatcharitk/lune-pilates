@@ -115,12 +115,9 @@ export function ClassDetailView({
               value={`${detail.capacity} ${t("people")}`}
               sub={reformerSub}
             />
-            <Fact
-              icon={<Pin size={17} />}
-              label={t("location")}
-              value={t("studio_name")}
-              sub={t("studio_level")}
-            />
+            {/* No floor line: "ชั้น 3" was a placeholder from the design prototype,
+                and the studio has no floor in its address (owner, 2026-09-28). */}
+            <Fact icon={<Pin size={17} />} label={t("location")} value={t("studio_name")} />
           </div>
         </div>
 
