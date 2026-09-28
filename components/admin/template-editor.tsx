@@ -28,7 +28,11 @@ import { CAPACITY, CLASS_LEVELS, type ClassLevel, type ClassType } from "@/lib/d
 import { LEVEL_KEY } from "./level-options";
 import type { StrKey } from "@/lib/i18n";
 
-const TYPES: ClassType[] = ["group", "private", "duo", "trio"]; // rental hidden 2026-07-20
+// Rental is back (2026-09-28). It was hidden here on 2026-07-20 and re-shown to
+// customers — buyable credits, a schedule filter — on 2026-07-23, but never here, so
+// the owner had no way to create a rental slot and made them as PRIVATE classes
+// instead. A private class debits 1:1 credits, which is exactly what it did.
+const TYPES: ClassType[] = ["group", "private", "duo", "trio", "rental"];
 const DURATIONS = [30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90];
 
 // ISO weekday (1=Mon … 7=Sun) → full-name i18n key (reuses the availability editor's

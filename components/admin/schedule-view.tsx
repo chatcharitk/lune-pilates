@@ -29,7 +29,11 @@ import { LEVEL_KEY } from "./level-options";
 import type { StrKey } from "@/lib/i18n";
 import { addDays, formatStudioDate, studioParts, studioStartOfDay } from "@/lib/time";
 
-const TYPES: ClassType[] = ["group", "private", "duo", "trio"]; // rental hidden 2026-07-20
+// Rental is back (2026-09-28). It was hidden here on 2026-07-20 and re-shown to
+// customers — buyable credits, a schedule filter — on 2026-07-23, but never here, so
+// the owner had no way to create a rental slot and made them as PRIVATE classes
+// instead. A private class debits 1:1 credits, which is exactly what it did.
+const TYPES: ClassType[] = ["group", "private", "duo", "trio", "rental"];
 
 /**
  * Every half hour the studio might open a class, 06:00–21:30.
