@@ -853,15 +853,9 @@ export const bookings = pgTable(
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
   },
   (t) => [
-    // DB BACKSTOP for "one LIVE booking per (class, user)" (CLAUDE.md §5 inv 1,
-    // audit LOW-1). The atomic debit already prevents a double-book via the class
-    // FOR UPDATE + in-tx dupe check; this PARTIAL unique index is defense-in-depth
-    // so a logic regression can never persist two live bookings for the same
-    // person in the same class. Partial (status='booked') so cancelled rows — of
-    // which there can be many for one (class,user) after re-books — don't collide.
-    uniqueIndex("bookings_one_live_per_user")
-      .on(t.classInstanceId, t.userId)
-      .where(sql`${t.status} = 'booked'`),
+    // (bookings_one_live_per_user was dropped 2026-09-28 — drizzle/0019. A customer
+    // may hold several seats in one class, booking for the household. Seats are
+    // still bounded by capacity and by the one-booking-per-reformer index below.)
     // DB BACKSTOP for "one LIVE booking per reformer position" — a position can be
     // held by at most one live booking in a class. Also partial on status='booked'
     // and only where a position is set (cap-1 Privates carry a null position).

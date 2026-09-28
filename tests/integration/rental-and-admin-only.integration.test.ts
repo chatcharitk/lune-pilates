@@ -38,6 +38,7 @@ import {
   packages,
   users,
   waitlist,
+  termsAcceptances,
 } from "@/lib/db/schema";
 import { bookClass } from "@/app/actions/booking";
 import { adminBookForCustomer } from "@/app/actions/admin-bookings";
@@ -45,6 +46,16 @@ import { joinWaitlist } from "@/app/actions/waitlist";
 import { createClass, updateClass } from "@/app/actions/schedule";
 import type { ClassType, PackageCategory } from "@/lib/domain/types";
 import { studioInstant, studioParts } from "@/lib/time";
+
+/**
+ * The active booking rules' id. Every customer booking must carry an acceptance
+ * since 2026-09-27 (lib/settings/terms.ts → gateBookingTerms), exactly as the sheet
+ * sends it on a customer's first booking.
+ */
+async function bookingTermsId(): Promise<string> {
+  const { loadActiveTerms } = await import("@/lib/settings/terms");
+  return (await loadActiveTerms("booking")).id;
+}
 
 const HAS_DB = !!process.env.DATABASE_URL;
 const future = (h: number) => new Date(Date.now() + h * 3_600_000);
@@ -133,6 +144,11 @@ describe.skipIf(!HAS_DB)("rental window + admin-only booking (integration · req
         await db.delete(classInstances).where(inArray(classInstances.id, classIds));
       }
       if (houseIds.length) {
+        // Booking-rules acceptances reference the user, so they go first — otherwise
+        // the user delete fails on the foreign key and the fixtures are left behind.
+        await db.delete(termsAcceptances).where(
+          inArray(termsAcceptances.userId, db.select({ id: users.id }).from(users).where(inArray(users.householdId, houseIds))),
+        );
         await db.delete(users).where(inArray(users.householdId, houseIds));
         await db.delete(households).where(inArray(households.id, houseIds));
       }
@@ -148,7 +164,7 @@ describe.skipIf(!HAS_DB)("rental window + admin-only booking (integration · req
     const classId = await insertClass("private", future(48), 60, 1);
 
     enqueueSession(user);
-    const res = await bookClass({ classInstanceId: classId });
+    const res = await bookClass({ bookingTermsVersionId: await bookingTermsId(), classInstanceId: classId });
     expect(res).toEqual({ ok: false, code: "ADMIN_ONLY" });
 
     // Untouched pool — the guard fires before package selection / debit.
@@ -187,7 +203,7 @@ describe.skipIf(!HAS_DB)("rental window + admin-only booking (integration · req
     const classId = await insertClass("rental", startsAt, 60, 3);
 
     enqueueSession(user);
-    const res = await bookClass({ classInstanceId: classId });
+    const res = await bookClass({ bookingTermsVersionId: await bookingTermsId(), classInstanceId: classId });
     expect(res).toEqual({ ok: false, code: "RENTAL_WINDOW_CLOSED" });
     const [p] = await getDb().select({ hoursLeft: packages.hoursLeft }).from(packages).where(eq(packages.id, packageId));
     expect(p!.hoursLeft).toBe(5); // no debit
@@ -202,7 +218,7 @@ describe.skipIf(!HAS_DB)("rental window + admin-only booking (integration · req
     const classId = await insertClass("rental", future(300), 60, 3);
 
     enqueueSession(user);
-    const res = await bookClass({ classInstanceId: classId });
+    const res = await bookClass({ bookingTermsVersionId: await bookingTermsId(), classInstanceId: classId });
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     const [p] = await getDb().select({ hoursLeft: packages.hoursLeft }).from(packages).where(eq(packages.id, packageId));
@@ -304,7 +320,7 @@ describe.skipIf(!HAS_DB)("rental window + admin-only booking (integration · req
     await insertClass("group", future(500.25), 60, 3); // 15 min into the rental
 
     enqueueSession(user);
-    const res = await bookClass({ classInstanceId: rentalId });
+    const res = await bookClass({ bookingTermsVersionId: await bookingTermsId(), classInstanceId: rentalId });
     expect(res).toEqual({ ok: false, code: "ROOM_CONFLICT" });
   });
 });

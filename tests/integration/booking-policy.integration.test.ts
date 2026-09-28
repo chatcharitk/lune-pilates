@@ -58,6 +58,7 @@ import {
   packages,
   users,
   waitlist,
+  termsAcceptances,
 } from "@/lib/db/schema";
 import { bookClass, cancelBookingAction } from "@/app/actions/booking";
 import { adminBookForCustomer, adminReschedule } from "@/app/actions/admin-bookings";
@@ -65,6 +66,16 @@ import { confirmWaitlistOffer, joinWaitlist } from "@/app/actions/waitlist";
 import { offerNextWaitlistSeat } from "@/lib/waitlist/queries";
 import { creditCostForClassType } from "@/lib/credits/cost";
 import type { ClassType, PackageCategory } from "@/lib/domain/types";
+
+/**
+ * The active booking rules' id. Every customer booking must carry an acceptance
+ * since 2026-09-27 (lib/settings/terms.ts → gateBookingTerms), exactly as the sheet
+ * sends it on a customer's first booking.
+ */
+async function bookingTermsId(): Promise<string> {
+  const { loadActiveTerms } = await import("@/lib/settings/terms");
+  return (await loadActiveTerms("booking")).id;
+}
 
 const HAS_DB = !!process.env.DATABASE_URL;
 const PRIVATE_COST = creditCostForClassType("private"); // 2
@@ -190,6 +201,11 @@ describe.skipIf(!HAS_DB)(
           await db.delete(classInstances).where(inArray(classInstances.id, classIds));
         }
         if (houseIds.length) {
+          // Booking-rules acceptances reference the user, so they go first — otherwise
+          // the user delete fails on the foreign key and the fixtures are left behind.
+          await db.delete(termsAcceptances).where(
+            inArray(termsAcceptances.userId, db.select({ id: users.id }).from(users).where(inArray(users.householdId, houseIds))),
+          );
           await db.delete(users).where(inArray(users.householdId, houseIds));
           await db.delete(households).where(inArray(households.id, houseIds));
         }
@@ -338,7 +354,7 @@ describe.skipIf(!HAS_DB)(
       void holderPkg;
 
       enqueueSession(holderM[0]!);
-      const held = await bookClass({ classInstanceId: classId });
+      const held = await bookClass({ bookingTermsVersionId: await bookingTermsId(), classInstanceId: classId });
       expect(held.ok).toBe(true);
       if (!held.ok) return;
 
@@ -373,8 +389,8 @@ describe.skipIf(!HAS_DB)(
       // Both confirm the SAME single freed seat concurrently.
       enqueueSession(waiterA, waiterB);
       const [rA, rB] = await Promise.allSettled([
-        confirmWaitlistOffer({ waitlistId: joinA.waitlistId }),
-        confirmWaitlistOffer({ waitlistId: joinB.waitlistId }),
+        confirmWaitlistOffer({ bookingTermsVersionId: await bookingTermsId(), waitlistId: joinA.waitlistId }),
+        confirmWaitlistOffer({ bookingTermsVersionId: await bookingTermsId(), waitlistId: joinB.waitlistId }),
       ]);
       expect(rA.status).toBe("fulfilled");
       expect(rB.status).toBe("fulfilled");

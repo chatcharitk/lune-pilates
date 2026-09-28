@@ -33,10 +33,21 @@ import {
   packages,
   users,
   waitlist,
+  termsAcceptances,
 } from "@/lib/db/schema";
 import { cancelClass } from "@/app/actions/schedule";
 import { bookClass } from "@/app/actions/booking";
 import { creditCostForClassType } from "@/lib/credits/cost";
+
+/**
+ * The active booking rules' id. Every customer booking must carry an acceptance
+ * since 2026-09-27 (lib/settings/terms.ts → gateBookingTerms), exactly as the sheet
+ * sends it on a customer's first booking.
+ */
+async function bookingTermsId(): Promise<string> {
+  const { loadActiveTerms } = await import("@/lib/settings/terms");
+  return (await loadActiveTerms("booking")).id;
+}
 
 const HAS_DB = !!process.env.DATABASE_URL;
 const GROUP_COST = creditCostForClassType("group");
@@ -119,6 +130,11 @@ describe.skipIf(!HAS_DB)("class-level cancel (integration · requires DATABASE_U
       }
       if (classIds.length) await db.delete(classInstances).where(inArray(classInstances.id, classIds));
       if (houseIds.length) {
+        // Booking-rules acceptances reference the user, so they go first — otherwise
+        // the user delete fails on the foreign key and the fixtures are left behind.
+        await db.delete(termsAcceptances).where(
+          inArray(termsAcceptances.userId, db.select({ id: users.id }).from(users).where(inArray(users.householdId, houseIds))),
+        );
         await db.delete(users).where(inArray(users.householdId, houseIds));
         await db.delete(households).where(inArray(households.id, houseIds));
       }
@@ -137,9 +153,9 @@ describe.skipIf(!HAS_DB)("class-level cancel (integration · requires DATABASE_U
 
     // Two live bookings through the REAL debit path.
     sessionQueue.push(a.session);
-    expect((await bookClass({ classInstanceId: classId })).ok).toBe(true);
+    expect((await bookClass({ bookingTermsVersionId: await bookingTermsId(), classInstanceId: classId })).ok).toBe(true);
     sessionQueue.push(b.session);
-    expect((await bookClass({ classInstanceId: classId })).ok).toBe(true);
+    expect((await bookClass({ bookingTermsVersionId: await bookingTermsId(), classInstanceId: classId })).ok).toBe(true);
 
     // One waiting queue entry (insert directly — join requires fullness, which holds).
     await db.insert(waitlist).values({
@@ -198,7 +214,7 @@ describe.skipIf(!HAS_DB)("class-level cancel (integration · requires DATABASE_U
 
     // Booking into the cancelled class is rejected by the atomic debit.
     sessionQueue.push(w.session);
-    const late = await bookClass({ classInstanceId: classId });
+    const late = await bookClass({ bookingTermsVersionId: await bookingTermsId(), classInstanceId: classId });
     expect(late.ok).toBe(false);
     if (!late.ok) expect(["NOT_BOOKABLE", "NOT_VISIBLE"]).toContain(late.code);
   });

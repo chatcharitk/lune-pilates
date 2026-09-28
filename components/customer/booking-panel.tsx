@@ -132,6 +132,12 @@ export function BookingPanel({
     [detail.positions],
   );
   const [selected, setSelected] = useState<number>(firstOpenIndex);
+  // When the seat map changes under us — the refresh after booking one seat, when
+  // the customer goes on to book another — never leave the picker on a reformer
+  // that is now taken.
+  useEffect(() => {
+    if (detail.positions[selected]?.taken) setSelected(firstOpenIndex);
+  }, [detail.positions, selected, firstOpenIndex]);
   const [phase, setPhase] = useState<Phase>("idle");
   const [failCode, setFailCode] = useState<BookActionFailureCode | null>(null);
   const [balanceAfter, setBalanceAfter] = useState<number | null>(null);
@@ -342,6 +348,23 @@ export function BookingPanel({
           >
             {t("done")}
           </button>
+          {/* Another seat in the SAME class — a member booking for the household
+              (owner, 2026-09-28). Refreshing first re-reads the seat map, so the
+              reformer just taken shows as taken and the next free one is offered;
+              only offered while there is still a seat to book. */}
+          {detail.seatsLeft > 1 && (
+            <button
+              type="button"
+              onClick={() => {
+                setPhase("idle");
+                setFailCode(null);
+                router.refresh();
+              }}
+              className="mt-2.5 flex h-12 w-full items-center justify-center rounded-lune-sm border-[1.5px] border-line-strong font-body text-base font-semibold text-ink"
+            >
+              {t("book_another_seat")}
+            </button>
+          )}
         </div>
       </div>
     );

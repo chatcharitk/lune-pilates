@@ -98,7 +98,6 @@ export const STR = {
   people: { en: "people", th: "คน" },
   reformers: { en: "reformers", th: "เครื่อง" },
   studio_name: { en: "LUNE Studio", th: "LUNE สตูดิโอ" },
-  studio_level: { en: "Level 3", th: "ชั้น 3" },
   book_now: { en: "Book class", th: "จองคลาส" },
   join_waitlist: { en: "Join waitlist", th: "เข้าคิวรอ" },
   // Private/Duo/Trio are front-desk-only (CUSTOMER_BOOKABLE_TYPES) — the customer CTA
@@ -1186,6 +1185,7 @@ export const STR = {
   },
   // ───────── admin: promo codes ─────────
   // The studio's booking rules, shown when booking (2026-09-27).
+  book_another_seat: { en: "Book another seat", th: "จองเพิ่มอีกที่" },
   booking_terms_title: { en: "Before you book", th: "ข้อกำหนดและเงื่อนไข" },
   booking_terms_intro: {
     en: "Please read the studio’s class rules and tick to accept before booking.",

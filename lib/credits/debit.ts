@@ -199,18 +199,11 @@ export async function bookClassWithDebit(
       return { ok: false, code: "CLASS_FULL" } as const;
     }
 
-    // 3) One live booking per user per class.
-    const [dupe] = await tx
-      .select({ id: bookings.id })
-      .from(bookings)
-      .where(
-        and(
-          eq(bookings.classInstanceId, cls.id),
-          eq(bookings.userId, input.userId),
-          eq(bookings.status, "booked"),
-        ),
-      );
-    if (dupe) return { ok: false, code: "ALREADY_BOOKED" } as const;
+    // 3) (Removed 2026-09-28.) One customer MAY hold several seats in the same class
+    //    — a member books for the rest of the household from one phone. Each seat is
+    //    its own booking with its own debit and its own reformer, so capacity (step 2)
+    //    and the position check (step 4) are what still bound it, and every seat is
+    //    cancelled or refunded on its own.
 
     // 4) Reformer position must be free (when the class uses positions).
     if (input.position) {
@@ -428,21 +421,11 @@ export async function rescheduleWithinTransaction(
       return { ok: false, code: "CLASS_FULL" } as const;
     }
 
-    // One live booking per user per class. (The OLD booking is in a DIFFERENT
-    // class — reschedule targets a new instance — so it never trips this; a
-    // self-reschedule to the same class is a no-op the caller should not send,
-    // but if it does, ALREADY_BOOKED is the correct fail-closed answer.)
-    const [dupe] = await tx
-      .select({ id: bookings.id })
-      .from(bookings)
-      .where(
-        and(
-          eq(bookings.classInstanceId, newCls.id),
-          eq(bookings.userId, input.userId),
-          eq(bookings.status, "booked"),
-        ),
-      );
-    if (dupe) return { ok: false, code: "ALREADY_BOOKED" } as const;
+    // A customer may already hold a seat in the target class (several seats per
+    // class are allowed since 2026-09-28), so that is no longer a refusal. Moving a
+    // booking onto the class it is ALREADY in is still meaningless — refuse that
+    // rather than refund and re-debit the same seat.
+    if (newCls.id === oldBk.classInstanceId) return { ok: false, code: "ALREADY_BOOKED" } as const;
 
     if (input.position) {
       const [taken] = await tx

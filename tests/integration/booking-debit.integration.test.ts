@@ -70,10 +70,21 @@ import {
   packages,
   users,
   waitlist,
+  termsAcceptances,
 } from "@/lib/db/schema";
 import { bookClass } from "@/app/actions/booking";
 import { joinWaitlist } from "@/app/actions/waitlist";
 import { creditCostForClassType } from "@/lib/credits/cost";
+
+/**
+ * The active booking rules' id. Every customer booking must carry an acceptance
+ * since 2026-09-27 (lib/settings/terms.ts → gateBookingTerms), exactly as the sheet
+ * sends it on a customer's first booking.
+ */
+async function bookingTermsId(): Promise<string> {
+  const { loadActiveTerms } = await import("@/lib/settings/terms");
+  return (await loadActiveTerms("booking")).id;
+}
 
 const HAS_DB = !!process.env.DATABASE_URL;
 const GROUP_COST = creditCostForClassType("group"); // 1 — the cost the code uses
@@ -298,10 +309,20 @@ describe.skipIf(!HAS_DB)(
           await db.delete(classInstances).where(inArray(classInstances.id, classIds));
         }
         if (houseIds.length) {
+          // Booking-rules acceptances reference the user, so they go first — otherwise
+          // the user delete fails on the foreign key and the fixtures are left behind.
+          await db.delete(termsAcceptances).where(
+            inArray(termsAcceptances.userId, db.select({ id: users.id }).from(users).where(inArray(users.householdId, houseIds))),
+          );
           await db.delete(users).where(inArray(users.householdId, houseIds));
           await db.delete(households).where(inArray(households.id, houseIds));
         }
         if (guestUserIds.length) {
+          // Booking-rules acceptances reference the user, so they go first — otherwise
+          // the user delete fails on the foreign key and the fixtures are left behind.
+          await db.delete(termsAcceptances).where(
+            inArray(termsAcceptances.userId, db.select({ id: users.id }).from(users).where(inArray(users.id, guestUserIds))),
+          );
           await db.delete(users).where(inArray(users.id, guestUserIds));
         }
       } finally {
@@ -324,8 +345,8 @@ describe.skipIf(!HAS_DB)(
       // draw from the same shared pool/package by server-side selection.
       enqueueSession(memberA!, memberB!);
       const [r1, r2] = await Promise.allSettled([
-        bookClass({ classInstanceId: classId }),
-        bookClass({ classInstanceId: classId }),
+        bookClass({ bookingTermsVersionId: await bookingTermsId(), classInstanceId: classId }),
+        bookClass({ bookingTermsVersionId: await bookingTermsId(), classInstanceId: classId }),
       ]);
 
       // Neither call should THROW — business-rule failures are typed results.
@@ -383,7 +404,7 @@ describe.skipIf(!HAS_DB)(
       const classId = await makeGroupClass(3);
 
       enqueueSession(members[0]!);
-      const res = await bookClass({ classInstanceId: classId });
+      const res = await bookClass({ bookingTermsVersionId: await bookingTermsId(), classInstanceId: classId });
 
       expect(res.ok).toBe(false);
       if (!res.ok) {
@@ -410,7 +431,7 @@ describe.skipIf(!HAS_DB)(
       const classId = await makeGroupClass(3);
 
       enqueueSession(members[0]!);
-      const res = await bookClass({ classInstanceId: classId });
+      const res = await bookClass({ bookingTermsVersionId: await bookingTermsId(), classInstanceId: classId });
 
       expect(res.ok).toBe(false);
       if (!res.ok) {
@@ -435,7 +456,7 @@ describe.skipIf(!HAS_DB)(
       // Guest with plenty of own credit: only the visibility gate can stop them.
       const guest = await makeGuest("vis-book", 5);
       enqueueSession(guest);
-      const guestRes = await bookClass({ classInstanceId: classId });
+      const guestRes = await bookClass({ bookingTermsVersionId: await bookingTermsId(), classInstanceId: classId });
       expect(guestRes.ok).toBe(false);
       if (!guestRes.ok) {
         expect(guestRes.code).toBe("NOT_VISIBLE");
@@ -446,7 +467,7 @@ describe.skipIf(!HAS_DB)(
       // A member of a household with credit books the SAME class fine.
       const { members, packageId } = await makeHousehold("vis-book-mem", 1, 5);
       enqueueSession(members[0]!);
-      const memberRes = await bookClass({ classInstanceId: classId });
+      const memberRes = await bookClass({ bookingTermsVersionId: await bookingTermsId(), classInstanceId: classId });
       expect(memberRes.ok).toBe(true);
       expect(await liveBookingsFor(classId)).toHaveLength(1);
       // The member's debit happened exactly once.
@@ -461,7 +482,7 @@ describe.skipIf(!HAS_DB)(
       // Fill the single seat with a member (members can see/book it).
       const { members } = await makeHousehold("vis-wl-fill", 1, 5);
       enqueueSession(members[0]!);
-      const fill = await bookClass({ classInstanceId: classId });
+      const fill = await bookClass({ bookingTermsVersionId: await bookingTermsId(), classInstanceId: classId });
       expect(fill.ok).toBe(true);
 
       // Guest tries to waitlist the now-full members-only class → NOT_VISIBLE,
@@ -489,66 +510,62 @@ describe.skipIf(!HAS_DB)(
       }
     });
 
-    // ───────────── 6. DB backstop: one live booking per (class,user) (audit LOW-1) ─────────────
-    // The partial unique index is defense-in-depth behind the in-tx dupe check. Prove
-    // the index is actually live in Neon by attempting a RAW second live booking for
-    // the same (class,user) — Postgres must reject it with 23505. (The action path
-    // never reaches here; the in-tx check catches it first, and the debit also maps a
-    // stray 23505 to the friendly ALREADY_BOOKED code — covered by uniqueViolationCode.)
+    // ───────────── 6. Several seats for one customer (owner, 2026-09-28) ─────────────
+    // A member books for the rest of the household from their own phone, so one
+    // customer may hold more than one seat in a class. Each seat is its own booking:
+    // its own debit, its own reformer. Capacity still bounds the total, and the
+    // one-booking-per-reformer index still stops two seats sharing a machine.
 
-    it("DB BACKSTOP: a raw second live booking for the same (class,user) is rejected by the unique index", async () => {
-      const db = getDb();
-      const { members, packageId } = await makeHousehold("backstop", 1, 5);
+    it("lets one customer book two seats in the same class, each debited and on its own reformer", async () => {
+      const { members, packageId } = await makeHousehold("two-seats", 1, 5);
       const classId = await makeGroupClass(3);
-      const userId = members[0]!.id;
 
-      // First live booking inserted directly (bypassing the action).
-      await db.insert(bookings).values({
+      enqueueSession(members[0]!);
+      const first = await bookClass({
+        bookingTermsVersionId: await bookingTermsId(),
         classInstanceId: classId,
-        userId,
-        packageId,
-        creditCost: GROUP_COST,
-        freeCancelHours: 5,
-        status: "booked",
+        position: "left",
+      });
+      enqueueSession(members[0]!);
+      const second = await bookClass({
+        bookingTermsVersionId: await bookingTermsId(),
+        classInstanceId: classId,
+        position: "middle",
       });
 
-      // A SECOND live booking for the same (class,user) must violate the partial
-      // unique index `bookings_one_live_per_user`.
-      let rejected = false;
-      let code: unknown;
-      try {
-        await db.insert(bookings).values({
-          classInstanceId: classId,
-          userId,
-          packageId,
-          creditCost: GROUP_COST,
-          freeCancelHours: 5,
-          status: "booked",
-        });
-      } catch (err) {
-        rejected = true;
-        // The neon-serverless driver may wrap the SQLSTATE on err.cause.code.
-        const top = err as { code?: unknown; cause?: { code?: unknown } };
-        code = top.code ?? top.cause?.code;
-      }
-      expect(rejected).toBe(true);
-      expect(code).toBe("23505");
+      expect(first.ok).toBe(true);
+      expect(second.ok).toBe(true);
 
-      // Still exactly one live booking — the index held the line.
+      const live = await liveBookingsFor(classId);
+      expect(live).toHaveLength(2);
+      expect(new Set(live.map((b) => b.userId)).size).toBe(1); // same customer
+      expect(new Set(live.map((b) => b.position)).size).toBe(2); // different reformers
+
+      // One credit per seat — two seats, two debits, never one.
+      const ledger = await bookingLedgerFor(packageId);
+      expect(ledger.map((l) => l.delta).sort()).toEqual([-GROUP_COST, -GROUP_COST]);
+    });
+
+    it("still refuses a second seat on a reformer that is already taken", async () => {
+      const { members } = await makeHousehold("two-seats-same-pos", 1, 5);
+      const classId = await makeGroupClass(3);
+
+      enqueueSession(members[0]!);
+      await bookClass({
+        bookingTermsVersionId: await bookingTermsId(),
+        classInstanceId: classId,
+        position: "left",
+      });
+      enqueueSession(members[0]!);
+      const again = await bookClass({
+        bookingTermsVersionId: await bookingTermsId(),
+        classInstanceId: classId,
+        position: "left",
+      });
+
+      expect(again.ok).toBe(false);
+      if (!again.ok) expect(again.code).toBe("POSITION_TAKEN");
       expect(await liveBookingsFor(classId)).toHaveLength(1);
-
-      // A CANCELLED row for the same (class,user) is allowed (the index is partial
-      // on status='booked'), so re-booking after a cancel is never blocked.
-      await db.insert(bookings).values({
-        classInstanceId: classId,
-        userId,
-        packageId,
-        creditCost: GROUP_COST,
-        freeCancelHours: 5,
-        status: "cancelled",
-        cancelledAt: new Date(),
-      });
-      // (no throw expected)
     });
   },
 );
