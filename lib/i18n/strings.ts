@@ -86,7 +86,7 @@ export const STR = {
   type_private: { en: "Private", th: "ส่วนตัว" },
   type_duo: { en: "Duo", th: "คู่" },
   type_trio: { en: "Trio", th: "สาม" },
-  type_rental: { en: "Rental", th: "เช่า" },
+  type_rental: { en: "Studio rental", th: "เช่าสตู" },
 
   // detail
   about_class: { en: "About this class", th: "เกี่ยวกับคลาสนี้" },

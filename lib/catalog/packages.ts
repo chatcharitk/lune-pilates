@@ -258,7 +258,6 @@ const FMT_LABEL = {
 const PLAN_LABEL = {
   drop: { en: "Drop-in", th: "ดรอปอิน" },
   pack8: { en: "8-class pack", th: "แพ็ก 8 คลาส" },
-  rental: { en: "Full apparatus", th: "อุปกรณ์ครบชุด" },
 } as const;
 
 type Fmt = keyof typeof FMT_LABEL;
@@ -327,9 +326,13 @@ export const SEED_CATALOG: readonly CatalogSeedItem[] = [
   { id: "trio-drop", category: "trio", hours: 1, price: 2200, validity: V1M, label: fmtPlanLabel("trio", "drop"), sortOrder: 40 },
   { id: "trio8", category: "trio", hours: 8, price: 16000, validity: V2M, label: fmtPlanLabel("trio", "pack8"), sortOrder: 50 },
   // studio rental
-  { id: "r-solo", category: "rental", hours: 1, price: 600, validity: V1M, label: fmtPlanLabel("solo", "rental"), sortOrder: 0 },
-  { id: "r-duo", category: "rental", hours: 1, price: 800, validity: V1M, label: fmtPlanLabel("duo", "rental"), sortOrder: 10 },
-  { id: "r-trio", category: "rental", hours: 1, price: 1000, validity: V1M, label: fmtPlanLabel("trio", "rental"), sortOrder: 20 },
+  // Named by HEAD-COUNT, not by format (2026-09-28). They used to read "1:1 · Full
+  // apparatus", "Duo · …", "Trio · …" — word for word the private-class formats, with
+  // "rental" appearing nowhere — so a studio rental was indistinguishable from a
+  // private class on the buy screen.
+  { id: "r-solo", category: "rental", hours: 1, price: 600, validity: V1M, label: { en: "Studio rental · 1 person", th: "เช่าสตูดิโอ · 1 คน" }, sortOrder: 0 },
+  { id: "r-duo", category: "rental", hours: 1, price: 800, validity: V1M, label: { en: "Studio rental · 2 people", th: "เช่าสตูดิโอ · 2 คน" }, sortOrder: 10 },
+  { id: "r-trio", category: "rental", hours: 1, price: 1000, validity: V1M, label: { en: "Studio rental · 3 people", th: "เช่าสตูดิโอ · 3 คน" }, sortOrder: 20 },
 ] as const;
 
 /**
@@ -358,7 +361,10 @@ export const CATEGORY_META: Record<PackageCategory, { label: Bilingual; note: Bi
   },
   rental: {
     label: { en: "Studio Rental", th: "เช่าสตูดิโอ" },
-    note: { en: "Full apparatus · per class", th: "อุปกรณ์ครบชุด · ต่อคลาส" },
+    note: {
+      en: "Your own time in the studio, no instructor · full apparatus",
+      th: "ใช้สตูดิโอฝึกเอง ไม่มีผู้สอน · อุปกรณ์ครบชุด",
+    },
   },
 };
 
