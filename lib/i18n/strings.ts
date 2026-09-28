@@ -102,10 +102,10 @@ export const STR = {
   join_waitlist: { en: "Join waitlist", th: "เข้าคิวรอ" },
   // Private/Duo/Trio are front-desk-only (CUSTOMER_BOOKABLE_TYPES) — the customer CTA
   // is replaced with this contact prompt instead of a Book button.
-  book_admin_only: { en: "Contact front desk", th: "ติดต่อหน้าเคาน์เตอร์" },
+  book_admin_only: { en: "Contact admin on LINE", th: "ติดต่อแอดมินผ่านทางไลน์" },
   book_admin_only_hint: {
-    en: "This class is booked through the front desk.",
-    th: "คลาสนี้จองผ่านหน้าเคาน์เตอร์",
+    en: "This class is booked by contacting our admin on LINE.",
+    th: "คลาสนี้จองโดยติดต่อแอดมินผ่านทางไลน์",
   },
   // Rental whose monthly booking window hasn't opened yet: locked CTA + open date.
   rental_locked: { en: "Booking not open yet", th: "ยังไม่เปิดให้จอง" },
@@ -183,8 +183,8 @@ export const STR = {
   // ADMIN_ONLY — a front-desk-only type (private/duo/trio) reached the book action.
   // The CTA is normally replaced before this, but the code is mapped defensively.
   err_admin_only: {
-    en: "This class is booked through the front desk. Please contact us to reserve.",
-    th: "คลาสนี้จองผ่านหน้าเคาน์เตอร์ กรุณาติดต่อเราเพื่อจอง",
+    en: "This class is booked through our admin. Please contact us on LINE to reserve.",
+    th: "คลาสนี้จองผ่านแอดมิน กรุณาติดต่อแอดมินผ่านทางไลน์เพื่อจอง",
   },
   // RENTAL_WINDOW_CLOSED — the rental's monthly booking window hasn't opened yet.
   err_rental_window_closed: {
