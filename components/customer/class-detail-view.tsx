@@ -38,6 +38,8 @@ export interface ClassDetailViewProps {
   usesPositions: boolean;
   /** The studio's booking rules and whether this customer has accepted them. */
   bookingTerms: CustomerBookingTerms;
+  /** Members may book several seats in one class; guests one. */
+  isMember: boolean;
 }
 
 export function ClassDetailView({
@@ -46,6 +48,7 @@ export function ClassDetailView({
   balanceBefore,
   usesPositions,
   bookingTerms,
+  isMember,
 }: ClassDetailViewProps) {
   const { t, tt, lang } = useCustomerLang();
 
@@ -131,6 +134,7 @@ export function ClassDetailView({
           dateStr={dateStr}
           timeRange={timeRange}
           bookingTerms={bookingTerms}
+          isMember={isMember}
         />
 
         {/* instructor — read-only. For instructor-selectable types (private/duo/

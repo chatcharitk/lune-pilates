@@ -546,6 +546,29 @@ describe.skipIf(!HAS_DB)(
       expect(ledger.map((l) => l.delta).sort()).toEqual([-GROUP_COST, -GROUP_COST]);
     });
 
+    it("holds a GUEST to one seat per class — only members book for a household", async () => {
+      const guest = await makeGuest("one-seat-guest", 5);
+      const classId = await makeGroupClass(3);
+
+      enqueueSession(guest);
+      const first = await bookClass({
+        bookingTermsVersionId: await bookingTermsId(),
+        classInstanceId: classId,
+        position: "left",
+      });
+      enqueueSession(guest);
+      const second = await bookClass({
+        bookingTermsVersionId: await bookingTermsId(),
+        classInstanceId: classId,
+        position: "middle",
+      });
+
+      expect(first.ok).toBe(true);
+      expect(second.ok).toBe(false);
+      if (!second.ok) expect(second.code).toBe("ALREADY_BOOKED");
+      expect(await liveBookingsFor(classId)).toHaveLength(1);
+    });
+
     it("still refuses a second seat on a reformer that is already taken", async () => {
       const { members } = await makeHousehold("two-seats-same-pos", 1, 5);
       const classId = await makeGroupClass(3);

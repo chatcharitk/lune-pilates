@@ -68,6 +68,7 @@ export default async function ClassDetailPage({
         body: { en: terms.bodyEn, th: terms.bodyTh },
         accepted,
       }}
+      isMember={viewer.tier === "member"}
     />
   );
 }

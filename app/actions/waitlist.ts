@@ -143,9 +143,25 @@ export async function joinWaitlist(raw: JoinWaitlistInput): Promise<JoinWaitlist
       return { ok: false, code: "NOT_FULL" } as const;
     }
 
-    // Holding a seat no longer stops someone joining the queue for ANOTHER one
-    // (2026-09-28): a member booking for the household may want a second seat in a
-    // class that has since filled.
+    // A MEMBER holding a seat may still queue for another one (they book for the
+    // household); a GUEST holds one seat per class, so queueing for a second would
+    // only ever end in a refused claim (2026-09-29).
+    if (viewer.tier !== "member") {
+      const [existingBooking] = await tx
+        .select({ id: bookings.id })
+        .from(bookings)
+        .where(
+          and(
+            eq(bookings.classInstanceId, cls.id),
+            eq(bookings.userId, viewer.id),
+            eq(bookings.status, "booked"),
+          ),
+        )
+        .limit(1);
+      if (existingBooking) {
+        return { ok: false, code: "ALREADY_BOOKED" } as const;
+      }
+    }
 
     // …and must not already be on this class's queue as waiting/offered.
     const [existingEntry] = await tx

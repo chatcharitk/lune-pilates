@@ -46,6 +46,11 @@ interface BookingPanelProps {
   timeRange: string;
   /** The studio's current booking rules, and whether this customer accepted them. */
   bookingTerms: CustomerBookingTerms;
+  /**
+   * Members may book several seats in one class (for their household); guests one.
+   * Only decides whether "Book another seat" is offered — the server enforces it.
+   */
+  isMember: boolean;
 }
 
 type Phase = "idle" | "submitting" | "booked" | "error";
@@ -122,6 +127,7 @@ export function BookingPanel({
   dateStr,
   timeRange,
   bookingTerms,
+  isMember,
 }: BookingPanelProps) {
   const { t, tt } = makeT(lang);
   const router = useRouter();
@@ -348,11 +354,11 @@ export function BookingPanel({
           >
             {t("done")}
           </button>
-          {/* Another seat in the SAME class — a member booking for the household
-              (owner, 2026-09-28). Refreshing first re-reads the seat map, so the
+          {/* Another seat in the SAME class — a MEMBER booking for the household
+              (owner, 2026-09-28; members only since 2026-09-29). Refreshing first re-reads the seat map, so the
               reformer just taken shows as taken and the next free one is offered;
               only offered while there is still a seat to book. */}
-          {detail.seatsLeft > 1 && (
+          {isMember && detail.seatsLeft > 1 && (
             <button
               type="button"
               onClick={() => {

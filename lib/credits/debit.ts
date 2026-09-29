@@ -8,8 +8,8 @@
 
 import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { z } from "zod";
-import { getDb } from "@/lib/db/client";
-import { bookings, classInstances, creditLedger, packages } from "@/lib/db/schema";
+import { getDb, type Database } from "@/lib/db/client";
+import { bookings, classInstances, creditLedger, packages, users } from "@/lib/db/schema";
 import type { ReformerPosition } from "@/lib/domain/types";
 import { effectiveCapacity, FREE_CANCEL_HOURS, isCustomerBookable } from "@/lib/domain/types";
 import { positionsForCapacity } from "@/lib/schedule/queries";
@@ -96,6 +96,40 @@ function uniqueViolationCode(err: unknown): "ALREADY_BOOKED" | "POSITION_TAKEN" 
   // Default the (class,user) index — and any unattributed booking 23505 — to the
   // safe, friendly ALREADY_BOOKED rather than leaking the raw violation.
   return "ALREADY_BOOKED";
+}
+
+/** The transaction handle, as every helper in lib/credits spells it. */
+type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
+
+/**
+ * True when `userId` already holds a live seat in `classInstanceId` AND is not
+ * allowed another: members may book several seats in one class (for their
+ * household), guests may book one. The tier comes from the users row — server
+ * truth — never from the caller.
+ *
+ * Run inside the booking transaction, after the class row is locked, so two
+ * concurrent bookings by the same guest are serialised and the second one sees the
+ * first.
+ */
+async function holdsSeatAndMayNotAddAnother(
+  tx: Tx,
+  classInstanceId: string,
+  userId: string,
+): Promise<boolean> {
+  const [who] = await tx.select({ tier: users.tier }).from(users).where(eq(users.id, userId)).limit(1);
+  if (who?.tier === "member") return false;
+  const [held] = await tx
+    .select({ id: bookings.id })
+    .from(bookings)
+    .where(
+      and(
+        eq(bookings.classInstanceId, classInstanceId),
+        eq(bookings.userId, userId),
+        eq(bookings.status, "booked"),
+      ),
+    )
+    .limit(1);
+  return held !== undefined;
 }
 
 /**
@@ -199,11 +233,14 @@ export async function bookClassWithDebit(
       return { ok: false, code: "CLASS_FULL" } as const;
     }
 
-    // 3) (Removed 2026-09-28.) One customer MAY hold several seats in the same class
-    //    — a member books for the rest of the household from one phone. Each seat is
-    //    its own booking with its own debit and its own reformer, so capacity (step 2)
-    //    and the position check (step 4) are what still bound it, and every seat is
-    //    cancelled or refunded on its own.
+    // 3) Seats per customer (owner, 2026-09-29): a MEMBER may hold several seats in
+    //    one class — they book for the rest of the household from one phone — but a
+    //    GUEST holds one. The tier is read from the users row here, NOT taken from
+    //    input.viewerTier: the front desk passes "member" there purely to bypass the
+    //    visibility window, which says nothing about who the seat is for.
+    if (await holdsSeatAndMayNotAddAnother(tx, cls.id, input.userId)) {
+      return { ok: false, code: "ALREADY_BOOKED" } as const;
+    }
 
     // 4) Reformer position must be free (when the class uses positions).
     if (input.position) {
@@ -421,11 +458,14 @@ export async function rescheduleWithinTransaction(
       return { ok: false, code: "CLASS_FULL" } as const;
     }
 
-    // A customer may already hold a seat in the target class (several seats per
-    // class are allowed since 2026-09-28), so that is no longer a refusal. Moving a
-    // booking onto the class it is ALREADY in is still meaningless — refuse that
-    // rather than refund and re-debit the same seat.
+    // Moving a booking onto the class it is ALREADY in is meaningless — refuse it
+    // rather than refund and re-debit the same seat. Beyond that, the seats-per-
+    // customer rule applies here too: a guest who already holds a seat in the target
+    // class cannot be moved into a second one; a member can (2026-09-29).
     if (newCls.id === oldBk.classInstanceId) return { ok: false, code: "ALREADY_BOOKED" } as const;
+    if (await holdsSeatAndMayNotAddAnother(tx, newCls.id, input.userId)) {
+      return { ok: false, code: "ALREADY_BOOKED" } as const;
+    }
 
     if (input.position) {
       const [taken] = await tx
