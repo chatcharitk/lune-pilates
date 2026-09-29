@@ -14,6 +14,7 @@ import { Avatar, Badge, Dot, Drawer } from "./ui";
 import { adminBookForCustomer } from "@/app/actions/admin-bookings";
 import type { AdminCustomer } from "@/lib/admin/members";
 import type { BookableClass } from "@/lib/schedule/queries";
+import { ClassPicker } from "./class-picker";
 import type { ClassType, ReformerPosition } from "@/lib/domain/types";
 import type { StrKey } from "@/lib/i18n";
 import { formatStudioDate, formatStudioTime } from "@/lib/time";
@@ -85,11 +86,6 @@ export function AddBookingDrawer({
     });
     return list.slice(0, 40);
   }, [customers, query]);
-
-  const upcoming = useMemo(
-    () => bookable.filter((c) => !c.full).sort((a, b) => a.startsAt.localeCompare(b.startsAt)),
-    [bookable],
-  );
 
   const cost = cls ? COST[cls.type] : 0;
   const showPositions = cls ? cls.type !== "private" : false;
@@ -261,35 +257,13 @@ export function AddBookingDrawer({
               </button>
             </div>
           ) : (
-            <ul className="mb-4 max-h-[42vh] overflow-y-auto rounded-xl border border-line">
-              {upcoming.length === 0 ? (
-                <li className="p-4 text-center font-body text-sm text-muted">{t("no_classes")}</li>
-              ) : (
-                upcoming.map((c) => (
-                  <li key={c.id} className="border-b border-line last:border-0">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCls(c);
-                        setErrorKey(null);
-                      }}
-                      className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-surface-2"
-                    >
-                      <Dot type={c.type} size={8} />
-                      <div className="min-w-0 flex-1">
-                        <span className="block truncate font-body text-[13.5px] font-semibold text-ink">
-                          {c.name || tt(c.typeMeta.label)}
-                        </span>
-                        <span className="block truncate font-body text-xs text-muted">{classLabel(c)}</span>
-                      </div>
-                      <span className="shrink-0 font-body text-xs font-semibold text-sage-deep tabular-nums">
-                        {c.seatsLeft} {c.seatsLeft === 1 ? t("spot_left") : t("spots_left")}
-                      </span>
-                    </button>
-                  </li>
-                ))
-              )}
-            </ul>
+            <ClassPicker
+              classes={bookable}
+              onSelect={(c) => {
+                setCls(c);
+                setErrorKey(null);
+              }}
+            />
           )}
         </>
       )}

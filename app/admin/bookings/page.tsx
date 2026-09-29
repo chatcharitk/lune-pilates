@@ -22,12 +22,15 @@ export default async function AdminBookingsPage() {
     return <AdminForbidden />;
   }
   const now = new Date();
-  // Bookable candidates across the next 4 weeks (this week + 3) so the front desk
-  // can book/reschedule a customer into an upcoming class, not just this week. Admin
+  // Bookable candidates across the next 8 weeks (this week + 7) so the front desk
+  // can book/reschedule a customer into any class already on the schedule — the
+  // owner schedules well ahead (the trial campaign runs to 30 Nov), and 4 weeks
+  // hid classes she could plainly see in the timetable. The day-first picker keeps
+  // the longer list easy to search. Admin
   // sees with full ("member") visibility — the tiered gate is a customer browsing
   // restriction, not an admin one. The action re-validates everything server-side;
   // this only populates the pickers.
-  const weekStarts = [0, 1, 2, 3].map((i) => addDays(currentWeekStart(now), i * 7));
+  const weekStarts = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => addDays(currentWeekStart(now), i * 7));
   const [overview, customers, ...bookableWeeks] = await Promise.all([
     getAdminBookingsOverview(),
     listCustomers({}, now),

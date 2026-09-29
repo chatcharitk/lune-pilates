@@ -28,6 +28,7 @@ import type {
   AdminWaitlistClass,
 } from "@/lib/admin/bookings";
 import type { BookableClass } from "@/lib/schedule/queries";
+import { ClassPicker } from "./class-picker";
 import type { AdminCustomer } from "@/lib/admin/members";
 import type { StrKey } from "@/lib/i18n";
 import { formatStudioDate, formatStudioTime, studioStartOfDay } from "@/lib/time";
@@ -705,34 +706,11 @@ function RescheduleStep({
           {t("no_other_times")}
         </p>
       ) : (
-        <ul className="flex flex-col gap-2.5">
-          {candidates.map((c) => (
-            <li key={c.id}>
-              <button
-                type="button"
-                onClick={() => onPick(c.id)}
-                disabled={pending}
-                className="flex w-full items-center gap-3 rounded-2xl border border-line bg-surface-2 px-3.5 py-3 text-left transition-colors hover:bg-surface disabled:opacity-50"
-              >
-                <Dot type={c.type} size={8} />
-                <span className="min-w-0 flex-1">
-                  <span className="block font-head text-[14.5px] font-semibold text-ink">
-                    {c.name || tt(c.typeMeta.short)}
-                  </span>
-                  <span className="block truncate font-body text-xs text-muted">
-                    {dayTime(c.startsAt, hhmmOf(c.startsAt), lang)}
-                    {c.instructor ? ` · ${tt(c.instructor.name)}` : ""}
-                  </span>
-                </span>
-                <span className="shrink-0">
-                  <Badge tone="neutral">
-                    {c.seatsLeft} {c.seatsLeft === 1 ? t("spot_left") : t("spots_left")}
-                  </Badge>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        // Same day-first picker as "Book for customer" — a flat list of every
+        // candidate across weeks was just as hard to search here.
+        <div className={pending ? "pointer-events-none opacity-50" : ""}>
+          <ClassPicker classes={candidates} onSelect={(c) => onPick(c.id)} />
+        </div>
       )}
     </div>
   );
