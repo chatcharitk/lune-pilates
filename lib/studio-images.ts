@@ -18,7 +18,9 @@ const BY_TYPE: Record<ClassType, string> = {
   private: "/studio/studio-private.jpg",
   duo: "/studio/studio-private.jpg",
   trio: "/studio/studio-private.jpg",
-  rental: "/studio/studio-3.jpg",
+  // The owner's own rental photo (2026-09-29): the studio with its reformers, props
+  // shelf and lounge — what a customer is actually hiring.
+  rental: "/studio/studio-rental.jpg",
 };
 
 /** The studio photo for a class type. */

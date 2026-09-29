@@ -126,8 +126,11 @@ const TYPE_META: Record<ClassType, ClassTypeMeta> = {
     label: { en: "Studio Rental", th: "เช่าสตูดิโอ" },
     short: { en: "Rental", th: "เช่า" },
     blurb: {
-      en: "Rent the reformer studio for your own practice — no instructor, for 1 to 3 people.",
-      th: "เช่าสตูดิโอรีฟอร์มเมอร์เพื่อฝึกเอง ไม่มีผู้สอน สำหรับ 1–3 คน",
+      // The owner's wording (2026-09-29). A rental comes with the machines and the
+      // equipment; the customer brings their OWN instructor — it is not a studio
+      // class without one.
+      en: "Hire the studio with its Pilates machines and equipment, bringing your own instructor — for 1 to 3 people.",
+      th: "เช่าสตูดิโอพร้อมเครื่องพิลาทิสและอุปกรณ์ต่างๆ โดยนำครูมาเอง สำหรับ 1-3 ท่าน",
     },
   },
 };

@@ -370,8 +370,8 @@ export const CATEGORY_META: Record<PackageCategory, { label: Bilingual; note: Bi
   rental: {
     label: { en: "Studio Rental", th: "เช่าสตูดิโอ" },
     note: {
-      en: "Your own time in the studio, no instructor · full apparatus",
-      th: "ใช้สตูดิโอฝึกเอง ไม่มีผู้สอน · อุปกรณ์ครบชุด",
+      en: "Studio with machines & equipment · bring your own instructor",
+      th: "สตูพร้อมเครื่องและอุปกรณ์ · นำครูมาเอง",
     },
   },
 };
