@@ -5,6 +5,7 @@
 // language from the CustomerLangProvider and renders the screen + booking flow.
 
 import { notFound } from "next/navigation";
+import { RENTAL_PARTY_SIZES } from "@/lib/domain/types";
 import { hasAcceptedTerms, loadActiveTerms } from "@/lib/settings/terms";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getClassDetail, getUsableBalance } from "@/lib/schedule/queries";
@@ -50,6 +51,26 @@ export default async function ClassDetailPage({
     new Date(detail.startsAt),
   );
 
+  // STUDIO RENTAL (2026-09-29): the customer picks how many people, and only a rental
+  // credit of that exact size can pay — so the screen needs the usable balance PER
+  // SIZE to know which sizes to offer. Null for a size they hold none of.
+  const rentalBalances =
+    detail.type === "rental"
+      ? await Promise.all(
+          RENTAL_PARTY_SIZES.map(async (size) => ({
+            size,
+            left: await getUsableBalance(
+              viewer,
+              detail.type,
+              new Date(),
+              cost,
+              new Date(detail.startsAt),
+              size,
+            ),
+          })),
+        )
+      : null;
+
   // The studio's booking rules, and whether this customer already accepted this
   // version — decided here on the server so the sheet asks for a tick only when the
   // booking would otherwise be refused for want of one.
@@ -69,6 +90,7 @@ export default async function ClassDetailPage({
         accepted,
       }}
       isMember={viewer.tier === "member"}
+      rentalBalances={rentalBalances}
     />
   );
 }

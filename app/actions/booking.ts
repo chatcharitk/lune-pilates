@@ -42,6 +42,8 @@ const bookClassInput = z.object({
    * record itself rather than taking the screen's word for it.
    */
   bookingTermsVersionId: z.string().min(1).max(64).optional(),
+  /** STUDIO RENTAL only: how many people the studio is hired for (1–3). */
+  partySize: z.number().int().min(1).max(3).optional(),
 });
 export type BookClassInput = z.infer<typeof bookClassInput>;
 
@@ -115,12 +117,19 @@ export async function bookClass(raw: BookClassInput): Promise<BookResult> {
   // Pick the package to debit — never trust a client-supplied package id. Pass the
   // booking's cost so we choose a package that can actually cover it (the pool may
   // hold credits in another package even if the soonest-expiring one is short).
+  // A rental must say how many people, and only a credit of that exact size will
+  // do (2026-09-29). Refused here so the customer is told plainly, rather than via a
+  // generic "no usable package" when they do have rental credit of another size.
+  if (cls.type === "rental" && input.partySize === undefined) {
+    return { ok: false, code: "PARTY_SIZE_REQUIRED" };
+  }
   const packageId = await selectUsablePackage(
     viewer,
     cls.type,
     now,
     creditCostForClassType(cls.type),
     cls.startsAt,
+    cls.type === "rental" ? input.partySize : undefined,
   );
   if (!packageId) {
     return { ok: false, code: "NO_USABLE_PACKAGE" };
@@ -135,6 +144,7 @@ export async function bookClass(raw: BookClassInput): Promise<BookResult> {
       viewerTier: viewer.tier,
       packageId,
       position: input.position,
+      partySize: cls.type === "rental" ? input.partySize : undefined,
     },
     now,
   );

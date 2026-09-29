@@ -266,6 +266,8 @@ const adminBookInput = z.object({
   /** The customer to book FOR — never the admin. Their pool is resolved server-side. */
   userId: z.string().uuid(),
   position: z.enum(["left", "middle", "right"]).optional(),
+  /** STUDIO RENTAL only: how many people the studio is hired for (1–3). */
+  partySize: z.number().int().min(1).max(3).optional(),
 });
 export type AdminBookForCustomerInput = z.infer<typeof adminBookInput>;
 
@@ -347,12 +349,16 @@ export async function adminBookForCustomer(
   // narrowest credit) and the guard inside the transaction would then refuse the
   // booking outright, leaving the desk unable to book a customer who has perfectly
   // good ordinary credits sitting beside it.
+  if (cls.type === "rental" && input.partySize === undefined) {
+    return { ok: false, code: "PARTY_SIZE_REQUIRED" };
+  }
   const packageId = await selectUsablePackageForUser(
     input.userId,
     cls.type,
     now,
     creditCostForClassType(cls.type),
     cls.startsAt,
+    cls.type === "rental" ? input.partySize : undefined,
   );
   if (!packageId) {
     // Either the user doesn't exist or they have no usable package in this pool.
@@ -371,6 +377,7 @@ export async function adminBookForCustomer(
       viewerTier: "member",
       packageId,
       position: input.position,
+      partySize: cls.type === "rental" ? input.partySize : undefined,
       // Front desk may book ADMIN-ONLY types and rentals before their release window.
       bookedByAdmin: true,
     },
@@ -498,6 +505,8 @@ export async function adminReschedule(raw: AdminRescheduleInput): Promise<AdminR
     newCost,
     now,
     newCls.startsAt,
+    // A moved rental keeps its head-count, so the new slot is paid from that size.
+    newCls.type === "rental" ? (old.partySize ?? undefined) : undefined,
   );
   if (!packageId) {
     return { ok: false, code: "NO_USABLE_PACKAGE" };
@@ -595,6 +604,8 @@ interface BookingForAdminCancel {
   creditCost: number;
   /** The package this booking debited — the refund target on a move/cancel. */
   packageId: string;
+  /** A rental booking's head-count; a moved rental keeps it (2026-09-29). */
+  partySize: number | null;
 }
 
 async function loadBookingForAdminCancel(bookingId: string): Promise<BookingForAdminCancel | null> {
@@ -608,6 +619,7 @@ async function loadBookingForAdminCancel(bookingId: string): Promise<BookingForA
       freeCancelHours: bookings.freeCancelHours,
       creditCost: bookings.creditCost,
       packageId: bookings.packageId,
+      partySize: bookings.partySize,
     })
     .from(bookings)
     .innerJoin(classInstances, eq(bookings.classInstanceId, classInstances.id))

@@ -60,6 +60,16 @@ function activeByNow(now: Date) {
  * The booking path always passes it, and `packageDebitBlock` re-checks under the
  * lock, so selection being the looser of the two cannot let a debit through.
  */
+/**
+ * The size filter for a STUDIO RENTAL (2026-09-29): a rental is paid for with a
+ * rental credit of exactly the head-count being hired. Absent = no filter (every
+ * non-rental booking, and the balance reads).
+ */
+function ofPartySize(partySize: number | undefined): SQL {
+  if (partySize === undefined) return sql`true`;
+  return eq(packages.partySize, partySize) as SQL;
+}
+
 function usableOnClassDay(classStartsAt: Date | undefined): SQL {
   if (!classStartsAt) return sql`true`;
   const day = studioYmd(classStartsAt);
@@ -112,6 +122,7 @@ export async function selectUsablePackageRow(
   now: Date = new Date(),
   minHours = 0,
   classStartsAt?: Date,
+  partySize?: number,
 ): Promise<UsablePackage | null> {
   const category = packageCategoryForClassType(classType);
   const db = getDb();
@@ -130,6 +141,7 @@ export async function selectUsablePackageRow(
         gt(packages.expiresAt, now),
         activeByNow(now),
         usableOnClassDay(classStartsAt),
+        ofPartySize(partySize),
       ),
     )
     // An event package is spent FIRST when it is eligible: it is the narrowest
@@ -152,8 +164,9 @@ export async function selectUsablePackage(
   now: Date = new Date(),
   minHours = 0,
   classStartsAt?: Date,
+  partySize?: number,
 ): Promise<string | null> {
-  const row = await selectUsablePackageRow(viewer, classType, now, minHours, classStartsAt);
+  const row = await selectUsablePackageRow(viewer, classType, now, minHours, classStartsAt, partySize);
   return row?.id ?? null;
 }
 
@@ -178,6 +191,7 @@ export async function selectPackageForReschedule(
   newCost: number,
   now: Date = new Date(),
   newClassStartsAt?: Date,
+  partySize?: number,
 ): Promise<string | null> {
   const db = getDb();
   const category = packageCategoryForClassType(newClassType);
@@ -196,6 +210,7 @@ export async function selectPackageForReschedule(
         gt(packages.expiresAt, now),
         activeByNow(now),
         usableOnClassDay(newClassStartsAt),
+        ofPartySize(partySize),
       ),
     )
     .limit(1);
@@ -204,7 +219,7 @@ export async function selectPackageForReschedule(
   }
 
   // Otherwise a DIFFERENT package must cover the new cost entirely on its own.
-  return selectUsablePackage(viewer, newClassType, now, newCost, newClassStartsAt);
+  return selectUsablePackage(viewer, newClassType, now, newCost, newClassStartsAt, partySize);
 }
 
 /** A target user's pool-ownership context — the only fields package selection needs. */
@@ -245,13 +260,14 @@ export async function selectUsablePackageForUser(
   now: Date = new Date(),
   minHours = 0,
   classStartsAt?: Date,
+  partySize?: number,
 ): Promise<string | null> {
   const owner = await loadPoolOwner(userId);
   if (!owner) return null;
   // `selectUsablePackageRow` reads only id/tier/householdId via `ownerWhere`; the
   // remaining SessionUser fields are display-only and irrelevant to selection.
   const viewer: SessionUser = { ...owner, name: "", houseNumber: null };
-  const row = await selectUsablePackageRow(viewer, classType, now, minHours, classStartsAt);
+  const row = await selectUsablePackageRow(viewer, classType, now, minHours, classStartsAt, partySize);
   return row?.id ?? null;
 }
 
@@ -277,6 +293,7 @@ export async function selectPackageForRescheduleForUser(
   newCost: number,
   now: Date = new Date(),
   newClassStartsAt?: Date,
+  partySize?: number,
 ): Promise<string | null> {
   const owner = await loadPoolOwner(userId);
   if (!owner) return null;
@@ -291,6 +308,7 @@ export async function selectPackageForRescheduleForUser(
     newCost,
     now,
     newClassStartsAt,
+    partySize,
   );
 }
 
@@ -372,6 +390,13 @@ export interface CreditBalance {
    * sees a single class and thinks the free one never arrived.
    */
   pendingClasses: number;
+  /**
+   * STUDIO RENTAL head-count (2026-09-29). Rental credits come in three sizes that
+   * never mix, so rental balances are reported ONE ROW PER SIZE — a single "rental: 2"
+   * would not say whether they can hire the studio for one person or for three.
+   * Absent on every other format.
+   */
+  partySize?: number;
 }
 
 /**
@@ -445,6 +470,7 @@ export async function getCreditBalances(
         hoursLeft: packages.hoursLeft,
         expiresAt: packages.expiresAt,
         classDays: packages.classDays,
+        partySize: packages.partySize,
       })
       .from(packages)
       .where(
@@ -460,16 +486,24 @@ export async function getCreditBalances(
     // dormant marker), so it is invisible to every query above — deliberately, since
     // it cannot be spent. Read separately to SHOW it as waiting.
     db
-      .select({ category: packages.category, hoursLeft: packages.hoursLeft })
+      .select({
+        category: packages.category,
+        hoursLeft: packages.hoursLeft,
+        partySize: packages.partySize,
+      })
       .from(packages)
       .where(
         and(ownerWhere(viewer), gt(packages.hoursLeft, 0), isNull(packages.expiresAt)),
       ),
   ]);
 
-  const byCategory = new Map<PackageCategory, CreditBalance>();
+  // Keyed by category AND, for rental, head-count — one row per rental size.
+  const keyOf = (category: PackageCategory, partySize: number | null) =>
+    category === "rental" && partySize !== null ? `rental:${partySize}` : category;
+  const byCategory = new Map<string, CreditBalance>();
   for (const r of rows) {
-    const current = byCategory.get(r.category);
+    const key = keyOf(r.category, r.partySize);
+    const current = byCategory.get(key);
     const row =
       current ??
       // Rows arrive expiry-ascending, so the first one seen carries the soonest.
@@ -479,6 +513,7 @@ export async function getCreditBalances(
         nearestExpiry: r.expiresAt,
         eventCredits: [],
         pendingClasses: 0,
+        ...(r.category === "rental" && r.partySize !== null ? { partySize: r.partySize } : {}),
       } satisfies CreditBalance);
     row.classes += r.hoursLeft;
     if (r.classDays && r.classDays.length > 0) {
@@ -489,21 +524,23 @@ export async function getCreditBalances(
       if (existing) existing.classes += r.hoursLeft;
       else row.eventCredits.push({ days: r.classDays, classes: r.hoursLeft });
     }
-    byCategory.set(r.category, row);
+    byCategory.set(key, row);
   }
 
   // Fold in the dormant bonus classes, creating a row for a pool that holds nothing
   // BUT a sleeping class (someone whose paid class is booked but not yet taken).
   for (const r of dormantRows) {
-    const row = byCategory.get(r.category) ?? {
+    const key = keyOf(r.category, r.partySize);
+    const row = byCategory.get(key) ?? {
       category: r.category,
       classes: 0,
       nearestExpiry: null,
       eventCredits: [],
       pendingClasses: 0,
+      ...(r.category === "rental" && r.partySize !== null ? { partySize: r.partySize } : {}),
     };
     row.pendingClasses += r.hoursLeft;
-    byCategory.set(r.category, row);
+    byCategory.set(key, row);
   }
 
   // Largest balance first, then soonest expiry, then a stable category order — so
@@ -514,7 +551,9 @@ export async function getCreditBalances(
     const ae = a.nearestExpiry?.getTime() ?? Infinity;
     const be = b.nearestExpiry?.getTime() ?? Infinity;
     if (ae !== be) return ae - be;
-    return order.indexOf(a.category) - order.indexOf(b.category);
+    const byFormat = order.indexOf(a.category) - order.indexOf(b.category);
+    // Rental sizes, when tied on everything else, read 1 → 3 people.
+    return byFormat !== 0 ? byFormat : (a.partySize ?? 0) - (b.partySize ?? 0);
   });
 }
 

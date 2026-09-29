@@ -14,7 +14,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ClassDetail, PositionAvailability } from "@/lib/schedule/queries";
-import type { ReformerPosition } from "@/lib/domain/types";
+import type { RentalPartySize, ReformerPosition } from "@/lib/domain/types";
 import { isCustomerBookable } from "@/lib/domain/types";
 import { bookClass, type BookActionFailureCode } from "@/app/actions/booking";
 import {
@@ -26,6 +26,13 @@ import type { StrKey } from "@/lib/i18n/strings";
 import { classDateLabel, POSITION_KEY, windowHoursLabel } from "./schedule-helpers";
 import { ArrowRight, Bell, Check, Info, Clock } from "./icons";
 import { BookingTermsSheet, type CustomerBookingTerms } from "./booking-terms-sheet";
+
+/** A studio-rental size and how much usable credit the customer holds for it. */
+export interface RentalBalance {
+  size: RentalPartySize;
+  /** Usable credits of this size, or null when they hold none. */
+  left: number | null;
+}
 
 interface BookingPanelProps {
   lang: Lang;
@@ -51,6 +58,12 @@ interface BookingPanelProps {
    * Only decides whether "Book another seat" is offered — the server enforces it.
    */
   isMember: boolean;
+  /**
+   * STUDIO RENTAL only (2026-09-29): usable credit per head-count. Present exactly
+   * when the class is a rental; the panel then asks "how many people?" instead of
+   * offering reformer seats, since the booking hires the whole studio.
+   */
+  rentalBalances: RentalBalance[] | null;
 }
 
 type Phase = "idle" | "submitting" | "booked" | "error";
@@ -69,6 +82,10 @@ function errorKey(code: BookActionFailureCode): StrKey {
       return "err_no_package";
     case "WRONG_CLASS_DAY":
       return "err_wrong_class_day";
+    case "PARTY_SIZE_REQUIRED":
+      return "err_party_size_required";
+    case "WRONG_PARTY_SIZE":
+      return "err_wrong_party_size";
     case "TERMS_OUTDATED":
       return "err_booking_terms_outdated";
     case "TERMS_NOT_ACCEPTED":
@@ -101,6 +118,8 @@ function errorKey(code: BookActionFailureCode): StrKey {
 /** Map a join-waitlist failure code to friendly, keyed copy. */
 function joinErrorKey(code: JoinWaitlistFailureCode): StrKey {
   switch (code) {
+    case "RENTAL_NO_WAITLIST":
+      return "err_rental_no_waitlist";
     case "ALREADY_WAITLISTED":
       return "err_already_waitlisted";
     case "ALREADY_BOOKED":
@@ -128,6 +147,7 @@ export function BookingPanel({
   timeRange,
   bookingTerms,
   isMember,
+  rentalBalances,
 }: BookingPanelProps) {
   const { t, tt } = makeT(lang);
   const router = useRouter();
@@ -152,6 +172,16 @@ export function BookingPanel({
   const [freeCancelHours, setFreeCancelHours] = useState<number | null>(null);
   // The rules sheet opens on every Book tap and doubles as the confirm step.
   const [termsOpen, setTermsOpen] = useState(false);
+  // The rental head-count: the smallest size they hold credit for, so the default is
+  // always one they can actually book.
+  const [partySize, setPartySize] = useState<RentalPartySize>(
+    () => rentalBalances?.find((b) => (b.left ?? 0) > 0)?.size ?? 1,
+  );
+  const isRental = rentalBalances !== null;
+  // For a rental, the balance that matters is the chosen SIZE's, not the format's.
+  const effectiveBalance = isRental
+    ? (rentalBalances.find((b) => b.size === partySize)?.left ?? null)
+    : balanceBefore;
 
   // Waitlist join state (full-class path) — the queue position comes from the
   // server join result, never computed here.
@@ -197,7 +227,12 @@ export function BookingPanel({
         ? detail.positions[selected].position
         : undefined;
     try {
-      const res = await bookClass({ classInstanceId: detail.id, position, bookingTermsVersionId });
+      const res = await bookClass({
+        classInstanceId: detail.id,
+        position,
+        bookingTermsVersionId,
+        ...(isRental ? { partySize } : {}),
+      });
       setTermsOpen(false);
       if (res.ok) {
         setBalanceAfter(res.hoursLeft);
@@ -314,6 +349,8 @@ export function BookingPanel({
           <div className="mt-5 rounded-lune-sm border border-line bg-surface px-4 py-3.5 text-left">
             <div className="font-head text-[17px] font-semibold text-ink">
               {detail.name || tt(detail.typeMeta.label)}
+              {isRental &&
+                ` · ${partySize === 1 ? t("party_size_one") : t("party_size_n").replace("{n}", String(partySize))}`}
             </div>
             <div className="mt-1 font-body text-[13px] text-ink-soft">
               {dateStr} · {timeRange}
@@ -444,6 +481,52 @@ export function BookingPanel({
         onConfirm={(versionId) => void submit(versionId)}
         onClose={() => setTermsOpen(false)}
       />
+      {/* STUDIO RENTAL: how many people. Each size is its own credit and they never
+          mix (owner, 2026-09-29), so a size they hold no credit for is shown but not
+          choosable — the customer sees the option exists and what it would take. */}
+      {isRental && rentalBalances && !full && (
+        <div className="mt-4 rounded-lune-sm border border-line bg-surface-2 px-4 pb-4 pt-3.5 shadow-soft">
+          <p className="font-body text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
+            {t("rental_party_title")}
+          </p>
+          <p className="mb-3 mt-1 font-body text-[12.5px] leading-snug text-ink-soft">
+            {t("rental_party_hint")}
+          </p>
+          <div role="radiogroup" aria-label={t("rental_party_title")} className="grid grid-cols-3 gap-2">
+            {rentalBalances.map((b) => {
+              const available = (b.left ?? 0) > 0;
+              const on = partySize === b.size;
+              return (
+                <button
+                  key={b.size}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  disabled={!available}
+                  onClick={() => setPartySize(b.size)}
+                  className={`flex flex-col items-center rounded-[14px] border-[1.5px] px-2 py-2.5 transition-colors ${
+                    on && available
+                      ? "border-taupe bg-surface shadow-soft"
+                      : "border-line bg-surface-2"
+                  } disabled:cursor-not-allowed disabled:opacity-45`}
+                >
+                  <span className="font-head text-[17px] font-semibold text-ink">
+                    {b.size === 1
+                      ? t("party_size_one")
+                      : t("party_size_n").replace("{n}", String(b.size))}
+                  </span>
+                  <span className="mt-0.5 font-body text-[11px] text-muted">
+                    {available
+                      ? t("rental_party_have").replace("{n}", String(b.left))
+                      : t("rental_party_none")}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* reformer position picker */}
       {usesPositions && (
         <div className="mt-4 rounded-lune-sm border border-line bg-surface-2 px-4 pb-4 pt-3.5 shadow-soft">
@@ -543,7 +626,12 @@ export function BookingPanel({
         </div>
 
         <div className="flex-1">
-          {full ? (
+          {full && isRental ? (
+            // A hired studio slot has no next seat to queue for (2026-09-29).
+            <div className="flex h-12 w-full items-center justify-center rounded-lune-sm border-[1.5px] border-line font-body text-base font-semibold text-muted">
+              {t("full")}
+            </div>
+          ) : full ? (
             <button
               type="button"
               onClick={joinWl}
@@ -574,16 +662,16 @@ export function BookingPanel({
           Book button still attempts; the server returns NO_PACKAGE/NO_CREDITS.
           The authoritative post-booking balance comes from the action result
           (balanceAfter) in the confirmation state above. */}
-      {!full && balanceBefore !== null && (
+      {!full && effectiveBalance !== null && (
         <p className="mt-2.5 text-center font-body text-[12px] text-muted">
           {t("remaining_after")}:{" "}
           <span className="font-semibold text-ink-soft">
-            {Math.max(0, balanceBefore - cost)}{" "}
-            {balanceBefore - cost === 1 ? t("hour") : t("hours")}
+            {Math.max(0, effectiveBalance - cost)}{" "}
+            {effectiveBalance - cost === 1 ? t("hour") : t("hours")}
           </span>
         </p>
       )}
-      {!full && balanceBefore === null && (
+      {!full && effectiveBalance === null && (
         <p className="mt-2.5 text-center font-body text-[12px] text-rose">
           {t("err_no_package")}{" "}
           <Link href="/buy" className="font-semibold text-taupe-deep underline">

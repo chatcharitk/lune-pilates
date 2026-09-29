@@ -27,6 +27,8 @@ import {
 import { BookingPanel } from "./booking-panel";
 import { LevelBadge } from "./level-badge";
 import type { CustomerBookingTerms } from "./booking-terms-sheet";
+import type { RentalBalance } from "./booking-panel";
+import { RENTAL_PARTY_SIZES } from "@/lib/domain/types";
 
 export interface ClassDetailViewProps {
   detail: ClassDetail;
@@ -40,6 +42,8 @@ export interface ClassDetailViewProps {
   bookingTerms: CustomerBookingTerms;
   /** Members may book several seats in one class; guests one. */
   isMember: boolean;
+  /** Studio rental only: usable credit per head-count (null = none of that size). */
+  rentalBalances: RentalBalance[] | null;
 }
 
 export function ClassDetailView({
@@ -49,6 +53,7 @@ export function ClassDetailView({
   usesPositions,
   bookingTerms,
   isMember,
+  rentalBalances,
 }: ClassDetailViewProps) {
   const { t, tt, lang } = useCustomerLang();
 
@@ -115,8 +120,15 @@ export function ClassDetailView({
             <Fact
               icon={<Users size={17} />}
               label={t("capacity")}
-              value={`${detail.capacity} ${t("people")}`}
-              sub={reformerSub}
+              // A rental slot holds ONE booking (the whole studio), but that booking can
+              // be for up to three people — the slot's booking capacity is not a head-
+              // count and must not be shown as one.
+              value={
+                detail.type === "rental"
+                  ? t("rental_capacity").replace("{n}", String(RENTAL_PARTY_SIZES.length))
+                  : `${detail.capacity} ${t("people")}`
+              }
+              sub={detail.type === "rental" ? t("rental_whole_studio") : reformerSub}
             />
             {/* No floor line: "ชั้น 3" was a placeholder from the design prototype,
                 and the studio has no floor in its address (owner, 2026-09-28). */}
@@ -135,6 +147,7 @@ export function ClassDetailView({
           timeRange={timeRange}
           bookingTerms={bookingTerms}
           isMember={isMember}
+          rentalBalances={rentalBalances}
         />
 
         {/* instructor — read-only. For instructor-selectable types (private/duo/

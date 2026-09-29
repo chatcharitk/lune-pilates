@@ -165,6 +165,8 @@ const createInput = z.object({
   /** A fixed expiry day for what it grants. Blank = the relative validity. */
   expiresOn: YMD_OR_BLANK,
   classDays: CLASS_DAYS,
+  /** Studio rental head-count, 1–3. Required for a rental item, ignored otherwise. */
+  partySize: z.number().int().min(1).max(3).nullable().optional(),
   sortOrder: z.number().int().min(0).max(10_000).optional(),
 });
 const createInputChecked = withValidityInRange(createInput);
@@ -192,6 +194,8 @@ const updateInput = z.object({
   /** A fixed expiry day for what it grants. Blank = the relative validity. */
   expiresOn: YMD_OR_BLANK,
   classDays: CLASS_DAYS,
+  /** Studio rental head-count, 1–3. Required for a rental item, ignored otherwise. */
+  partySize: z.number().int().min(1).max(3).nullable().optional(),
   sortOrder: z.number().int().min(0).max(10_000).optional(),
 });
 const updateInputChecked = withValidityInRange(updateInput);
@@ -269,6 +273,8 @@ export type CreateCatalogItemFailureCode =
   | "EXPIRY_IN_PAST"
   /** The sale window closes before it opens, or the credits die before it closes. */
   | "BAD_DATE_ORDER"
+  /** A studio-rental item must say how many people its credit is for. */
+  | "PARTY_SIZE_REQUIRED"
   | MockNoDbCode;
 
 export type CreateCatalogItemResult =
@@ -282,6 +288,8 @@ export type UpdateCatalogItemFailureCode =
   | "CATEGORY_IMMUTABLE"
   | "EXPIRY_IN_PAST"
   | "BAD_DATE_ORDER"
+  /** A studio-rental item must say how many people its credit is for. */
+  | "PARTY_SIZE_REQUIRED"
   | MockNoDbCode;
 
 export type UpdateCatalogItemResult =
@@ -345,6 +353,11 @@ export async function createCatalogItem(
     return { ok: false, code: "EXPIRY_IN_PAST" };
   }
   if (datesOutOfOrder(input)) return { ok: false, code: "BAD_DATE_ORDER" };
+  // A rental credit is good only for a rental of its exact head-count; an item with
+  // no head-count would sell credit that can never be used (2026-09-29).
+  if (input.category === "rental" && !input.partySize) {
+    return { ok: false, code: "PARTY_SIZE_REQUIRED" };
+  }
 
   // Mock-data dev mode: the input is fully validated above, but there is no database
   // to write to. Report MOCK_NO_DB rather than a fake success — see MockNoDbCode.
@@ -386,6 +399,7 @@ export async function createCatalogItem(
         saleEndsOn: blankToNull(input.saleEndsOn),
         expiresOn: blankToNull(input.expiresOn),
         classDays: normalizeClassDays(input.classDays),
+        partySize: input.category === "rental" ? (input.partySize ?? null) : null,
         active: true,
         sortOrder,
       })
@@ -458,6 +472,11 @@ export async function updateCatalogItem(
     return { ok: false, code: "EXPIRY_IN_PAST" };
   }
   if (datesOutOfOrder(input)) return { ok: false, code: "BAD_DATE_ORDER" };
+  // A rental credit is good only for a rental of its exact head-count; an item with
+  // no head-count would sell credit that can never be used (2026-09-29).
+  if (current.category === "rental" && !input.partySize) {
+    return { ok: false, code: "PARTY_SIZE_REQUIRED" };
+  }
 
   const sortOrder = input.sortOrder ?? current.sortOrder;
 
@@ -480,6 +499,7 @@ export async function updateCatalogItem(
       saleEndsOn: blankToNull(input.saleEndsOn),
       expiresOn: blankToNull(input.expiresOn),
       classDays: normalizeClassDays(input.classDays),
+      partySize: current.category === "rental" ? (input.partySize ?? null) : null,
       sortOrder,
     })
     .where(eq(catalogItems.id, input.id));

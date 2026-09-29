@@ -48,6 +48,8 @@ export interface ChargeTermsSnapshot {
   classDays: string[] | null;
   /** The fixed expiry day it was sold with; null = the relative validity (2026-09-17). */
   expiresOn: string | null;
+  /** Rental head-count it was sold for; null on every non-rental charge (2026-09-29). */
+  partySize: number | null;
 }
 
 /**
@@ -80,7 +82,7 @@ export function itemForCredit(live: CatalogItem, snapshot: ChargeTermsSnapshot):
   // item silently shorten — or pin to two days — credits somebody had already paid
   // for while their slip sat in review. So both are set explicitly here, and an
   // absent snapshot value CLEARS whatever the live item now carries.
-  const { classDays: _liveDays, expiresOn: _liveExpiry, ...rest } = live;
+  const { classDays: _liveDays, expiresOn: _liveExpiry, partySize: _liveSize, ...rest } = live;
   return {
     ...rest,
     hours: snapshot.hours!,
@@ -90,6 +92,9 @@ export function itemForCredit(live: CatalogItem, snapshot: ChargeTermsSnapshot):
       ? { classDays: snapshot.classDays }
       : {}),
     ...(snapshot.expiresOn ? { expiresOn: snapshot.expiresOn } : {}),
+    // The rental size is what was PAID for; an owner re-sizing the item later must
+    // not change which rentals this credit can hire.
+    ...(snapshot.partySize !== null ? { partySize: snapshot.partySize } : {}),
   };
 }
 
@@ -106,6 +111,7 @@ export function termsSnapshotFor(item: CatalogItem): {
   category: PackageCategory;
   classDays: string[] | null;
   expiresOn: string | null;
+  partySize: number | null;
 } {
   return {
     hours: item.hours,
@@ -115,6 +121,7 @@ export function termsSnapshotFor(item: CatalogItem): {
     category: item.category,
     classDays: item.classDays && item.classDays.length > 0 ? item.classDays : null,
     expiresOn: item.expiresOn ?? null,
+    partySize: item.partySize ?? null,
   };
 }
 

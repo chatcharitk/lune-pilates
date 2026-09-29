@@ -29,6 +29,10 @@ export const bookInput = z.object({
   viewerTier: z.enum(["member", "guest"]),
   packageId: z.string().uuid(),
   position: z.enum(["left", "middle", "right"]).optional(),
+  // STUDIO RENTAL head-count (2026-09-29). Required for a rental, ignored otherwise:
+  // the booking hires the whole studio for this many people, and must be settled by
+  // a rental credit of exactly this size.
+  partySize: z.number().int().min(1).max(3).optional(),
   // Set ONLY by the front-desk paths (adminBookForCustomer / adminReschedule). The
   // front desk operates the schedule, so it may book ADMIN-ONLY types (private/duo/
   // trio) and may book a rental before its customer release window opens. The
@@ -61,7 +65,11 @@ export type BookFailureCode =
   // group class before the paid private class has been taken (2026-09-08).
   | "NOT_YET_ACTIVE"
   // An event package used on a class outside the days it was sold for (2026-09-12).
-  | "WRONG_CLASS_DAY";
+  | "WRONG_CLASS_DAY"
+  // A rental booked without saying how many people (2026-09-29).
+  | "PARTY_SIZE_REQUIRED"
+  // A rental credit of one size used for a rental of another — sizes never mix.
+  | "WRONG_PARTY_SIZE";
 
 export type BookResult =
   | { ok: true; bookingId: string; hoursLeft: number; freeCancelHours: number }
@@ -274,6 +282,16 @@ export async function bookClassWithDebit(
     const block = packageDebitBlock(pkg, cost, now, studioYmd(cls.startsAt));
     if (block) return { ok: false, code: block } as const;
 
+    // STUDIO RENTAL (2026-09-29): the whole studio, priced by head-count. The size
+    // must be stated, and the credit must be of exactly that size — the owner's rule
+    // is that the three rental sizes never mix. Checked under the package lock so it
+    // is the package actually being debited that is judged.
+    const partySize = cls.type === "rental" ? (input.partySize ?? null) : null;
+    if (cls.type === "rental") {
+      if (partySize === null) return { ok: false, code: "PARTY_SIZE_REQUIRED" } as const;
+      if (pkg.partySize !== partySize) return { ok: false, code: "WRONG_PARTY_SIZE" } as const;
+    }
+
     // The cancellation window is a single FIXED 5h window for every booking
     // (CLAUDE.md §5 invariant 7, decided 2026-06-28). Stamp the constant as an
     // audit record on the booking; it is no longer derived from lead time.
@@ -289,6 +307,7 @@ export async function bookClassWithDebit(
         userId: input.userId,
         packageId: pkg.id,
         position: input.position as ReformerPosition | undefined,
+        partySize,
         creditCost: cost,
         freeCancelHours,
         status: "booked",
@@ -519,6 +538,15 @@ export async function rescheduleWithinTransaction(
     );
     if (block) return { ok: false, code: block } as const;
 
+    // A moved RENTAL keeps its head-count, and the credit paying for the new slot must
+    // be of that exact size (2026-09-29). Nothing else can set the size here — a
+    // reschedule moves a hire, it does not resize it.
+    const newPartySize = newCls.type === "rental" ? (oldBk.partySize ?? null) : null;
+    if (newCls.type === "rental") {
+      if (newPartySize === null) return { ok: false, code: "PARTY_SIZE_REQUIRED" } as const;
+      if (newPkg.partySize !== newPartySize) return { ok: false, code: "WRONG_PARTY_SIZE" } as const;
+    }
+
     // Fixed 5h window stamped on the new booking (audit constant, CLAUDE.md §5 inv 7).
     const freeCancelHours = FREE_CANCEL_HOURS;
 
@@ -544,6 +572,7 @@ export async function rescheduleWithinTransaction(
         userId: input.userId,
         packageId: newPkg.id,
         position: input.position as ReformerPosition | undefined,
+        partySize: newPartySize,
         creditCost: newCost,
         freeCancelHours,
         status: "booked",

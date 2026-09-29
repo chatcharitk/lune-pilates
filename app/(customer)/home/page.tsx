@@ -69,6 +69,7 @@ export default async function HomePage() {
         nearestExpiryIso: b.nearestExpiry ? b.nearestExpiry.toISOString() : null,
         eventCredits: b.eventCredits,
         pendingClasses: b.pendingClasses,
+        partySize: b.partySize ?? null,
       }))}
       isHouseholdPool={overview.isHouseholdPool}
       next={next}

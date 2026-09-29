@@ -156,6 +156,12 @@ export interface CatalogItem {
   promoShelf?: boolean;
   /** How many times one customer may buy this, ever. Absent = unlimited. */
   maxPerCustomer?: number;
+  /**
+   * STUDIO RENTAL head-count (2026-09-29): the credit this item grants hires the whole
+   * studio for exactly this many people, and cannot be used for any other size.
+   * Absent on every non-rental item.
+   */
+  partySize?: number;
   /** Bangkok days bounding when the item may be BOUGHT; absent = unbounded. */
   saleStartsOn?: string;
   saleEndsOn?: string;
@@ -301,6 +307,8 @@ export interface CatalogSeedItem {
   validity: Validity;
   tag?: CatalogTag;
   label: Bilingual;
+  /** Studio-rental head-count; absent on every other item. */
+  partySize?: number;
   /** Display order WITHIN the category (ascending). */
   sortOrder: number;
 }
@@ -330,9 +338,9 @@ export const SEED_CATALOG: readonly CatalogSeedItem[] = [
   // apparatus", "Duo · …", "Trio · …" — word for word the private-class formats, with
   // "rental" appearing nowhere — so a studio rental was indistinguishable from a
   // private class on the buy screen.
-  { id: "r-solo", category: "rental", hours: 1, price: 600, validity: V1M, label: { en: "Studio rental · 1 person", th: "เช่าสตูดิโอ · 1 คน" }, sortOrder: 0 },
-  { id: "r-duo", category: "rental", hours: 1, price: 800, validity: V1M, label: { en: "Studio rental · 2 people", th: "เช่าสตูดิโอ · 2 คน" }, sortOrder: 10 },
-  { id: "r-trio", category: "rental", hours: 1, price: 1000, validity: V1M, label: { en: "Studio rental · 3 people", th: "เช่าสตูดิโอ · 3 คน" }, sortOrder: 20 },
+  { id: "r-solo", category: "rental", hours: 1, price: 600, validity: V1M, label: { en: "Studio rental · 1 person", th: "เช่าสตูดิโอ · 1 คน" }, partySize: 1, sortOrder: 0 },
+  { id: "r-duo", category: "rental", hours: 1, price: 800, validity: V1M, label: { en: "Studio rental · 2 people", th: "เช่าสตูดิโอ · 2 คน" }, partySize: 2, sortOrder: 10 },
+  { id: "r-trio", category: "rental", hours: 1, price: 1000, validity: V1M, label: { en: "Studio rental · 3 people", th: "เช่าสตูดิโอ · 3 คน" }, partySize: 3, sortOrder: 20 },
 ] as const;
 
 /**
@@ -407,6 +415,7 @@ function toCatalogItem(seed: CatalogSeedItem): CatalogItem {
     ...(seed.tag ? { tag: seed.tag } : {}),
     label: seed.label,
     sublabel: sublabelForValidity(seed.validity),
+    ...(seed.partySize !== undefined ? { partySize: seed.partySize } : {}),
   };
 }
 
@@ -431,6 +440,7 @@ interface CatalogRow {
   classDays: string[] | null;
   promoShelf: boolean;
   maxPerCustomer: number | null;
+  partySize: number | null;
   saleStartsOn: string | null;
   saleEndsOn: string | null;
   expiresOn: string | null;
@@ -457,6 +467,7 @@ function rowToAdminItem(r: CatalogRow): AdminCatalogItem {
     ...(r.classDays && r.classDays.length > 0 ? { classDays: r.classDays } : {}),
     ...(r.promoShelf ? { promoShelf: true } : {}),
     ...(r.maxPerCustomer !== null ? { maxPerCustomer: r.maxPerCustomer } : {}),
+    ...(r.partySize !== null ? { partySize: r.partySize } : {}),
     ...(r.saleStartsOn ? { saleStartsOn: r.saleStartsOn } : {}),
     ...(r.saleEndsOn ? { saleEndsOn: r.saleEndsOn } : {}),
     ...(r.expiresOn ? { expiresOn: r.expiresOn } : {}),
@@ -487,6 +498,7 @@ const SELECT_COLUMNS = {
   classDays: catalogItems.classDays,
   promoShelf: catalogItems.promoShelf,
   maxPerCustomer: catalogItems.maxPerCustomer,
+  partySize: catalogItems.partySize,
   saleStartsOn: catalogItems.saleStartsOn,
   saleEndsOn: catalogItems.saleEndsOn,
   expiresOn: catalogItems.expiresOn,
@@ -609,6 +621,7 @@ export async function listPackageCatalog(
     ...(i.classDays && i.classDays.length > 0 ? { classDays: i.classDays } : {}),
     ...(i.promoShelf ? { promoShelf: true } : {}),
     ...(i.maxPerCustomer !== undefined ? { maxPerCustomer: i.maxPerCustomer } : {}),
+    ...(i.partySize !== undefined ? { partySize: i.partySize } : {}),
     ...(i.saleEndsOn ? { saleEndsOn: i.saleEndsOn } : {}),
     ...(i.expiresOn ? { expiresOn: i.expiresOn } : {}),
     ...(partsByItem.has(i.id) ? { parts: partsByItem.get(i.id)! } : {}),

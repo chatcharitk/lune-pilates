@@ -19,6 +19,7 @@ import type { ClassType, ReformerPosition } from "@/lib/domain/types";
 import type { StrKey } from "@/lib/i18n";
 import { formatStudioDate, formatStudioTime } from "@/lib/time";
 import { creditCostForClassType } from "@/lib/credits/cost";
+import { RENTAL_PARTY_SIZES, type RentalPartySize } from "@/lib/domain/types";
 
 // Display-only credit cost per type (server recomputes authoritatively).
 // Display-only credit cost per type. Derived from the SAME function the debit uses
@@ -50,6 +51,8 @@ const ERR: Record<string, StrKey> = {
   // An event package aimed at a class it was not sold for (2026-09-12). Selection
   // avoids this now, but the in-transaction guard can still raise it in a race.
   WRONG_CLASS_DAY: "err_wrong_class_day",
+  PARTY_SIZE_REQUIRED: "err_party_size_required",
+  WRONG_PARTY_SIZE: "err_wrong_party_size",
 };
 
 export function AddBookingDrawer({
@@ -71,6 +74,9 @@ export function AddBookingDrawer({
   const [customer, setCustomer] = useState<AdminCustomer | null>(null);
   const [cls, setCls] = useState<BookableClass | null>(null);
   const [position, setPosition] = useState<ReformerPosition | null>(null);
+  // Studio rental head-count (2026-09-29): the booking hires the whole studio, and
+  // the customer's rental credit of exactly this size pays for it.
+  const [partySize, setPartySize] = useState<RentalPartySize>(1);
   const [errorKey, setErrorKey] = useState<StrKey | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -88,7 +94,9 @@ export function AddBookingDrawer({
   }, [customers, query]);
 
   const cost = cls ? COST[cls.type] : 0;
-  const showPositions = cls ? cls.type !== "private" : false;
+  // No reformer to choose for a 1:1 (one machine) or a rental (the whole studio).
+  const showPositions = cls ? cls.type !== "private" && cls.type !== "rental" : false;
+  const isRental = cls?.type === "rental";
   const balanceAfter = customer ? customer.balance - cost : 0;
   const insufficient = Boolean(customer && cls && customer.balance < cost);
 
@@ -97,6 +105,7 @@ export function AddBookingDrawer({
     setCustomer(null);
     setCls(null);
     setPosition(null);
+    setPartySize(1);
     setErrorKey(null);
   }
   function close() {
@@ -111,7 +120,8 @@ export function AddBookingDrawer({
       const res = await adminBookForCustomer({
         classInstanceId: cls.id,
         userId: customer.id,
-        ...(position ? { position } : {}),
+        ...(position && !isRental ? { position } : {}),
+        ...(isRental ? { partySize } : {}),
       });
       if (res.ok) {
         reset();
@@ -266,6 +276,34 @@ export function AddBookingDrawer({
             />
           )}
         </>
+      )}
+
+      {/* ── step 3a: rental head-count ── */}
+      {customer && cls && isRental && (
+        <div className="mb-4">
+          <p className="mb-2 font-body text-[11.5px] font-semibold uppercase tracking-[0.06em] text-muted">
+            {t("rental_party_title")}
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {RENTAL_PARTY_SIZES.map((n) => {
+              const on = partySize === n;
+              return (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setPartySize(n)}
+                  aria-pressed={on}
+                  className={`h-11 rounded-xl border font-body text-sm font-semibold ${
+                    on ? "border-ink bg-ink text-cream" : "border-line-strong bg-surface-2 text-ink"
+                  }`}
+                >
+                  {n === 1 ? t("party_size_one") : t("party_size_n").replace("{n}", String(n))}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-1.5 font-body text-[11.5px] leading-snug text-muted">{t("rental_party_hint")}</p>
+        </div>
       )}
 
       {/* ── step 3: position (optional; reformer types only) ── */}

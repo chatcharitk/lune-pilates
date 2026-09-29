@@ -51,6 +51,10 @@ export type JoinWaitlistFailureCode =
   // Private/Duo/Trio are front-desk-only — a customer must not queue for a class
   // they can't self-book (CUSTOMER_BOOKABLE_TYPES). Mirrors the booking ADMIN_ONLY.
   | "ADMIN_ONLY"
+  // A studio rental is the whole studio for one customer (2026-09-29): there is no
+  // "next seat" to wait for, and a claim could not know how many people to hire it
+  // for. A full rental slot is simply taken.
+  | "RENTAL_NO_WAITLIST"
   | "NOT_FULL"
   | "ALREADY_BOOKED"
   | "ALREADY_WAITLISTED";
@@ -108,6 +112,9 @@ export async function joinWaitlist(raw: JoinWaitlistInput): Promise<JoinWaitlist
     // CUSTOMER_BOOKABLE_TYPES). Rentals stay waitlistable when full.
     if (!isCustomerBookable(cls.type as ClassType)) {
       return { ok: false, code: "ADMIN_ONLY" } as const;
+    }
+    if (cls.type === "rental") {
+      return { ok: false, code: "RENTAL_NO_WAITLIST" } as const;
     }
 
     // Tiered visibility under the lock (CLAUDE.md §5 inv 4). Like the booking

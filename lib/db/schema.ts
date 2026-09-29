@@ -88,6 +88,9 @@ export const packages = pgTable(
     // when a dormant component activates: the sibling's class start time. Gates
     // the window's near edge the way expires_at gates the far edge.
     activatesAt: timestamp("activates_at", { withTimezone: true }),
+    // PARTY SIZE snapshot (2026-09-29): a rental credit is good only for a rental of
+    // exactly this many people. Null on every non-rental package.
+    partySize: integer("party_size"),
     // EVENT DAYS (2026-09-12) — snapshot of the catalog item's `class_days` at
     // purchase. The Bangkok days ("YYYY-MM-DD") whose classes these credits may be
     // booked into; NULL = any day, which is every ordinary package. Copied rather
@@ -185,6 +188,11 @@ export const catalogItems = pgTable(
     // date means that date, not a rolling window that would let a late buyer use
     // classes into December.
     expiresOn: text("expires_on"),
+    // PARTY SIZE (2026-09-29) — studio rental only. A rental is the WHOLE studio for
+    // one slot, priced by how many people come: 1, 2 or 3. The credit an item grants
+    // is good only for a rental of exactly that size (owner: "the payment types
+    // cannot be mixed"). Null on every non-rental item.
+    partySize: integer("party_size"),
     // PROMOTIONAL SHELF (2026-09-13). A "buy one get one" package sits on its own
     // tab in the buy screen rather than inside its format's tab: it is a different
     // KIND of offer, and burying it among the ordinary packs was the owner's
@@ -445,6 +453,8 @@ export const charges = pgTable("charges", {
   validityAmount: integer("validity_amount"),
   validityUnit: text("validity_unit"), // 'day' | 'month'
   category: packageCategory("category"),
+  // PARTY-SIZE snapshot (2026-09-29): the rental size bought, frozen at checkout.
+  partySize: integer("party_size"),
   // EXPIRES-ON snapshot (2026-09-17): the fixed end date the credits were sold
   // with, frozen for the same reason as the hours/validity beside it.
   expiresOn: text("expires_on"),
@@ -833,6 +843,10 @@ export const bookings = pgTable(
     packageId: uuid("package_id")
       .notNull()
       .references(() => packages.id),
+    // How many people a RENTAL booking is for (2026-09-29): it holds the whole
+    // studio for the slot and debited a rental credit of exactly this size. Null on
+    // every non-rental booking.
+    partySize: integer("party_size"),
     position: reformerPosition("position"),
     // Credits actually debited for this booking (1 group/rental · 2 private·duo·trio).
     // Whole integer credits. This is the exact amount a free cancellation refunds

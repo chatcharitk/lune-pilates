@@ -13,7 +13,7 @@
 // Gated on DATABASE_URL; fixtures share a per-run tag and are torn down in afterAll.
 
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { SessionUser } from "@/lib/auth/session";
 
 const sessionQueue: SessionUser[] = [];
@@ -74,6 +74,8 @@ describe.skipIf(!HAS_DB)("rental window + admin-only booking (integration · req
     label: string,
     category: PackageCategory,
     hoursLeft: number,
+    /** Studio rental head-count for a rental package (2026-09-29). */
+    partySize: number | null = category === "rental" ? 1 : null,
   ): Promise<{ user: SessionUser; packageId: string }> {
     const db = getDb();
     const houseNumber = `${run}-${label}`;
@@ -92,6 +94,7 @@ describe.skipIf(!HAS_DB)("rental window + admin-only booking (integration · req
         hoursLeft,
         expiresAt: future(720),
         ownerHouseholdId: h!.id,
+        partySize,
       })
       .returning({ id: packages.id });
     return {
@@ -209,20 +212,90 @@ describe.skipIf(!HAS_DB)("rental window + admin-only booking (integration · req
     expect(p!.hoursLeft).toBe(5); // no debit
 
     // The front desk bypasses the window.
-    const admin = await adminBookForCustomer({ classInstanceId: classId, userId: user.id });
+    const admin = await adminBookForCustomer({ classInstanceId: classId, userId: user.id, partySize: 1 });
     expect(admin.ok).toBe(true);
   });
 
   it("customer books a rental whose window is OPEN (48h out) and it debits the rental pool", async () => {
     const { user, packageId } = await makeMember("rent-open", "rental", 5);
-    const classId = await insertClass("rental", future(300), 60, 3);
+    const classId = await insertClass("rental", future(300), 60, 1);
 
     enqueueSession(user);
-    const res = await bookClass({ bookingTermsVersionId: await bookingTermsId(), classInstanceId: classId });
+    const res = await bookClass({
+      bookingTermsVersionId: await bookingTermsId(),
+      classInstanceId: classId,
+      partySize: 1,
+    });
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     const [p] = await getDb().select({ hoursLeft: packages.hoursLeft }).from(packages).where(eq(packages.id, packageId));
     expect(p!.hoursLeft).toBe(4); // rental cost = 1
+  });
+
+  // ───────────── Studio rental: the whole studio, priced by head-count (2026-09-29) ─────────────
+
+  it("a rental must say how many people it is for", async () => {
+    const { user } = await makeMember("rent-nosize", "rental", 5, 2);
+    const classId = await insertClass("rental", future(310), 60, 1);
+    enqueueSession(user);
+    const res = await bookClass({ bookingTermsVersionId: await bookingTermsId(), classInstanceId: classId });
+    expect(res).toEqual({ ok: false, code: "PARTY_SIZE_REQUIRED" });
+  });
+
+  it("a rental credit of one size cannot hire the studio for another — sizes never mix", async () => {
+    // Holds only 2-person credit; asks for a 3-person rental.
+    const { user, packageId } = await makeMember("rent-wrongsize", "rental", 5, 2);
+    const classId = await insertClass("rental", future(320), 60, 1);
+    enqueueSession(user);
+    const res = await bookClass({
+      bookingTermsVersionId: await bookingTermsId(),
+      classInstanceId: classId,
+      partySize: 3,
+    });
+    expect(res.ok).toBe(false);
+    // Selection finds no 3-person credit at all, which is the honest answer here.
+    if (!res.ok) expect(["NO_USABLE_PACKAGE", "WRONG_PARTY_SIZE"]).toContain(res.code);
+    const [p] = await getDb().select({ hoursLeft: packages.hoursLeft }).from(packages).where(eq(packages.id, packageId));
+    expect(p!.hoursLeft).toBe(5); // nothing debited
+  });
+
+  it("the matching size hires the WHOLE studio: the slot is full after one booking", async () => {
+    const { user, packageId } = await makeMember("rent-exact", "rental", 5, 2);
+    const other = await makeMember("rent-exact-2", "rental", 5, 2);
+    const classId = await insertClass("rental", future(330), 60, 1);
+
+    enqueueSession(user);
+    const first = await bookClass({
+      bookingTermsVersionId: await bookingTermsId(),
+      classInstanceId: classId,
+      partySize: 2,
+    });
+    expect(first.ok).toBe(true);
+    const [p] = await getDb().select({ hoursLeft: packages.hoursLeft }).from(packages).where(eq(packages.id, packageId));
+    expect(p!.hoursLeft).toBe(4); // one 2-person credit
+
+    const [bk] = await getDb()
+      .select({ partySize: bookings.partySize })
+      .from(bookings)
+      .where(and(eq(bookings.classInstanceId, classId), eq(bookings.status, "booked")));
+    expect(bk!.partySize).toBe(2);
+
+    // Nobody else can take a seat in a hired studio.
+    enqueueSession(other.user);
+    const second = await bookClass({
+      bookingTermsVersionId: await bookingTermsId(),
+      classInstanceId: classId,
+      partySize: 2,
+    });
+    expect(second).toEqual({ ok: false, code: "CLASS_FULL" });
+  });
+
+  it("a hired studio slot offers no waitlist", async () => {
+    const { user } = await makeMember("rent-wl", "rental", 5, 1);
+    const classId = await insertClass("rental", future(340), 60, 1);
+    enqueueSession(user);
+    const res = await joinWaitlist({ classInstanceId: classId });
+    expect(res).toEqual({ ok: false, code: "RENTAL_NO_WAITLIST" });
   });
 
   // ───────────── CHANGE 2c: room exclusivity ─────────────
@@ -320,7 +393,11 @@ describe.skipIf(!HAS_DB)("rental window + admin-only booking (integration · req
     await insertClass("group", future(500.25), 60, 3); // 15 min into the rental
 
     enqueueSession(user);
-    const res = await bookClass({ bookingTermsVersionId: await bookingTermsId(), classInstanceId: rentalId });
+    const res = await bookClass({
+      bookingTermsVersionId: await bookingTermsId(),
+      classInstanceId: rentalId,
+      partySize: 1,
+    });
     expect(res).toEqual({ ok: false, code: "ROOM_CONFLICT" });
   });
 });

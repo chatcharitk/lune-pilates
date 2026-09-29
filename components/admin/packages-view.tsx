@@ -114,6 +114,8 @@ function createErrorKey(code: CreateCatalogItemFailureCode): StrKey {
       return "err_cat_expiry_past";
     case "BAD_DATE_ORDER":
       return "err_cat_date_order";
+    case "PARTY_SIZE_REQUIRED":
+      return "err_party_size_required";
     case "MOCK_NO_DB":
       return "err_cat_mock_no_db";
     default:
@@ -133,6 +135,8 @@ function updateErrorKey(code: UpdateCatalogItemFailureCode): StrKey {
       return "err_cat_expiry_past";
     case "BAD_DATE_ORDER":
       return "err_cat_date_order";
+    case "PARTY_SIZE_REQUIRED":
+      return "err_party_size_required";
     case "MOCK_NO_DB":
       return "err_cat_mock_no_db";
     default:
@@ -542,6 +546,8 @@ function ItemFormDrawer({
   // Promotional shelf + per-customer cap (2026-09-13).
   const [promoShelf, setPromoShelf] = useState(false);
   const [maxPerCustomer, setMaxPerCustomer] = useState("0");
+  // Studio rental head-count (2026-09-29): what a rental credit from this item hires.
+  const [partySize, setPartySize] = useState<string>("1");
   // Sale window + a fixed expiry day (2026-09-17). Empty = unbounded / use validity.
   const [saleStartsOn, setSaleStartsOn] = useState("");
   const [saleEndsOn, setSaleEndsOn] = useState("");
@@ -567,6 +573,7 @@ function ItemFormDrawer({
     setClassDays(item?.classDays ?? []);
     setPromoShelf(item?.promoShelf ?? false);
     setMaxPerCustomer(String(item?.maxPerCustomer ?? 0));
+    setPartySize(String(item?.partySize ?? 1));
     setSaleStartsOn(item?.saleStartsOn ?? "");
     setSaleEndsOn(item?.saleEndsOn ?? "");
     setExpiresOn(item?.expiresOn ?? "");
@@ -629,6 +636,7 @@ function ItemFormDrawer({
       firstPurchaseOnly,
       promoShelf,
       maxPerCustomer: Math.max(0, Number.parseInt(maxPerCustomer, 10) || 0),
+      partySize: category === "rental" ? Number.parseInt(partySize, 10) : null,
       saleStartsOn,
       saleEndsOn,
       expiresOn,
@@ -907,6 +915,25 @@ function ItemFormDrawer({
           </span>
         </span>
       </label>
+
+      {/* STUDIO RENTAL head-count. A rental credit hires the whole studio for exactly
+          this many people and cannot be used for any other size, so a rental package
+          must say which. */}
+      {category === "rental" && (
+        <Field label={t("cat_party_size")} hint={t("cat_party_size_hint")}>
+          {(id) => (
+            <Select
+              id={id}
+              value={partySize}
+              onChange={setPartySize}
+              options={[1, 2, 3].map((n) => ({
+                value: String(n),
+                label: n === 1 ? t("party_size_one") : t("party_size_n").replace("{n}", String(n)),
+              }))}
+            />
+          )}
+        </Field>
+      )}
 
       {/* WHEN IT IS ON SALE, and a fixed end date for what it grants. Both empty on
           an ordinary package: it sells until archived, and its credits run the

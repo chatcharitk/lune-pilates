@@ -254,6 +254,7 @@ async function sellForCash(params: {
       category: charges.category,
       classDays: charges.classDays,
       expiresOn: charges.expiresOn,
+      partySize: charges.partySize,
     })
     .from(charges)
     .where(eq(charges.chargeId, chargeId))

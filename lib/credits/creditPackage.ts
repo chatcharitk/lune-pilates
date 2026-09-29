@@ -342,6 +342,8 @@ export async function creditPackage(params: {
             // an event is an event bundle throughout, and `item` here is already the
             // charge's frozen snapshot (itemForCredit), not today's catalog.
             classDays: item.classDays ?? null,
+            // A rental credit hires the studio for exactly this many people (2026-09-29).
+            partySize: item.partySize ?? null,
           })
           .returning({ id: packages.id, hoursLeft: packages.hoursLeft });
 

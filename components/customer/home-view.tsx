@@ -50,6 +50,8 @@ export interface HomeViewProps {
     eventCredits: { days: string[]; classes: number }[];
     /** Bonus classes waiting for their first class to be taken. */
     pendingClasses: number;
+    /** Studio rental only: the head-count these credits hire the studio for. */
+    partySize: number | null;
   }[];
   /** true when these balances are the shared household pool rather than personal. */
   isHouseholdPool: boolean;
@@ -172,7 +174,7 @@ export function HomeView({
               const expiry = expiryLabelFor(b.nearestExpiryIso);
               return (
                 <li
-                  key={b.category}
+                  key={`${b.category}:${b.partySize ?? ""}`}
                   className={`flex items-baseline justify-between gap-3 py-2.5 ${
                     i > 0 ? "border-t border-line" : "pt-0"
                   }`}
@@ -180,6 +182,13 @@ export function HomeView({
                   <span className="min-w-0">
                     <span className="block font-head text-[15px] font-semibold leading-tight text-ink">
                       {t(CATEGORY_KEY[b.category])}
+                      {/* Rental credits come in three sizes that never mix — say which. */}
+                      {b.partySize !== null &&
+                        ` · ${
+                          b.partySize === 1
+                            ? t("party_size_one")
+                            : t("party_size_n").replace("{n}", String(b.partySize))
+                        }`}
                     </span>
                     {expiry && (
                       <span className="mt-0.5 block font-body text-[11.5px] leading-tight text-muted">

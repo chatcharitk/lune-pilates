@@ -1185,6 +1185,30 @@ export const STR = {
   },
   // ───────── admin: promo codes ─────────
   // The studio's booking rules, shown when booking (2026-09-27).
+  // Studio rental head-count (2026-09-29).
+  party_size_n: { en: "{n} people", th: "{n} คน" },
+  party_size_one: { en: "1 person", th: "1 คน" },
+  rental_capacity: { en: "Up to {n} people", th: "สูงสุด {n} คน" },
+  rental_whole_studio: { en: "Whole studio", th: "เหมาทั้งสตู" },
+  rental_party_title: { en: "How many people?", th: "มากี่คน" },
+  rental_party_hint: {
+    en: "The whole studio is yours for this slot. Use a rental credit of the same size.",
+    th: "เหมาทั้งสตูดิโอในช่วงเวลานี้ ใช้เครดิตเช่าตามจำนวนคนที่มา",
+  },
+  rental_party_have: { en: "{n} left", th: "เหลือ {n}" },
+  rental_party_none: { en: "No credit", th: "ไม่มีเครดิต" },
+  err_party_size_required: {
+    en: "Choose how many people the studio is for.",
+    th: "กรุณาเลือกจำนวนคน",
+  },
+  err_wrong_party_size: {
+    en: "That rental credit is for a different number of people. Each size can only be used for itself.",
+    th: "เครดิตเช่านี้เป็นของจำนวนคนอื่น แต่ละขนาดใช้ได้เฉพาะขนาดนั้น",
+  },
+  err_rental_no_waitlist: {
+    en: "This studio slot is already hired. Please choose another time.",
+    th: "ช่วงเวลานี้มีผู้เช่าสตูแล้ว กรุณาเลือกเวลาอื่น",
+  },
   book_another_seat: { en: "Book another seat", th: "จองเพิ่มอีกที่" },
   booking_terms_title: { en: "Before you book", th: "ข้อกำหนดและเงื่อนไข" },
   booking_terms_intro: {
@@ -1384,6 +1408,11 @@ export const STR = {
   cat_promo: { en: "Promotions", th: "โปรโมชั่น" },
   buy_class_days: { en: "Only for classes on", th: "ใช้ได้เฉพาะคลาสวันที่" },
   // Event days on a package (2026-09-12).
+  cat_party_size: { en: "Number of people", th: "จำนวนคน" },
+  cat_party_size_hint: {
+    en: "A studio rental is the whole studio for one slot. This package's credit can only hire it for exactly this many people.",
+    th: "เช่าสตูคือเหมาทั้งสตูใน 1 ช่วงเวลา เครดิตจากแพ็กนี้ใช้เช่าได้เฉพาะจำนวนคนนี้เท่านั้น",
+  },
   cat_sale_starts: { en: "On sale from", th: "เริ่มขายวันที่" },
   cat_sale_ends: { en: "On sale until", th: "ขายถึงวันที่" },
   cat_sale_window_hint: {

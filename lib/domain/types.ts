@@ -22,6 +22,10 @@ export type ClassType = "group" | "private" | "duo" | "trio" | "rental";
 export type ClassLevel = "basic" | "intermediate" | "advance";
 
 /** Display order, easiest first — the picker and any legend follow it. */
+/** Head-counts a studio rental can be hired for (2026-09-29). */
+export type RentalPartySize = 1 | 2 | 3;
+export const RENTAL_PARTY_SIZES: readonly RentalPartySize[] = [1, 2, 3] as const;
+
 export const CLASS_LEVELS: readonly ClassLevel[] = ["basic", "intermediate", "advance"] as const;
 export type ClassStatus = "draft" | "published" | "cancelled";
 export type BookingStatus = "booked" | "cancelled";
@@ -51,7 +55,9 @@ export const CAPACITY: Record<ClassType, number> = {
   private: 1,
   duo: 2,
   trio: 3,
-  rental: 3,
+  // A rental is the WHOLE studio for the slot (2026-09-29): one booking fills it,
+  // and its size (1–3 people) rides on the booking, not on extra seats.
+  rental: 1,
 };
 
 /**
