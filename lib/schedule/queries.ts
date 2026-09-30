@@ -110,8 +110,8 @@ const TYPE_META: Record<ClassType, ClassTypeMeta> = {
   },
   duo: {
     type: "duo",
-    label: { en: "Duo", th: "ดูโอ (คู่)" },
-    short: { en: "Duo", th: "คู่" },
+    label: { en: "Duo 2:1", th: "ดูโอ 2:1" },
+    short: { en: "Duo", th: "ดูโอ" },
     blurb: {
       en: "Train side by side with a partner — shared focus, personal attention.",
       th: "ฝึกเคียงข้างคู่ของคุณ ใส่ใจเป็นรายบุคคล",
@@ -119,8 +119,8 @@ const TYPE_META: Record<ClassType, ClassTypeMeta> = {
   },
   trio: {
     type: "trio",
-    label: { en: "Trio", th: "ทรีโอ (สาม)" },
-    short: { en: "Trio", th: "สาม" },
+    label: { en: "Trio 3:1", th: "ทรีโอ 3:1" },
+    short: { en: "Trio", th: "ทรีโอ" },
     blurb: {
       en: "A small group of three — the energy of a class with hands-on guidance.",
       th: "กลุ่มเล็กสามคน ได้พลังของคลาสพร้อมการดูแลใกล้ชิด",

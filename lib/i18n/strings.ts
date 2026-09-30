@@ -84,8 +84,8 @@ export const STR = {
   // class-type filter labels (mirror TYPES[*].short)
   type_group: { en: "Group", th: "กลุ่ม" },
   type_private: { en: "Private", th: "ส่วนตัว" },
-  type_duo: { en: "Duo", th: "คู่" },
-  type_trio: { en: "Trio", th: "สาม" },
+  type_duo: { en: "Duo", th: "ดูโอ" },
+  type_trio: { en: "Trio", th: "ทรีโอ" },
   type_rental: { en: "Studio rental", th: "เช่าสตู" },
 
   // detail
