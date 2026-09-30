@@ -77,13 +77,13 @@ export function VisibilityView({ windows }: { windows: VisibilityWindow[] }) {
   const { t } = useAdminLang();
   const router = useRouter();
   const [editing, setEditing] = useState<VisibilityWindow | null>(null);
-  const [toast, setToast] = useState<StrKey | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   const byType = new Map(windows.map((w) => [w.type, w]));
 
-  function flash(key: StrKey) {
-    setToast(key);
-    window.setTimeout(() => setToast(null), 3200);
+  function flash(message: string) {
+    setToast(message);
+    window.setTimeout(() => setToast(null), 3600);
   }
 
   return (
@@ -102,7 +102,7 @@ export function VisibilityView({ windows }: { windows: VisibilityWindow[] }) {
           role="status"
           className="mb-4 rounded-xl bg-sage/15 px-4 py-2.5 font-body text-[13px] font-semibold text-sage-deep"
         >
-          {t(toast)}
+          {toast}
         </div>
       )}
 
@@ -121,9 +121,15 @@ export function VisibilityView({ windows }: { windows: VisibilityWindow[] }) {
       <EditDrawer
         window={editing}
         onClose={() => setEditing(null)}
-        onSaved={() => {
+        onSaved={(restamped) => {
           setEditing(null);
-          flash("vis_saved_toast");
+          // Say how many timetable classes moved, so the owner can see the setting
+          // took effect on what is already scheduled — not only on future classes.
+          flash(
+            restamped > 0
+              ? t("vis_saved_restamped").replace("{n}", String(restamped))
+              : t("vis_saved_toast"),
+          );
           router.refresh();
         }}
       />
@@ -178,7 +184,8 @@ function EditDrawer({
 }: {
   window: VisibilityWindow | null;
   onClose: () => void;
-  onSaved: () => void;
+  /** Called with how many upcoming classes were re-stamped. */
+  onSaved: (restamped: number) => void;
 }) {
   const { t } = useAdminLang();
   const [pending, startTransition] = useTransition();
@@ -229,7 +236,7 @@ function EditDrawer({
         guestUnit,
       });
       if (res.ok) {
-        onSaved();
+        onSaved(res.restamped);
       } else {
         setErrorKey(updateErrorKey(res.code));
       }

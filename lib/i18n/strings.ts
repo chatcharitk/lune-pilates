@@ -1702,9 +1702,13 @@ export const STR = {
   vis_before_start: { en: "before the class starts", th: "ก่อนคลาสเริ่ม" },
   vis_save: { en: "Save", th: "บันทึก" },
   vis_saved_toast: { en: "Booking window updated", th: "อัปเดตช่วงเวลาเปิดจองแล้ว" },
+  vis_saved_restamped: {
+    en: "Booking window updated — {n} upcoming classes now follow it",
+    th: "อัปเดตช่วงเวลาเปิดจองแล้ว — ปรับคลาสที่จะมาถึง {n} คลาสตามการตั้งค่าใหม่",
+  },
   vis_no_retro_note: {
-    en: "Changes apply only to classes created from now on — already-scheduled classes keep the window they were created with.",
-    th: "การเปลี่ยนแปลงมีผลกับคลาสที่สร้างใหม่เท่านั้น — คลาสที่จัดตารางไว้แล้วยังคงใช้ช่วงเวลาเดิม",
+    en: "Saving applies to every upcoming class of that type straight away, including classes already on the timetable. Past classes and bookings already made are not affected.",
+    th: "เมื่อบันทึก จะมีผลกับคลาสที่จะมาถึงของประเภทนั้นทันที รวมถึงคลาสที่จัดตารางไว้แล้ว คลาสที่ผ่านไปแล้วและการจองที่ทำไว้แล้วไม่ได้รับผลกระทบ",
   },
   err_vis_forbidden: {
     en: "Only the studio owner can manage booking windows.",

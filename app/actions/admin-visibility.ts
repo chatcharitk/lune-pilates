@@ -20,19 +20,27 @@
 //   - amounts are positive whole integers, units are the closed day/week/month enum
 //     — never trust a client-supplied lead-hours number (CLAUDE.md §8).
 //
-// A class instance's `members_visible_at` / `public_visible_at` are stamped ONCE at
-// creation/generation time (app/actions/schedule.ts), not recomputed live — so an
-// edit here changes what gets stamped on NEWLY created/generated classes only, and
-// deliberately does NOT retroactively alter already-scheduled classes (mirrors how
-// charge-terms snapshots freeze a purchase's terms at charge-creation time).
+// A class instance's `members_visible_at` / `public_visible_at` are stamped at
+// creation/generation time (app/actions/schedule.ts). Saving a window here ALSO
+// re-stamps every FUTURE published class of that type (2026-09-30).
+//
+// It used to leave existing classes alone, on the analogy of charge-terms snapshots.
+// The analogy did not hold: a charge snapshot protects an agreement a customer PAID
+// for, whereas a visibility window is the owner's shop setting, and nobody is harmed
+// by it taking effect. Leaving classes on their old stamp meant the owner widened
+// group visibility to a month and customers still saw an empty week, because every
+// class already on the timetable kept its one-week stamp. Past and cancelled classes
+// are untouched; bookings already made are never affected by visibility at all.
 
-import { eq } from "drizzle-orm";
+import { and, eq, gt } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getDb } from "@/lib/db/client";
-import { visibilityWindows } from "@/lib/db/schema";
+import { classInstances, visibilityWindows } from "@/lib/db/schema";
+import { computeVisibleAt } from "@/lib/schedule/visibility";
 import type { ClassType } from "@/lib/domain/types";
 import {
+  leadHoursFor,
   loadVisibilityWindows,
   type VisibilityUnit,
   type VisibilityWindow,
@@ -73,7 +81,7 @@ export type ListVisibilityWindowsResult =
 
 export type UpdateVisibilityWindowFailureCode = "UNAUTHORIZED" | "INVALID_INPUT" | MockNoDbCode;
 export type UpdateVisibilityWindowResult =
-  | { ok: true; window: VisibilityWindow }
+  | { ok: true; window: VisibilityWindow; /** Future classes of this type re-stamped with the new window. */ restamped: number }
   | { ok: false; code: UpdateVisibilityWindowFailureCode };
 
 // Stable display order (matches CLASS_TYPE / CAPACITY ordering elsewhere in the app).
@@ -103,9 +111,9 @@ export async function listVisibilityWindows(): Promise<ListVisibilityWindowsResu
  * on `type` (the table's PK — exactly one row per class type, so there is no
  * separate create/delete: every type always resolves to SOME window, real or seed).
  *
- * Deliberately does NOT touch any existing `class_instances` row — see the file
- * doc comment. Only classes created/generated AFTER this call pick up the new
- * lead times (app/actions/schedule.ts resolves them fresh on every create/generate).
+ * Then re-stamps every FUTURE published class of this type with the new lead times,
+ * so the setting takes effect on the timetable the owner is looking at, not only on
+ * classes created later — see the file doc comment.
  */
 export async function updateVisibilityWindow(
   raw: UpdateVisibilityWindowInput,
@@ -121,7 +129,8 @@ export async function updateVisibilityWindow(
   if (mockDataMode()) return { ok: false, code: "MOCK_NO_DB" };
 
   const db = getDb();
-  await db
+  const restamped = await db.transaction(async (tx) => {
+  await tx
     .insert(visibilityWindows)
     .values({
       type: input.type,
@@ -141,10 +150,37 @@ export async function updateVisibilityWindow(
       },
     });
 
+    // Re-stamp the classes still to come, in the same transaction as the setting,
+    // so the timetable and the setting can never disagree.
+    const memberLeadHours = leadHoursFor(input.memberAmount, input.memberUnit as VisibilityUnit);
+    const guestLeadHours = leadHoursFor(input.guestAmount, input.guestUnit as VisibilityUnit);
+    const upcoming = await tx
+      .select({ id: classInstances.id, startsAt: classInstances.startsAt })
+      .from(classInstances)
+      .where(
+        and(
+          eq(classInstances.type, input.type),
+          eq(classInstances.status, "published"),
+          gt(classInstances.startsAt, new Date()),
+        ),
+      );
+    for (const c of upcoming) {
+      await tx
+        .update(classInstances)
+        .set({
+          membersVisibleAt: computeVisibleAt(c.startsAt, memberLeadHours),
+          publicVisibleAt: computeVisibleAt(c.startsAt, guestLeadHours),
+        })
+        .where(eq(classInstances.id, c.id));
+    }
+    return upcoming.length;
+  });
+
   revalidateVisibilitySettings();
 
   return {
     ok: true,
+    restamped,
     window: {
       type: input.type,
       memberAmount: input.memberAmount,
