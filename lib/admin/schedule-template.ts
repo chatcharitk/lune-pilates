@@ -42,6 +42,8 @@ export interface TemplateSlot {
   name: string | null;
   /** Difficulty stamped onto every class this slot generates; null = unstated. */
   level: ClassLevel | null;
+  /** "About this class" text, read live by every class of this slot; null = the type's. */
+  description: string | null;
   durationMin: number;
   capacity: number;
   instructorId: string | null;
@@ -86,6 +88,7 @@ export async function getScheduleTemplate(): Promise<TemplateSlot[]> {
       type: classTemplates.type,
       name: classTemplates.name,
       level: classTemplates.level,
+      description: classTemplates.description,
       durationMin: classTemplates.durationMin,
       capacity: classTemplates.capacity,
       instructorId: classTemplates.instructorId,
@@ -106,6 +109,7 @@ export async function getScheduleTemplate(): Promise<TemplateSlot[]> {
     typeMeta: metaFor(r.type),
     name: r.name,
     level: r.level,
+    description: r.description,
     durationMin: r.durationMin,
     capacity: effectiveCapacity(r.capacity, r.type),
     instructorId: r.instructorId,
@@ -189,6 +193,7 @@ function mockTemplateSlot(slot: BaselineSlot, i: number): TemplateSlot {
     typeMeta: metaFor(slot.type),
     name: null,
     level: null,
+    description: null,
     durationMin: slot.durationMin,
     capacity: slot.capacity,
     instructorId: null,

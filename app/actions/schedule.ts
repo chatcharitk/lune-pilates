@@ -54,6 +54,12 @@ function levelOrNull(level: string | undefined): "basic" | "intermediate" | "adv
   return level === "basic" || level === "intermediate" || level === "advance" ? level : null;
 }
 
+/**
+ * The owner's own "about this class" text. Optional; blank → null, and the customer
+ * then sees the type's built-in sentence instead.
+ */
+const CLASS_DESCRIPTION = z.string().trim().max(500).nullable().optional();
+
 /** ISO day of week (1=Mon … 7=Sun) of an instant, in Bangkok (studio) time. */
 function isoDow(date: Date): number {
   return studioIsoDow(date);
@@ -76,6 +82,7 @@ const createInput = z.object({
   // Optional custom class name; blank → null (the type label is shown).
   name: z.string().trim().max(60).nullable().optional(),
   level: CLASS_LEVEL,
+  description: CLASS_DESCRIPTION,
 });
 export type CreateClassInput = z.infer<typeof createInput>;
 
@@ -138,6 +145,7 @@ export async function createClass(raw: CreateClassInput): Promise<CreateClassRes
       type: input.type,
       name: input.name?.trim() || null,
       level: levelOrNull(input.level),
+      description: input.description?.trim() || null,
       capacity: effectiveCapacity(input.capacity, input.type),
       instructorId,
       status: "published",
@@ -167,6 +175,7 @@ const updateInput = z.object({
   // Optional custom class name; blank → null (the type label is shown).
   name: z.string().trim().max(60).nullable().optional(),
   level: CLASS_LEVEL,
+  description: CLASS_DESCRIPTION,
 });
 export type UpdateClassInput = z.infer<typeof updateInput>;
 
@@ -237,6 +246,7 @@ export async function updateClass(raw: UpdateClassInput): Promise<UpdateClassRes
       type: input.type,
       name: input.name?.trim() || null,
       level: levelOrNull(input.level),
+      description: input.description?.trim() || null,
       capacity: cap,
       instructorId,
       ...(existing.status === "published"
@@ -634,6 +644,7 @@ const createTemplateInput = z.object({
   instructorId: z.string().min(1).nullable().optional(),
   name: z.string().trim().max(60).nullable().optional(),
   level: CLASS_LEVEL,
+  description: CLASS_DESCRIPTION,
 });
 export type CreateTemplateSlotInput = z.infer<typeof createTemplateInput>;
 
@@ -674,6 +685,7 @@ export async function createTemplateSlot(
       type: input.type,
       name: input.name?.trim() || null,
       level: levelOrNull(input.level),
+      description: input.description?.trim() || null,
       durationMin: input.durationMin,
       capacity: effectiveCapacity(input.capacity, input.type),
       instructorId,
@@ -694,6 +706,7 @@ const updateTemplateInput = z.object({
   instructorId: z.string().min(1).nullable().optional(),
   name: z.string().trim().max(60).nullable().optional(),
   level: CLASS_LEVEL,
+  description: CLASS_DESCRIPTION,
 });
 export type UpdateTemplateSlotInput = z.infer<typeof updateTemplateInput>;
 
@@ -731,6 +744,7 @@ export async function updateTemplateSlot(
       type: input.type,
       name: input.name?.trim() || null,
       level: levelOrNull(input.level),
+      description: input.description?.trim() || null,
       durationMin: input.durationMin,
       capacity: effectiveCapacity(input.capacity, input.type),
       instructorId,

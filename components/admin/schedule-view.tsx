@@ -370,6 +370,8 @@ function ClassEditor({
   const [name, setName] = useState<string>(c?.name ?? "");
   // "" = not stated, which is how a class with no level is stored and shown.
   const [level, setLevel] = useState<string>(c?.level ?? "");
+  // This class's own text only; blank = the weekly slot's (or the type's) is shown.
+  const [description, setDescription] = useState<string>(c?.description ?? "");
   const [time, setTime] = useState<string>(c?.time ?? "07:00");
   const [durationMin, setDurationMin] = useState<number>(c?.durationMin ?? 60);
   const [instructorId, setInstructorId] = useState<string | null>(c?.instructorId ?? null);
@@ -398,6 +400,7 @@ function ClassEditor({
             instructorId,
             name: name.trim() || null,
             level: level as "" | ClassLevel,
+            description: description.trim() || null,
           })
         : await updateClass({
             id: c!.id,
@@ -408,6 +411,7 @@ function ClassEditor({
             instructorId,
             name: name.trim() || null,
             level: level as "" | ClassLevel,
+            description: description.trim() || null,
           });
       if (res.ok) onSaved();
       else setErrorKey(FAILURE_STR[res.code] ?? "err_generic");
@@ -513,6 +517,19 @@ function ClassEditor({
             { value: "", label: t("level_none") },
             ...CLASS_LEVELS.map((l) => ({ value: l, label: t(LEVEL_KEY[l]) })),
           ]}
+        />
+      </Field>
+
+      {/* "About this class" as the customer reads it on the class page. Left blank,
+          the weekly slot's text shows (or the class type's built-in sentence). */}
+      <Field label={t("class_desc_label")} hint={t("class_desc_hint_week")}>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder={t("class_desc_ph")}
+          maxLength={500}
+          rows={3}
+          className="w-full resize-y rounded-xl border border-line-strong bg-surface-2 px-3.5 py-2.5 font-body text-sm leading-relaxed text-ink placeholder:text-muted"
         />
       </Field>
 

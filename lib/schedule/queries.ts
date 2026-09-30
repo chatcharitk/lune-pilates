@@ -12,7 +12,7 @@
 
 import { and, asc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
-import { bookings, classInstances, instructors } from "@/lib/db/schema";
+import { bookings, classInstances, classTemplates, instructors } from "@/lib/db/schema";
 import type { Bilingual } from "@/lib/i18n";
 import type { ClassLevel, ClassType, ReformerPosition } from "@/lib/domain/types";
 import { CAPACITY, effectiveCapacity } from "@/lib/domain/types";
@@ -78,6 +78,11 @@ export interface PositionAvailability {
 /** A single class with full booking-detail context. */
 export interface ClassDetail extends BookableClass {
   positions: PositionAvailability[];
+  /**
+   * The owner's "about this class" text (2026-09-30): the class's own, else its
+   * template's. Null → show the class type's built-in description.
+   */
+  description: string | null;
 }
 
 // ───────────────────────── display catalog (bilingual) ─────────────────────────
@@ -368,6 +373,8 @@ export async function getClassDetail(
         durationMin: classInstances.durationMin,
         type: classInstances.type,
         name: classInstances.name,
+        classDescription: classInstances.description,
+        templateDescription: classTemplates.description,
       level: classInstances.level,
         capacity: classInstances.capacity,
         status: classInstances.status,
@@ -380,6 +387,9 @@ export async function getClassDetail(
       })
       .from(classInstances)
       .leftJoin(instructors, eq(classInstances.instructorId, instructors.id))
+      // The template's text is read LIVE, so editing a weekly slot's description
+      // updates every class already generated from it.
+      .leftJoin(classTemplates, eq(classInstances.templateId, classTemplates.id))
       .where(eq(classInstances.id, classInstanceId))
       .limit(1),
     db
@@ -418,6 +428,8 @@ export async function getClassDetail(
     type: cls.type,
     typeMeta: metaFor(cls.type),
     level: cls.level,
+    // Blank text counts as none, so clearing the field falls back cleanly.
+    description: cls.classDescription?.trim() || cls.templateDescription?.trim() || null,
     name: cls.name ?? null,
     instructor: instructorMetaFor(
       cls.instructorId,
@@ -552,7 +564,7 @@ function mockGetClassDetail(
     position,
     taken: i < base.booked,
   }));
-  return { ...base, positions };
+  return { ...base, positions, description: null };
 }
 
 /** Bangkok Monday 00:00 of the current week, used to anchor mock detail dates. */

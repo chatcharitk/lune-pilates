@@ -801,6 +801,13 @@ export const classTemplates = pgTable("class_templates", {
   instructorId: text("instructor_id").references(() => instructors.id),
   /** Difficulty, copied onto every class this slot generates. Null = unstated. */
   level: classLevel("level"),
+  /**
+   * The owner's "about this class" text for every class generated from this slot
+   * (2026-09-30). Read LIVE through template_id rather than copied, so editing it
+   * updates the classes already on the timetable too — it is display text, not a
+   * term anyone agreed to. Null → the class type's built-in description.
+   */
+  description: text("description"),
   active: boolean("active").notNull().default(true),
 });
 
@@ -821,6 +828,11 @@ export const classInstances = pgTable("class_instances", {
    * unstated, and then nothing is shown — a missing level must not read as "basic".
    */
   level: classLevel("level"),
+  /**
+   * This one class's own "about this class" text (2026-09-30), overriding its
+   * template's. Null → the template's text, then the class type's built-in one.
+   */
+  description: text("description"),
   status: classStatus("status").notNull().default("draft"),
   publishedAt: timestamp("published_at", { withTimezone: true }),
   // computed on publish; members see at publishedAt, guests at publicVisibleAt

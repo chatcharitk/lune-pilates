@@ -182,8 +182,10 @@ export function ClassDetailView({
           <h2 className="mb-2 font-body text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
             {t("about_class")}
           </h2>
-          <p className="m-0 font-body text-[14.5px] leading-[1.62] text-ink-soft">
-            {tt(detail.typeMeta.blurb)}
+          <p className="m-0 font-body text-[14.5px] leading-[1.62] whitespace-pre-line text-ink-soft">
+            {/* The owner's own text for this class (or its weekly slot); the type's
+                built-in sentence only when the owner has written none. */}
+            {detail.description ?? tt(detail.typeMeta.blurb)}
           </p>
         </div>
 

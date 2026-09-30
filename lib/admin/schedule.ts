@@ -50,6 +50,8 @@ export interface AdminScheduleClass {
   name: string | null;
   /** Difficulty shown to customers; null = unstated (nothing is shown). */
   level: ClassLevel | null;
+  /** This class's own "about" text; null → the weekly slot's text (or the type's). */
+  description: string | null;
   instructorId: string | null;
   instructor: InstructorMeta | null;
   capacity: number;
@@ -146,6 +148,7 @@ function shape(row: {
   type: ClassType;
   name: string | null;
   level: ClassLevel | null;
+  description: string | null;
   capacity: number;
   status: ClassStatus;
   instructorId: string | null;
@@ -163,6 +166,7 @@ function shape(row: {
     typeMeta: metaFor(row.type),
     name: row.name,
     level: row.level,
+    description: row.description,
     instructorId: row.instructorId,
     instructor: instructorMetaFor(
       row.instructorId,
@@ -250,6 +254,7 @@ export async function getWeekSchedule(
       type: classInstances.type,
       name: classInstances.name,
       level: classInstances.level,
+      description: classInstances.description,
       capacity: classInstances.capacity,
       status: classInstances.status,
       instructorId: classInstances.instructorId,
@@ -315,6 +320,7 @@ function mockWeekSchedule(weekStart: Date): AdminWeekSchedule {
         startsAt: startsAt.toISOString(),
         time: slot.time,
         level: null,
+        description: null,
         durationMin: slot.durationMin,
         type: "group",
         typeMeta: metaFor("group"),
@@ -336,6 +342,7 @@ function mockWeekSchedule(weekStart: Date): AdminWeekSchedule {
       startsAt: startsAt.toISOString(),
       time: a.time,
       level: null,
+      description: null,
       durationMin: a.type === "group" ? 60 : 50,
       type: a.type,
       typeMeta: metaFor(a.type),

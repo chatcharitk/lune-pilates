@@ -272,6 +272,8 @@ function SlotFormDrawer({
   const [name, setName] = useState<string>("");
   // "" = not stated. A level set here rides onto every class this slot generates.
   const [level, setLevel] = useState<string>("");
+  // Read live by every class of this slot, so an edit reaches weeks already generated.
+  const [description, setDescription] = useState<string>("");
   const [time, setTime] = useState<string>("07:00");
   const [durationMin, setDurationMin] = useState<number>(60);
   const [capacity, setCapacity] = useState<number>(CAPACITY.group);
@@ -285,6 +287,7 @@ function SlotFormDrawer({
     setType(slot?.type ?? "group");
     setName(slot?.name ?? "");
     setLevel(slot?.level ?? "");
+    setDescription(slot?.description ?? "");
     setTime(slot?.time ?? "07:00");
     setDurationMin(slot?.durationMin ?? 60);
     setCapacity(slot?.capacity ?? CAPACITY.group);
@@ -313,6 +316,7 @@ function SlotFormDrawer({
             instructorId,
             name: name.trim() || null,
             level: level as "" | ClassLevel,
+            description: description.trim() || null,
           })
         : await createTemplateSlot({
             dayOfWeek,
@@ -323,6 +327,7 @@ function SlotFormDrawer({
             instructorId,
             name: name.trim() || null,
             level: level as "" | ClassLevel,
+            description: description.trim() || null,
           });
       if (res.ok) {
         onSaved(isEdit ? "toast_template_updated" : "toast_template_added");
@@ -429,6 +434,22 @@ function SlotFormDrawer({
             ...CLASS_LEVELS.map((l) => ({ value: l, label: t(LEVEL_KEY[l]) })),
           ]}
         />
+      </Field>
+
+      {/* "About this class" for every week of this slot — including weeks already on
+          the timetable, since classes read it through their template. */}
+      <Field label={t("class_desc_label")}>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder={t("class_desc_ph")}
+          maxLength={500}
+          rows={3}
+          className="w-full resize-y rounded-xl border border-line-strong bg-surface-2 px-3.5 py-2.5 font-body text-sm leading-relaxed text-ink placeholder:text-muted"
+        />
+        <p className="mt-1.5 font-body text-[11.5px] leading-snug text-muted">
+          {t("class_desc_hint_template")}
+        </p>
       </Field>
 
       <div className="grid grid-cols-2 gap-3.5">

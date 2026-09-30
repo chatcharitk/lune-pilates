@@ -1248,6 +1248,19 @@ export const STR = {
   level_advance: { en: "Advance", th: "ระดับสูง" },
   level_label: { en: "Level", th: "ระดับ" },
   level_none: { en: "Not stated", th: "ไม่ระบุ" },
+  class_desc_label: { en: "About this class (optional)", th: "เกี่ยวกับคลาสนี้ (เลือกได้)" },
+  class_desc_ph: {
+    en: "What customers read on the class page",
+    th: "ข้อความที่ลูกค้าจะเห็นในหน้ารายละเอียดคลาส",
+  },
+  class_desc_hint_week: {
+    en: "For this class only. Leave blank to use the weekly template's text.",
+    th: "ใช้เฉพาะคลาสนี้ ถ้าเว้นว่างจะใช้ข้อความจากตารางประจำสัปดาห์",
+  },
+  class_desc_hint_template: {
+    en: "Shown on every class of this slot, including weeks already on the timetable. Leave blank for the standard text.",
+    th: "แสดงในทุกคลาสของช่วงเวลานี้ รวมถึงสัปดาห์ที่สร้างไว้แล้ว ถ้าเว้นว่างจะใช้ข้อความมาตรฐาน",
+  },
   level_hint: {
     en: "Shown to customers when they pick this class. Leave unstated and nothing is shown.",
     th: "แสดงให้ลูกค้าเห็นตอนเลือกคลาส ถ้าไม่ระบุจะไม่แสดงอะไร",
