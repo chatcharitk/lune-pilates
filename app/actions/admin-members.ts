@@ -25,7 +25,7 @@ import { and, eq, gt, inArray, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getDb } from "@/lib/db/client";
-import { bookings, classInstances, households, users, waitlist } from "@/lib/db/schema";
+import { bookings, classInstances, households, packages, users, waitlist } from "@/lib/db/schema";
 import type { UserTier } from "@/lib/domain/types";
 import { cancelBooking } from "@/lib/credits/debit";
 import { normalizeThaiPhone } from "@/lib/util/phone";
@@ -250,20 +250,22 @@ export type UpdateCustomerResult = { ok: true } | { ok: false; code: UpdateCusto
  * with a pre-check and by catching the unique-violation on write. No-DB dev path
  * echoes success so the drawer works on mock data.
  *
- * WHAT CHANGING TIER / HOUSE DOES **NOT** DO — deliberately. Only the user row moves.
- * Existing PACKAGES keep the owner they were bought under:
+ * WHAT HAPPENS TO PACKAGES ALREADY BOUGHT:
  *
- *   - A guest's packages are owned by the USER (`owner_user_id`) and are
- *     non-transferable by construction (CLAUDE.md §5 invariant 3). Promoting them to
- *     member does NOT pour those classes into the household pool — the studio sold
- *     them as personal, and silently making them sharable would hand the rest of the
- *     house free classes.
+ *   - Guest → member (decided 2026-10-04, supersedes "guest classes stay personal").
+ *     The customer's own packages (`owner_user_id`) MOVE into the household they
+ *     join, in the same transaction. The studio's real flow is "log in through LINE
+ *     as a guest, buy, then get a house number" — and a member's balance reads only
+ *     the household pool, so leaving the packages personal stranded classes the
+ *     customer had paid for (they vanished from their balance entirely). Moving the
+ *     owner changes no ledger row: each package's ledger, and so its balance, is
+ *     untouched; only who may draw on it widens to the house.
  *   - A member's packages are owned by the HOUSEHOLD. Demoting them to guest, or
- *     moving them to another house, therefore LOSES them access to that pool — the
- *     classes stay with the house they were bought for.
+ *     moving them to another house, LOSES them access to that pool — the classes
+ *     stay with the house they were bought for. The admin UI warns before saving.
  *
- * Both directions are one-way-ish and visible to the customer immediately, so the
- * admin UI says so before saving rather than letting the owner discover it after.
+ * Invariant 3 still holds where it matters: a GUEST's package is never in a
+ * household. It only joins one once its owner is a member of that house.
  */
 export async function updateCustomer(raw: UpdateCustomerInput): Promise<UpdateCustomerResult> {
   if (!(await requireOwner())) return { ok: false, code: "UNAUTHORIZED" };
@@ -341,6 +343,15 @@ export async function updateCustomer(raw: UpdateCustomerInput): Promise<UpdateCu
           ...(householdId !== undefined ? { householdId } : {}),
         })
         .where(eq(users.id, userId));
+
+      // Now a member of a house: whatever they bought as a guest joins that pool
+      // (see the header). Without this the classes disappear from their balance.
+      if (tier === "member" && householdId) {
+        await tx
+          .update(packages)
+          .set({ ownerHouseholdId: householdId, ownerUserId: null })
+          .where(eq(packages.ownerUserId, userId));
+      }
     });
   } catch (err) {
     if (isUniquePhoneViolation(err)) return { ok: false, code: "PHONE_TAKEN" };

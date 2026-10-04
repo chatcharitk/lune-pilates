@@ -1574,8 +1574,8 @@ export const STR = {
   // Shown when the owner is about to change tier or house — the consequence is not
   // obvious and is immediately visible to the customer.
   edit_tier_warning: {
-    en: "Classes already bought do not move. A guest's classes stay personal, and a member's stay with their house — so changing this can cut someone off from a pool they were using.",
-    th: "คลาสที่ซื้อไปแล้วจะไม่ถูกย้าย คลาสของลูกค้าทั่วไปยังเป็นสิทธิ์ส่วนตัว และคลาสของสมาชิกยังผูกกับบ้านเดิม การเปลี่ยนค่านี้อาจทำให้บางคนใช้คลาสที่เคยใช้อยู่ไม่ได้",
+    en: "Making a guest a member moves the classes they already bought into that house. A member's classes stay with their house — so moving someone to another house, or back to guest, cuts them off from that pool.",
+    th: "เมื่อเปลี่ยนลูกค้าทั่วไปเป็นสมาชิก คลาสที่ซื้อไว้แล้วจะย้ายเข้าบ้านเลขที่นั้นด้วย ส่วนคลาสของสมาชิกจะผูกกับบ้านเดิม การย้ายบ้านหรือเปลี่ยนกลับเป็นลูกค้าทั่วไปจะทำให้ใช้คลาสของบ้านเดิมไม่ได้",
   },
   expiry_edit: { en: "Change expiry", th: "แก้ไขวันหมดอายุ" },
   expiry_label: { en: "Last day it can be used", th: "วันสุดท้ายที่ใช้ได้" },
