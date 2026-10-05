@@ -18,6 +18,7 @@ import type { Lang, StrKey } from "@/lib/i18n";
 // (Feature 4 nav decision: Dashboard + Instructors live behind "More"). Desktop
 // shows every item in the sidebar.
 const MOBILE_OVERFLOW: ReadonlySet<string> = new Set([
+  "/admin/households",
   "/admin/dashboard",
   "/admin/instructors",
   "/admin/sales",
@@ -103,6 +104,17 @@ const NAV: NavItem[] = [
       <>
         <circle cx="9" cy="8" r="3.5" />
         <path d="M3 20a6 6 0 0 1 12 0M16 11a3 3 0 0 0 0-6M21 20a6 6 0 0 0-5-5.9" />
+      </>
+    ),
+  },
+  {
+    href: "/admin/households",
+    key: "admin_households",
+    ownerOnly: true,
+    icon: (
+      <>
+        <rect x="4" y="3" width="16" height="18" rx="1.5" />
+        <path d="M10 21v-4h4v4M8 7h2M14 7h2M8 11h2M14 11h2" />
       </>
     ),
   },
