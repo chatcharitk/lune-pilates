@@ -1,6 +1,6 @@
 "use client";
 
-// Admin "Households" (2026-10-05): one card per house number — who is in it and
+// Admin "Households" (2026-10-05): one list row per house number — who is in it and
 // how many classes the house has left, by class type — and a drawer listing the
 // house's packages. Read-only: people are added to / moved between houses on the
 // Members page (updateCustomer), so this screen has one job, making the sharing
@@ -74,13 +74,23 @@ export function HouseholdsView({ households }: { households: AdminHousehold[] })
           {t("hh_none")}
         </p>
       ) : (
-        <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((h) => (
-            <li key={h.id}>
-              <HouseCard house={h} onOpen={() => setOpenId(h.id)} />
-            </li>
-          ))}
-        </ul>
+        <div className="overflow-hidden rounded-2xl border border-line bg-surface-2 shadow-soft">
+          <div
+            className={`${GRID} border-b border-line bg-surface px-[18px] py-3 font-body text-[11px] font-semibold uppercase tracking-[0.06em] text-muted`}
+          >
+            <span>{t("house_label")}</span>
+            <span className="hidden sm:block">{t("hh_members")}</span>
+            <span className="text-right sm:text-left">{t("hh_classes_left")}</span>
+            <span aria-hidden className="hidden sm:block" />
+          </div>
+          <ul>
+            {filtered.map((h) => (
+              <li key={h.id}>
+                <HouseRow house={h} onOpen={() => setOpenId(h.id)} />
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       <HouseDrawer house={open} onClose={() => setOpenId(null)} />
@@ -88,77 +98,74 @@ export function HouseholdsView({ households }: { households: AdminHousehold[] })
   );
 }
 
-// ───────────────────────── card ─────────────────────────
+// ───────────────────────── list row ─────────────────────────
 
-function HouseCard({ house, onOpen }: { house: AdminHousehold; onOpen: () => void }) {
+// House / Members / Classes left / chevron. On a phone the members move under the
+// house number and the chevron drops, mirroring the Members table.
+const GRID = "grid grid-cols-[1.2fr_1fr] sm:grid-cols-[0.8fr_1.4fr_1.4fr_28px] items-center gap-3";
+
+function HouseRow({ house, onOpen }: { house: AdminHousehold; onOpen: () => void }) {
   const { t, lang } = useAdminLang();
   const stranded = house.members.length === 0 && house.balance > 0;
+  const names = house.members.map((m) => m.name).join(", ");
+
+  const members =
+    house.members.length === 0 ? (
+      <Badge tone={stranded ? "rose" : "neutral"}>{t("hh_no_members_badge")}</Badge>
+    ) : (
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="flex shrink-0 -space-x-2">
+          {house.members.slice(0, 3).map((m) => (
+            <span key={m.id} className="rounded-full ring-2 ring-surface-2">
+              <Avatar name={m.name} seed={m.id} size={26} />
+            </span>
+          ))}
+        </span>
+        <span className="min-w-0 truncate font-body text-[13px] text-ink-soft">{names}</span>
+      </span>
+    );
 
   return (
     <button
       type="button"
       onClick={onOpen}
-      className={`flex h-full w-full flex-col gap-3.5 rounded-2xl border bg-surface-2 p-[18px] text-left shadow-soft transition-colors hover:bg-surface ${
-        stranded ? "border-rose/60" : "border-line"
+      className={`${GRID} w-full border-b border-line px-[18px] py-3 text-left transition-colors last:border-b-0 hover:bg-surface ${
+        stranded ? "bg-rose/10" : ""
       }`}
     >
-      {/* house number + balance */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-body text-[11px] font-semibold uppercase tracking-[0.06em] text-muted">
-            {t("house_label")}
-          </p>
-          <p className="truncate font-head text-xl font-semibold text-ink">{house.houseNumber}</p>
-        </div>
-        <div className="shrink-0 text-right">
-          <p className="font-head text-xl font-bold" style={{ color: house.expiringSoon ? "#a56a52" : "var(--color-ink)" }}>
-            {house.balance}
-            <span className="ml-1 font-body text-[12px] font-medium text-muted">{t("hrs")}</span>
-          </p>
-          <p className="font-body text-[11.5px]" style={{ color: house.expiringSoon ? "#a56a52" : "var(--color-muted)" }}>
-            {house.expiry
-              ? house.expiringSoon
-                ? t("expiring_soon")
-                : t("expires_till").replace("{date}", fmtDate(house.expiry, lang))
-              : t("hh_no_classes")}
-          </p>
-        </div>
-      </div>
-
-      {/* classes by type */}
-      {house.byCategory.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {house.byCategory.map((c) => (
-            <span
-              key={c.category}
-              className="inline-flex items-center gap-1.5 rounded-full bg-cream px-2.5 py-1 font-body text-[12px] font-semibold text-ink-soft"
-            >
-              <Dot type={c.category} size={7} />
-              {t(CAT_KEY[c.category])} · {c.hours}
-            </span>
-          ))}
-        </div>
-      )}
+      {/* house (+ members on a phone) */}
+      <span className="min-w-0">
+        <span className="block truncate font-head text-[15px] font-semibold text-ink">{house.houseNumber}</span>
+        <span className="mt-1 block sm:hidden">{members}</span>
+      </span>
 
       {/* members */}
-      <div className="mt-auto border-t border-line pt-3">
-        {house.members.length === 0 ? (
-          <Badge tone={stranded ? "rose" : "neutral"}>{t("hh_no_members_badge")}</Badge>
-        ) : (
-          <div className="flex items-center gap-2">
-            <span className="flex -space-x-2">
-              {house.members.slice(0, 4).map((m) => (
-                <span key={m.id} className="rounded-full ring-2 ring-surface-2">
-                  <Avatar name={m.name} seed={m.id} size={28} />
-                </span>
-              ))}
-            </span>
-            <span className="min-w-0 truncate font-body text-[13px] text-ink-soft">
-              {house.members.map((m) => m.name).join(", ")}
-            </span>
-          </div>
+      <span className="hidden min-w-0 sm:block">{members}</span>
+
+      {/* classes left */}
+      <span className="min-w-0 text-right sm:text-left">
+        <span className="font-head text-[15px] font-bold" style={{ color: house.expiringSoon ? "#a56a52" : "var(--color-ink)" }}>
+          {house.balance}
+        </span>
+        <span className="ml-1 font-body text-[11.5px] text-muted">{t("hrs")}</span>
+        {house.byCategory.length > 0 && (
+          <span className="ml-1.5 font-body text-[12px] text-ink-soft">
+            ({house.byCategory.map((c) => `${t(CAT_KEY[c.category])} ${c.hours}`).join(" · ")})
+          </span>
         )}
-      </div>
+        <span className="block font-body text-[11px]" style={{ color: house.expiringSoon ? "#a56a52" : "var(--color-muted)" }}>
+          {house.expiry
+            ? house.expiringSoon
+              ? t("expiring_soon")
+              : t("expires_till").replace("{date}", fmtDate(house.expiry, lang))
+            : t("hh_no_classes")}
+        </span>
+      </span>
+
+      {/* chevron */}
+      <span aria-hidden className="hidden justify-self-end text-muted sm:block">
+        <ChevR />
+      </span>
     </button>
   );
 }
@@ -271,6 +278,14 @@ function PackageRow({ pkg }: { pkg: HouseholdPackage }) {
         {t("hh_of_total").replace("{left}", String(pkg.hoursLeft)).replace("{total}", String(pkg.hoursTotal))}
       </p>
     </li>
+  );
+}
+
+function ChevR() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m9 18 6-6-6-6" />
+    </svg>
   );
 }
 
