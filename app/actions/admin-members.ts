@@ -260,9 +260,13 @@ export type UpdateCustomerResult = { ok: true } | { ok: false; code: UpdateCusto
  *     customer had paid for (they vanished from their balance entirely). Moving the
  *     owner changes no ledger row: each package's ledger, and so its balance, is
  *     untouched; only who may draw on it widens to the house.
- *   - A member's packages are owned by the HOUSEHOLD. Demoting them to guest, or
- *     moving them to another house, LOSES them access to that pool — the classes
- *     stay with the house they were bought for. The admin UI warns before saving.
+ *   - Member → another house (decided 2026-10-05). If NOBODY is left in the old
+ *     house, its packages move with the person — the common case is fixing a wrong
+ *     or mistyped house number, and otherwise the classes sat in an empty house no
+ *     one could reach. If others still live there, the classes stay with them (a
+ *     family keeps what it shares). Again an owner change only; no ledger row moves.
+ *   - Member → guest: the household's packages stay with the house. The admin UI
+ *     warns before saving.
  *
  * Invariant 3 still holds where it matters: a GUEST's package is never in a
  * household. It only joins one once its owner is a member of that house.
@@ -283,11 +287,12 @@ export async function updateCustomer(raw: UpdateCustomerInput): Promise<UpdateCu
 
   const db = getDb();
   const [existing] = await db
-    .select({ id: users.id })
+    .select({ id: users.id, householdId: users.householdId })
     .from(users)
     .where(eq(users.id, userId))
     .limit(1);
   if (!existing) return { ok: false, code: "NOT_FOUND" };
+  const oldHouseholdId = existing.householdId;
 
   // Pre-check uniqueness against every OTHER user (the unique index has no partial
   // filter, so a deactivated user's "removed-…" phone can't collide with a real one).
@@ -351,6 +356,21 @@ export async function updateCustomer(raw: UpdateCustomerInput): Promise<UpdateCu
           .update(packages)
           .set({ ownerHouseholdId: householdId, ownerUserId: null })
           .where(eq(packages.ownerUserId, userId));
+
+        // Moved out of a house that is now empty: its classes come along (header).
+        if (oldHouseholdId && oldHouseholdId !== householdId) {
+          const [stillThere] = await tx
+            .select({ id: users.id })
+            .from(users)
+            .where(eq(users.householdId, oldHouseholdId))
+            .limit(1);
+          if (!stillThere) {
+            await tx
+              .update(packages)
+              .set({ ownerHouseholdId: householdId })
+              .where(eq(packages.ownerHouseholdId, oldHouseholdId));
+          }
+        }
       }
     });
   } catch (err) {
