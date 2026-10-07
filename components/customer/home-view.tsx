@@ -82,6 +82,15 @@ export function HomeView({
 }: HomeViewProps) {
   const { t, tt, lang } = useCustomerLang();
   const avatarInitial = viewer.name.trim().charAt(0).toUpperCase() || "·";
+  // The line under the balances: what the numbers mean, or nothing.
+  const balanceCaption =
+    balances.length === 0
+      ? null
+      : balances.length > 1
+        ? t("balances_note")
+        : isHouseholdPool && viewer.houseNumber
+          ? t("balance_pool_shared")
+          : null;
 
   function expiryLabelFor(iso: string | null): string | null {
     return iso
@@ -127,17 +136,16 @@ export function HomeView({
         </div>
       </header>
 
-      {/* balance hero — warm cream gradient + sparkle motif; tappable to /schedule.
-          Same treatment as the Profile screen so the two stay consistent. */}
+      {/* balance hero — warm cream gradient + sparkle motif. Display only: booking
+          and buying are the two buttons below it (2026-10-07), so the card no longer
+          doubles as a link. Same treatment as the Profile screen. */}
       {/* CLASS BALANCES — one per format the viewer holds (2026-09-08).
           Group, 1:1, Duo, Trio and Rental classes are separate balances that can
           only book their own format, so this deliberately shows NO combined total:
           a customer with 5 group and 2 duo classes has no "7" they can spend on
           anything. Empty formats are omitted rather than shown as zeros. */}
-      <Link
-        href="/schedule"
-        aria-label={t("book_a_class")}
-        className="relative block overflow-hidden rounded-lune border border-line p-[18px] shadow-md transition-transform active:scale-[0.99]"
+      <div
+        className="relative overflow-hidden rounded-lune border border-line p-[18px] shadow-md"
         style={{ background: "linear-gradient(150deg, var(--color-surface-2), var(--color-surface))" }}
       >
         <Sparkle
@@ -242,24 +250,14 @@ export function HomeView({
           </ul>
         )}
 
-        <div className="relative mt-2.5 flex items-center justify-between gap-4 border-t border-line pt-3">
-          <span className="min-w-0 font-body text-[12.5px] text-ink-soft">
-            {/* Nothing to caption when they hold nothing — "shared with your house"
-                over an empty balance reads as a bug. */}
-            {balances.length === 0
-              ? null
-              : balances.length > 1
-                ? t("balances_note")
-                : isHouseholdPool && viewer.houseNumber
-                  ? t("balance_pool_shared")
-                  : null}
-          </span>
-          <span className="inline-flex shrink-0 items-center gap-1 font-body text-[13.5px] font-semibold text-taupe-deep">
-            {t("book_a_class")}
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
-          </span>
-        </div>
-      </Link>
+        {/* Nothing to caption when they hold nothing — "shared with your house"
+            over an empty balance reads as a bug — so the row is dropped then. */}
+        {balanceCaption && (
+          <p className="relative m-0 mt-2.5 border-t border-line pt-3 font-body text-[12.5px] text-ink-soft">
+            {balanceCaption}
+          </p>
+        )}
+      </div>
 
       {/* waitlist offer banner — only when a live offer is outstanding. Minimal,
           links to /bookings where the countdown + Confirm live. */}
@@ -340,16 +338,25 @@ export function HomeView({
         </section>
       )}
 
-      {/* primary action — the only hero CTA. Buying, not booking (2026-10-07):
-          customers could not find where to buy a package, while booking already
-          has the balance card above, the week strip below and its own tab. */}
-      <Link
-        href="/buy"
-        className="mt-5 flex items-center justify-center gap-2 rounded-lune bg-taupe px-6 py-3.5 font-head text-base font-semibold text-cream shadow-soft transition-colors hover:bg-taupe-deep"
-      >
-        {t("buy_credits")}
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
-      </Link>
+      {/* The two primary actions, side by side and equal (2026-10-07): customers
+          could not find where to buy, and a "book" link tucked inside the balance
+          card was easy to miss. Different fills so they never read as one button. */}
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        <Link
+          href="/schedule"
+          className="flex items-center justify-center gap-2 rounded-lune bg-ink px-4 py-3.5 font-head text-base font-semibold text-cream shadow-soft transition-colors hover:bg-ink-soft"
+        >
+          {t("book_a_class")}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+        </Link>
+        <Link
+          href="/buy"
+          className="flex items-center justify-center gap-2 rounded-lune bg-taupe px-4 py-3.5 font-head text-base font-semibold text-cream shadow-soft transition-colors hover:bg-taupe-deep"
+        >
+          {t("buy_credits")}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+        </Link>
+      </div>
 
       {/* this week — horizontal-scroll strip of bookable cards (lune-home.jsx). */}
       <section className="mt-6">
