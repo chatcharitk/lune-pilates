@@ -10,6 +10,7 @@ export const STR = {
   nav_home: { en: "Home", th: "หน้าแรก" },
   nav_schedule: { en: "Schedule", th: "ตารางเรียน" },
   nav_bookings: { en: "Bookings", th: "การจอง" },
+  nav_buy: { en: "Packages", th: "ซื้อแพ็กเกจ" },
   nav_profile: { en: "Profile", th: "โปรไฟล์" },
 
   // LINE LIFF login gate (customer)
@@ -52,7 +53,7 @@ export const STR = {
   member: { en: "Member", th: "สมาชิก" },
   household: { en: "Household", th: "ครัวเรือน" },
   shared_pool: { en: "Shared pool", th: "คลาสรวมของบ้าน" },
-  buy_credits: { en: "Buy classes", th: "ซื้อคลาส" },
+  buy_credits: { en: "Buy a package", th: "ซื้อแพ็กเกจ" },
   book_a_class: { en: "Book a class", th: "จองคลาส" },
   next_class: { en: "Your next class", th: "คลาสถัดไปของคุณ" },
   this_week: { en: "This week", th: "สัปดาห์นี้" },

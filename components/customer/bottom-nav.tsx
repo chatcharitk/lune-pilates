@@ -33,6 +33,17 @@ const NAV: NavItem[] = [
       </>
     ),
   },
+  {
+    // Its own tab (2026-10-07): customers could not find where to buy a package.
+    href: "/buy",
+    key: "nav_buy",
+    icon: (
+      <>
+        <path d="M6 7h12l1 13H5L6 7Z" />
+        <path d="M9 7a3 3 0 0 1 6 0" />
+      </>
+    ),
+  },
   { href: "/bookings", key: "nav_bookings", icon: <path d="M5 12h14M12 5l7 7-7 7" /> },
   {
     href: "/profile",
@@ -75,7 +86,7 @@ export function BottomNav() {
               <Link
                 href={n.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex flex-col items-center gap-0.5 rounded-2xl px-4 py-1 transition-colors hover:text-taupe-deep ${
+                className={`flex flex-col items-center gap-0.5 rounded-2xl px-2.5 py-1 transition-colors hover:text-taupe-deep ${
                   active ? "text-ink" : "text-muted"
                 }`}
               >

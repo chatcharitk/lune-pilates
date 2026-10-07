@@ -127,7 +127,7 @@ export function HomeView({
         </div>
       </header>
 
-      {/* balance hero — warm cream gradient + sparkle motif; tappable to /buy.
+      {/* balance hero — warm cream gradient + sparkle motif; tappable to /schedule.
           Same treatment as the Profile screen so the two stay consistent. */}
       {/* CLASS BALANCES — one per format the viewer holds (2026-09-08).
           Group, 1:1, Duo, Trio and Rental classes are separate balances that can
@@ -135,8 +135,8 @@ export function HomeView({
           a customer with 5 group and 2 duo classes has no "7" they can spend on
           anything. Empty formats are omitted rather than shown as zeros. */}
       <Link
-        href="/buy"
-        aria-label={t("buy_credits")}
+        href="/schedule"
+        aria-label={t("book_a_class")}
         className="relative block overflow-hidden rounded-lune border border-line p-[18px] shadow-md transition-transform active:scale-[0.99]"
         style={{ background: "linear-gradient(150deg, var(--color-surface-2), var(--color-surface))" }}
       >
@@ -255,7 +255,7 @@ export function HomeView({
                   : null}
           </span>
           <span className="inline-flex shrink-0 items-center gap-1 font-body text-[13.5px] font-semibold text-taupe-deep">
-            {t("buy_credits")}
+            {t("book_a_class")}
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
           </span>
         </div>
@@ -340,12 +340,14 @@ export function HomeView({
         </section>
       )}
 
-      {/* primary action — the only hero CTA */}
+      {/* primary action — the only hero CTA. Buying, not booking (2026-10-07):
+          customers could not find where to buy a package, while booking already
+          has the balance card above, the week strip below and its own tab. */}
       <Link
-        href="/schedule"
+        href="/buy"
         className="mt-5 flex items-center justify-center gap-2 rounded-lune bg-taupe px-6 py-3.5 font-head text-base font-semibold text-cream shadow-soft transition-colors hover:bg-taupe-deep"
       >
-        {t("book_a_class")}
+        {t("buy_credits")}
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
       </Link>
 
