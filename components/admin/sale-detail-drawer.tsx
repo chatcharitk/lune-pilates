@@ -12,6 +12,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminLang } from "./admin-context";
 import { Avatar, Badge, Drawer, type BadgeTone } from "./ui";
+import { SlipAttach } from "./slip-attach";
 import { getSlip } from "@/app/actions/admin-payments";
 import { cancelSale, updateSaleTime } from "@/app/actions/admin-sales";
 import type { SalesRow, PaymentMethod, PaymentStatus } from "@/lib/admin/sales";
@@ -127,9 +128,16 @@ export function SaleDetailDrawer({ sale, onClose }: { sale: SalesRow | null; onC
     });
   }
 
+  // An unpaid PromptPay sale can take a slip from the front desk (2026-10-08).
+  // (awaiting_review rows open the review drawer instead, so it isn't offered here.)
+  const canAttachSlip =
+    sale !== null && sale.method === "promptpay" && (sale.status === "pending" || sale.status === "rejected");
+  const [attached, setAttached] = useState(false);
+  useEffect(() => setAttached(false), [saleId]);
+
   const badge = sale ? STATUS_BADGE[sale.status] : null;
   const isCancelled = sale?.status === "cancelled";
-  const toastOk = toast === "sale_time_saved" || toast === "sale_cancelled_toast";
+  const toastOk = toast === "sale_time_saved" || toast === "sale_cancelled_toast" || toast === "slip_attached_toast";
 
   return (
     <Drawer open={sale !== null} onClose={onClose} title={t("sale_detail")}>
@@ -228,6 +236,19 @@ export function SaleDetailDrawer({ sale, onClose }: { sale: SalesRow | null; onC
             <p className="rounded-2xl border border-line bg-surface-2 p-6 text-center font-body text-[13px] text-muted">
               {t("err_generic")}
             </p>
+          )}
+
+          {canAttachSlip && !attached && (
+            <div className="mt-3">
+              <SlipAttach
+                chargeId={sale.id}
+                onApproved={() => {
+                  setAttached(true);
+                  setToast("slip_attached_toast");
+                  router.refresh();
+                }}
+              />
+            </div>
           )}
 
           {/* cancel (void) the sale — Owner action, reverses any unused credit */}

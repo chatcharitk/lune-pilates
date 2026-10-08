@@ -22,7 +22,7 @@
 // PII: slip images contain bank details. getSlip serves them ONLY behind this admin
 // gate; they are never publicly fetchable.
 
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getDb } from "@/lib/db/client";
@@ -36,6 +36,104 @@ import { emit } from "@/lib/events/bus";
 import { registerNotificationHandlers } from "@/lib/events/notifications";
 import { requireOwner } from "@/lib/auth/admin";
 import { mockDataMode } from "@/lib/mock-mode";
+import { validateSlipDataUrl } from "@/lib/payments/slip";
+
+// ───────────────────────── attach slip (admin) ─────────────────────────
+
+const attachSlipInput = z.object({
+  chargeId: z.string().min(1),
+  /** A `data:<mime>;base64,…` URL of the transfer slip (validated server-side). */
+  slipDataUrl: z.string().min(1),
+});
+export type AttachSlipInput = z.infer<typeof attachSlipInput>;
+
+export type AttachSlipFailureCode =
+  | ApproveSlipFailureCode
+  | "INVALID_FILE"
+  | "TOO_LARGE"
+  // Already paid or cancelled — nothing left to pay for.
+  | "NOT_PAYABLE";
+
+export type AttachSlipResult =
+  | { ok: true; receipt: ApproveSlipReceipt }
+  | { ok: false; code: AttachSlipFailureCode };
+
+/**
+ * The front desk attaches a transfer slip on the customer's behalf and approves it
+ * in one step (2026-10-08) — for a sale the admin rang up at the counter, or a
+ * customer who sent their slip over LINE instead of uploading it. The slip is
+ * stored exactly like a customer upload (same validation, same storage adapter,
+ * same row), then credited through `approveSlip`, so there is still ONE money path.
+ *
+ * Only an unpaid charge takes a slip: pending, awaiting_review (the admin's slip
+ * replaces the customer's) or rejected. `uploaded_by_user_id` is the charge's
+ * customer (the column references users; staff are not users) and the review note
+ * records that the admin attached it.
+ */
+export async function attachSlipAndApprove(raw: AttachSlipInput): Promise<AttachSlipResult> {
+  const admin = await requireOwner();
+  if (!admin) return { ok: false, code: "UNAUTHORIZED" };
+
+  const parsed = attachSlipInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
+  const { chargeId, slipDataUrl } = parsed.data;
+
+  const validated = validateSlipDataUrl(slipDataUrl);
+  if (!validated.ok) return { ok: false, code: validated.code };
+
+  if (mockDataMode()) {
+    return {
+      ok: true,
+      receipt: {
+        chargeId,
+        packageId: "00000000-0000-4000-8000-0000000000d3",
+        hoursAdded: 10,
+        hoursLeft: 10,
+        created: true,
+        owner: { ownerHouseholdId: null, ownerUserId: "00000000-0000-4000-8000-000000000001" },
+      },
+    };
+  }
+
+  const db = getDb();
+  const [intent] = await db.select().from(charges).where(eq(charges.chargeId, chargeId)).limit(1);
+  if (!intent) return { ok: false, code: "UNKNOWN_CHARGE" };
+  const payable = ["pending", "awaiting_review", "rejected"] as const;
+  if (!(payable as readonly string[]).includes(intent.status)) return { ok: false, code: "NOT_PAYABLE" };
+
+  const { storageKey, dataUrlToPersist } = await getSlipStorage().put({
+    dataUrl: slipDataUrl,
+    mimeType: validated.mimeType,
+    chargeId,
+  });
+  const now = new Date();
+  const slipValues = {
+    dataUrl: dataUrlToPersist,
+    storageKey,
+    mimeType: validated.mimeType,
+    sizeBytes: validated.sizeBytes,
+    uploadedByUserId: intent.userId,
+    uploadedAt: now,
+    reviewedByAdminId: null,
+    reviewedAt: null,
+    reviewDecision: null,
+    reviewNote: `Attached by admin ${admin.id}`,
+  };
+  await db
+    .insert(paymentSlips)
+    .values({ chargeId, ...slipValues })
+    .onConflictDoUpdate({ target: paymentSlips.chargeId, set: slipValues });
+
+  // Into review — guarded so a charge that got paid/cancelled meanwhile is untouched.
+  const moved = await db
+    .update(charges)
+    .set({ status: "awaiting_review", rejectionReason: null })
+    .where(and(eq(charges.chargeId, chargeId), inArray(charges.status, [...payable])))
+    .returning({ chargeId: charges.chargeId });
+  if (moved.length !== 1) return { ok: false, code: "NOT_PAYABLE" };
+
+  return approveSlip({ chargeId });
+}
 
 // ───────────────────────── approve slip ─────────────────────────
 

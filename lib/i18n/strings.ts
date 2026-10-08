@@ -874,6 +874,17 @@ export const STR = {
   tier_label: { en: "Customer type", th: "ประเภทลูกค้า" },
   save_customer: { en: "Save customer", th: "บันทึกลูกค้า" },
   no_members: { en: "No customers match your search", th: "ไม่พบลูกค้าที่ตรงกับการค้นหา" },
+  // Admin attaches a transfer slip for the customer (2026-10-08).
+  slip_attach_title: { en: "Attach transfer slip", th: "แนบสลิปโอนเงิน" },
+  slip_attach_hint: {
+    en: "Customer paid but sent the slip another way (e.g. LINE)? Attach it here — the payment is approved and the classes added right away.",
+    th: "ลูกค้าโอนแล้วแต่ส่งสลิปมาทางอื่น เช่น LINE แนบสลิปที่นี่ได้เลย ระบบจะอนุมัติและเพิ่มคลาสให้ลูกค้าทันที",
+  },
+  slip_attach_choose: { en: "Choose slip image", th: "เลือกรูปสลิป" },
+  slip_attach_change: { en: "Change image", th: "เปลี่ยนรูป" },
+  slip_attach_confirm: { en: "Attach slip & approve", th: "แนบสลิปและอนุมัติ" },
+  slip_attached_toast: { en: "Slip attached — classes added", th: "แนบสลิปแล้ว เพิ่มคลาสให้ลูกค้าเรียบร้อย" },
+  err_not_payable: { en: "This sale is already paid or cancelled", th: "รายการนี้ชำระแล้วหรือถูกยกเลิกแล้ว" },
   // Households screen (2026-10-05) — house-first view of who shares which classes.
   hh_subtitle: { en: "{n} houses", th: "ทั้งหมด {n} บ้าน" },
   hh_search: { en: "Search house number, name or phone…", th: "ค้นหาบ้านเลขที่ ชื่อ หรือเบอร์โทร…" },

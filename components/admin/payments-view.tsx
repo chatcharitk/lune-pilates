@@ -51,6 +51,7 @@ import type {
 } from "@/lib/admin/payments";
 import type { SalesRow } from "@/lib/admin/sales";
 import { SaleDetailDrawer } from "./sale-detail-drawer";
+import { SlipAttach } from "./slip-attach";
 import { thb, type StrKey } from "@/lib/i18n";
 
 // ───────────────────────── helpers ─────────────────────────
@@ -723,8 +724,22 @@ function PosDrawer({
         />
       )}
 
-      {step === "qr" && charge && item && (
-        <QrStep charge={charge} item={item} errorKey={errorKey} />
+      {step === "qr" && charge && item && customer && (
+        <>
+          <QrStep charge={charge} item={item} errorKey={errorKey} />
+          {/* Paid by transfer? The admin attaches the slip and it is approved and
+              credited in one step (2026-10-08). */}
+          <div className="mt-4">
+            <SlipAttach
+              chargeId={charge.chargeId}
+              onApproved={(r) => {
+                setReceipt({ hoursAdded: r.hoursAdded, amount: charge.amount, customerName: customer.name });
+                setStep("receipt");
+                router.refresh();
+              }}
+            />
+          </div>
+        </>
       )}
 
       {step === "receipt" && receipt && <ReceiptStep receipt={receipt} />}
