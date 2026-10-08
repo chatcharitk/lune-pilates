@@ -10,14 +10,17 @@ import { useId, useState, useTransition } from "react";
 import { useAdminLang } from "./admin-context";
 import {
   attachSlipAndApprove,
+  attachSlipToPaidSale,
   type AttachSlipFailureCode,
   type ApproveSlipReceipt,
 } from "@/app/actions/admin-payments";
 import { SLIP_ACCEPT, SLIP_ALLOWED_TYPES, SLIP_MAX_BYTES, slipToUploadDataUrl } from "@/lib/payments/slip-file";
 import type { StrKey } from "@/lib/i18n";
 
-function errorKeyFor(code: AttachSlipFailureCode): StrKey {
+function errorKeyFor(code: AttachSlipFailureCode | "HAS_SLIP"): StrKey {
   switch (code) {
+    case "HAS_SLIP":
+      return "err_has_slip";
     case "INVALID_FILE":
       return "err_invalid_file";
     case "TOO_LARGE":
@@ -29,13 +32,14 @@ function errorKeyFor(code: AttachSlipFailureCode): StrKey {
   }
 }
 
-export function SlipAttach({
-  chargeId,
-  onApproved,
-}: {
-  chargeId: string;
-  onApproved: (receipt: ApproveSlipReceipt) => void;
-}) {
+export function SlipAttach(
+  props:
+    | { chargeId: string; mode?: "approve"; onApproved: (receipt: ApproveSlipReceipt) => void }
+    // An already-paid sale: the slip is kept as proof only, nothing is credited.
+    | { chargeId: string; mode: "record"; onApproved: () => void },
+) {
+  const { chargeId } = props;
+  const record = props.mode === "record";
   const { t } = useAdminLang();
   const inputId = useId();
   const [dataUrl, setDataUrl] = useState<string | null>(null);
@@ -61,8 +65,14 @@ export function SlipAttach({
     if (!dataUrl || pending) return;
     setErrorKey(null);
     startTransition(async () => {
+      if (props.mode === "record") {
+        const res = await attachSlipToPaidSale({ chargeId, slipDataUrl: dataUrl });
+        if (res.ok) props.onApproved();
+        else setErrorKey(errorKeyFor(res.code));
+        return;
+      }
       const res = await attachSlipAndApprove({ chargeId, slipDataUrl: dataUrl });
-      if (res.ok) onApproved(res.receipt);
+      if (res.ok) props.onApproved(res.receipt);
       else setErrorKey(errorKeyFor(res.code));
     });
   }
@@ -70,7 +80,9 @@ export function SlipAttach({
   return (
     <div className="w-full rounded-2xl border border-line bg-surface-2 p-4 text-left">
       <p className="font-body text-sm font-semibold text-ink">{t("slip_attach_title")}</p>
-      <p className="mt-1 font-body text-[12.5px] leading-relaxed text-muted">{t("slip_attach_hint")}</p>
+      <p className="mt-1 font-body text-[12.5px] leading-relaxed text-muted">
+        {t(record ? "slip_attach_hint_paid" : "slip_attach_hint")}
+      </p>
 
       <label
         htmlFor={inputId}
@@ -104,7 +116,7 @@ export function SlipAttach({
         disabled={!dataUrl || pending}
         className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-xl bg-ink px-4 font-body text-sm font-semibold text-cream disabled:opacity-40"
       >
-        {pending ? t("loading") : t("slip_attach_confirm")}
+        {pending ? t("loading") : t(record ? "slip_attach_save" : "slip_attach_confirm")}
       </button>
     </div>
   );

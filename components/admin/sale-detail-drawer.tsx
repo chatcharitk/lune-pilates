@@ -132,12 +132,15 @@ export function SaleDetailDrawer({ sale, onClose }: { sale: SalesRow | null; onC
   // (awaiting_review rows open the review drawer instead, so it isn't offered here.)
   const canAttachSlip =
     sale !== null && sale.method === "promptpay" && (sale.status === "pending" || sale.status === "rejected");
+  // A paid PromptPay sale without a slip (confirmed before the slip arrived) can
+  // still have one kept as proof — nothing is credited again.
+  const canRecordSlip = sale !== null && sale.method === "promptpay" && sale.status === "paid" && !sale.hasSlip;
   const [attached, setAttached] = useState(false);
   useEffect(() => setAttached(false), [saleId]);
 
   const badge = sale ? STATUS_BADGE[sale.status] : null;
   const isCancelled = sale?.status === "cancelled";
-  const toastOk = toast === "sale_time_saved" || toast === "sale_cancelled_toast" || toast === "slip_attached_toast";
+  const toastOk = toast === "sale_time_saved" || toast === "sale_cancelled_toast" || toast === "slip_attached_toast" || toast === "slip_saved_toast";
 
   return (
     <Drawer open={sale !== null} onClose={onClose} title={t("sale_detail")}>
@@ -245,6 +248,19 @@ export function SaleDetailDrawer({ sale, onClose }: { sale: SalesRow | null; onC
                 onApproved={() => {
                   setAttached(true);
                   setToast("slip_attached_toast");
+                  router.refresh();
+                }}
+              />
+            </div>
+          )}
+          {canRecordSlip && !attached && (
+            <div className="mt-3">
+              <SlipAttach
+                chargeId={sale.id}
+                mode="record"
+                onApproved={() => {
+                  setAttached(true);
+                  setToast("slip_saved_toast");
                   router.refresh();
                 }}
               />

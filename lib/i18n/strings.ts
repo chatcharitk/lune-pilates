@@ -885,6 +885,13 @@ export const STR = {
   slip_attach_confirm: { en: "Attach slip & approve", th: "แนบสลิปและอนุมัติ" },
   slip_attached_toast: { en: "Slip attached — classes added", th: "แนบสลิปแล้ว เพิ่มคลาสให้ลูกค้าเรียบร้อย" },
   err_not_payable: { en: "This sale is already paid or cancelled", th: "รายการนี้ชำระแล้วหรือถูกยกเลิกแล้ว" },
+  slip_attach_hint_paid: {
+    en: "This sale is already paid. Attach the transfer slip to keep it as proof — no classes are added again.",
+    th: "รายการนี้ชำระแล้ว แนบสลิปเพื่อเก็บเป็นหลักฐานได้ ระบบจะไม่เพิ่มคลาสซ้ำ",
+  },
+  slip_attach_save: { en: "Save slip", th: "บันทึกสลิป" },
+  slip_saved_toast: { en: "Slip saved", th: "บันทึกสลิปแล้ว" },
+  err_has_slip: { en: "This sale already has a slip", th: "รายการนี้มีสลิปแล้ว" },
   // Households screen (2026-10-05) — house-first view of who shares which classes.
   hh_subtitle: { en: "{n} houses", th: "ทั้งหมด {n} บ้าน" },
   hh_search: { en: "Search house number, name or phone…", th: "ค้นหาบ้านเลขที่ ชื่อ หรือเบอร์โทร…" },

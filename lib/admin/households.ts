@@ -26,6 +26,8 @@ export interface HouseholdMember {
   name: string;
   phone: string;
   tier: UserTier;
+  /** LINE profile photo URL, or null → initial avatar. */
+  photoUrl: string | null;
 }
 
 /** One package the house owns, for the detail drawer. */
@@ -80,6 +82,7 @@ export async function listHouseholds(now: Date = new Date()): Promise<AdminHouse
         phone: users.phone,
         tier: users.tier,
         householdId: users.householdId,
+        photoUrl: users.linePictureUrl,
       })
       .from(users)
       .where(and(eq(users.active, true), isNotNull(users.householdId))),
@@ -109,7 +112,7 @@ export async function listHouseholds(now: Date = new Date()): Promise<AdminHouse
   const membersBy = new Map<string, HouseholdMember[]>();
   for (const m of memberRows) {
     const list = membersBy.get(m.householdId!) ?? [];
-    list.push({ id: m.id, name: m.name, phone: m.phone, tier: m.tier });
+    list.push({ id: m.id, name: m.name, phone: m.phone, tier: m.tier, photoUrl: m.photoUrl });
     membersBy.set(m.householdId!, list);
   }
 
@@ -192,8 +195,8 @@ function mockHouseholds(now: Date): AdminHousehold[] {
     shapeHousehold(
       { id: "mock-h1", houseNumber: "A-114" },
       [
-        { id: "mock-u1", name: "Mai", phone: "0810000001", tier: "member" },
-        { id: "mock-u2", name: "Ploy", phone: "0810000002", tier: "member" },
+        { id: "mock-u1", name: "Mai", phone: "0810000001", tier: "member", photoUrl: null },
+        { id: "mock-u2", name: "Ploy", phone: "0810000002", tier: "member", photoUrl: null },
       ],
       [
         { id: "mock-p1", label: { en: "10 classes", th: "10 คลาส" }, category: "group", partySize: null, hoursLeft: 6, hoursTotal: 10, expiresAt: inDays(40) },
@@ -203,7 +206,7 @@ function mockHouseholds(now: Date): AdminHousehold[] {
     ),
     shapeHousehold(
       { id: "mock-h2", houseNumber: "B-27" },
-      [{ id: "mock-u3", name: "Fah", phone: "0810000003", tier: "member" }],
+      [{ id: "mock-u3", name: "Fah", phone: "0810000003", tier: "member", photoUrl: null }],
       [],
       now,
     ),

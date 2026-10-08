@@ -135,6 +135,62 @@ export async function attachSlipAndApprove(raw: AttachSlipInput): Promise<Attach
   return approveSlip({ chargeId });
 }
 
+/**
+ * Keep a transfer slip on a sale that is ALREADY PAID but has none — e.g. a counter
+ * sale confirmed with the "paid" button before the slip arrived (2026-10-08). Proof
+ * only: no credit moves and the status stays "paid" (the classes were granted when
+ * it was paid). Refused when the sale already carries a slip, so a customer's
+ * reviewed slip is never overwritten.
+ */
+export async function attachSlipToPaidSale(
+  raw: AttachSlipInput,
+): Promise<{ ok: true } | { ok: false; code: AttachSlipFailureCode | "HAS_SLIP" }> {
+  const admin = await requireOwner();
+  if (!admin) return { ok: false, code: "UNAUTHORIZED" };
+
+  const parsed = attachSlipInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
+  const { chargeId, slipDataUrl } = parsed.data;
+
+  const validated = validateSlipDataUrl(slipDataUrl);
+  if (!validated.ok) return { ok: false, code: validated.code };
+  if (mockDataMode()) return { ok: true };
+
+  const db = getDb();
+  const [intent] = await db.select().from(charges).where(eq(charges.chargeId, chargeId)).limit(1);
+  if (!intent) return { ok: false, code: "UNKNOWN_CHARGE" };
+  if (intent.status !== "paid" || intent.method !== "promptpay") return { ok: false, code: "NOT_PAYABLE" };
+
+  const { storageKey, dataUrlToPersist } = await getSlipStorage().put({
+    dataUrl: slipDataUrl,
+    mimeType: validated.mimeType,
+    chargeId,
+  });
+  const now = new Date();
+  const inserted = await db
+    .insert(paymentSlips)
+    .values({
+      chargeId,
+      dataUrl: dataUrlToPersist,
+      storageKey,
+      mimeType: validated.mimeType,
+      sizeBytes: validated.sizeBytes,
+      uploadedByUserId: intent.userId,
+      uploadedAt: now,
+      reviewedByAdminId: admin.id,
+      reviewedAt: now,
+      reviewDecision: "approved",
+      reviewNote: `Attached by admin ${admin.id} after payment`,
+    })
+    .onConflictDoNothing({ target: paymentSlips.chargeId })
+    .returning({ id: paymentSlips.id });
+  if (inserted.length !== 1) return { ok: false, code: "HAS_SLIP" };
+
+  revalidatePath("/admin/payments");
+  revalidatePath("/admin/sales");
+  return { ok: true };
+}
+
 // ───────────────────────── approve slip ─────────────────────────
 
 const approveSlipInput = z.object({

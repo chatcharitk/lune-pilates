@@ -151,7 +151,7 @@ export function MembersView({
                   >
                     {/* member */}
                     <span className="flex min-w-0 items-center gap-2.5">
-                      <Avatar name={c.name} seed={c.id} size={36} />
+                      <Avatar name={c.name} seed={c.id} size={36} photoUrl={c.photoUrl} />
                       <span className="min-w-0">
                         <span className="flex items-center gap-1.5">
                           <span className="truncate font-body text-sm font-semibold text-ink">
@@ -276,7 +276,7 @@ function CustomerDrawer({
         <div className="flex flex-col gap-5">
           {/* identity */}
           <div className="flex items-center gap-3.5">
-            <Avatar name={customer.name} seed={customer.id} size={56} />
+            <Avatar name={customer.name} seed={customer.id} size={56} photoUrl={customer.photoUrl} />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-head text-xl font-semibold text-ink">{customer.name}</span>
@@ -339,7 +339,7 @@ function CustomerDrawer({
                     key={hm.id}
                     className="flex items-center gap-3 rounded-[13px] border border-line px-3 py-2.5"
                   >
-                    <Avatar name={hm.name} seed={hm.id} size={34} />
+                    <Avatar name={hm.name} seed={hm.id} size={34} photoUrl={hm.photoUrl} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-body text-[13.5px] font-semibold text-ink">{hm.name}</p>
                       <p className="font-body text-xs text-muted">

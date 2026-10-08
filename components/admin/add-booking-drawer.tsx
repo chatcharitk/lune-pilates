@@ -178,7 +178,7 @@ export function AddBookingDrawer({
       </p>
       {customer ? (
         <div className="mb-5 flex items-center gap-3 rounded-2xl border border-line bg-surface-2 px-3 py-2.5">
-          <Avatar name={customer.name} seed={customer.id} size={38} />
+          <Avatar name={customer.name} seed={customer.id} size={38} photoUrl={customer.photoUrl} />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span className="truncate font-body text-sm font-semibold text-ink">{customer.name}</span>
@@ -224,7 +224,7 @@ export function AddBookingDrawer({
                     }}
                     className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-surface-2"
                   >
-                    <Avatar name={c.name} seed={c.id} size={34} />
+                    <Avatar name={c.name} seed={c.id} size={34} photoUrl={c.photoUrl} />
                     <div className="min-w-0 flex-1">
                       <span className="block truncate font-body text-[13.5px] font-semibold text-ink">{c.name}</span>
                       <span className="block truncate font-body text-xs text-muted">{c.phone}</span>

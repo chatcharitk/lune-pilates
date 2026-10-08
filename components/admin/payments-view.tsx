@@ -861,7 +861,7 @@ function CustomerStep({
                 onClick={() => onPick(c)}
                 className="flex w-full items-center gap-3 rounded-[13px] border border-line bg-surface-2 px-3.5 py-2.5 text-left transition-colors hover:border-line-strong"
               >
-                <Avatar name={c.name} seed={c.id} size={34} />
+                <Avatar name={c.name} seed={c.id} size={34} photoUrl={c.photoUrl} />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5">
                     <span className="truncate font-body text-sm font-semibold text-ink">
@@ -910,7 +910,7 @@ function MethodStep({
 
       {/* assigned customer */}
       <div className="flex items-center gap-2.5 rounded-2xl bg-cream-2 px-3.5 py-3">
-        <Avatar name={customer.name} seed={customer.id} size={32} />
+        <Avatar name={customer.name} seed={customer.id} size={32} photoUrl={customer.photoUrl} />
         <span className="min-w-0">
           <span className="flex items-center gap-1.5">
             <span className="truncate font-body text-sm font-semibold text-ink">

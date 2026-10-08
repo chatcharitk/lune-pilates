@@ -117,7 +117,7 @@ function HouseRow({ house, onOpen }: { house: AdminHousehold; onOpen: () => void
         <span className="flex shrink-0 -space-x-2">
           {house.members.slice(0, 3).map((m) => (
             <span key={m.id} className="rounded-full ring-2 ring-surface-2">
-              <Avatar name={m.name} seed={m.id} size={26} />
+              <Avatar name={m.name} seed={m.id} size={26} photoUrl={m.photoUrl} />
             </span>
           ))}
         </span>
@@ -217,7 +217,7 @@ function HouseDrawer({ house, onClose }: { house: AdminHousehold | null; onClose
               <ul className="overflow-hidden rounded-2xl border border-line bg-surface-2">
                 {house.members.map((m) => (
                   <li key={m.id} className="flex items-center gap-3 border-b border-line px-4 py-3 last:border-b-0">
-                    <Avatar name={m.name} seed={m.id} size={36} />
+                    <Avatar name={m.name} seed={m.id} size={36} photoUrl={m.photoUrl} />
                     <div className="min-w-0 flex-1">
                       <p className="flex items-center gap-1.5 truncate font-body text-sm font-semibold text-ink">
                         {m.name}

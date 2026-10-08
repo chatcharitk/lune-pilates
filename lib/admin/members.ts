@@ -72,6 +72,8 @@ export interface AdminCustomer {
   status: CustomerCreditStatus;
   /** Sharing summary for a member; null for a guest (credits non-transferable). */
   sharing: SharingSummary | null;
+  /** LINE profile photo URL (saved at each LINE login), or null → initial avatar. */
+  photoUrl: string | null;
 }
 
 export type CustomerCreditStatus = "active" | "expiring";
@@ -240,6 +242,7 @@ export async function listCustomers(filter: ListCustomersFilter = {}, now: Date 
         tier: users.tier,
         householdId: users.householdId,
         house: households.houseNumber,
+        photoUrl: users.linePictureUrl,
       })
       .from(users)
       .leftJoin(households, eq(users.householdId, households.id))
@@ -283,7 +286,7 @@ export async function listCustomers(filter: ListCustomersFilter = {}, now: Date 
     const credit = summariseCredits(pkgs, now);
     const size = u.householdId ? householdSize.get(u.householdId) ?? 1 : 0;
     return shapeCustomer(
-      { id: u.id, name: u.name, phone: u.phone, tier: u.tier, house: u.house ?? null },
+      { id: u.id, name: u.name, phone: u.phone, tier: u.tier, house: u.house ?? null, photoUrl: u.photoUrl ?? null },
       credit,
       size,
     );
@@ -321,6 +324,7 @@ export async function getCustomerDetail(
       tier: users.tier,
       householdId: users.householdId,
       house: households.houseNumber,
+      photoUrl: users.linePictureUrl,
     })
     .from(users)
     .leftJoin(households, eq(users.householdId, households.id))
@@ -365,7 +369,7 @@ export async function getCustomerDetail(
   }));
 
   const base = shapeCustomer(
-    { id: u.id, name: u.name, phone: u.phone, tier: u.tier, house: u.house ?? null },
+    { id: u.id, name: u.name, phone: u.phone, tier: u.tier, house: u.house ?? null, photoUrl: u.photoUrl ?? null },
     credit,
     housemates.length,
   );
@@ -464,7 +468,7 @@ function toLedgerEntries(
 
 /** Build the `AdminCustomer` row from the resolved identity + credit summary. */
 function shapeCustomer(
-  who: { id: string; name: string; phone: string; tier: UserTier; house: string | null },
+  who: { id: string; name: string; phone: string; tier: UserTier; house: string | null; photoUrl: string | null },
   credit: CreditSummary,
   householdSize: number,
 ): AdminCustomer {
@@ -483,6 +487,7 @@ function shapeCustomer(
     expiry: credit.expiry,
     status: credit.status,
     sharing,
+    photoUrl: who.photoUrl,
   };
 }
 
@@ -569,7 +574,7 @@ function mockShapeCustomer(c: MockCustomer, now: Date): AdminCustomer {
   const house = c.member ? c.house : null;
   const householdSize = c.member ? mockHousehold(c.house).filter((x) => x.member).length : 0;
   return shapeCustomer(
-    { id: c.id, name: c.name, phone: c.phone, tier: c.member ? "member" : "guest", house },
+    { id: c.id, name: c.name, phone: c.phone, tier: c.member ? "member" : "guest", house, photoUrl: null },
     credit,
     householdSize,
   );

@@ -4,7 +4,7 @@
 // Avatar, CapBar, Drawer). Built on the shared warm design tokens; class-type dot
 // colours come from admin-data.jsx ATYPES. Shared across admin screens.
 
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { ClassType } from "@/lib/domain/types";
 import { useAdminLang } from "./admin-context";
 
@@ -187,17 +187,24 @@ export function Avatar({
   photoUrl?: string | null;
 }) {
   const initials = (initialsProp ?? name.trim().charAt(0)).toUpperCase() || "?";
+  // A customer's LINE photo is a remote URL that stops resolving when they change
+  // their picture (until their next login refreshes it) — fall back to the initial.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const showPhoto = photoUrl && photoUrl !== failedUrl;
   return (
     <span className="relative inline-block shrink-0" style={{ width: size, height: size }}>
-      {photoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element -- a stored data URL:
-        // there is no remote origin for next/image to optimise, and it must render
-        // in the admin without a loader round-trip.
+      {showPhoto ? (
+        // eslint-disable-next-line @next/next/no-img-element -- a stored data URL or
+        // a LINE CDN URL: nothing for next/image to optimise, and it must render in
+        // the admin without a loader round-trip.
         <img
           src={photoUrl}
           alt=""
           width={size}
           height={size}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onError={() => setFailedUrl(photoUrl)}
           className="h-full w-full rounded-full object-cover"
         />
       ) : (
