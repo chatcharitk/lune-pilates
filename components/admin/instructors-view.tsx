@@ -5,8 +5,8 @@
 //
 // Two parts:
 //   1. A responsive grid of instructor cards. Each card = avatar + name + the
-//      "{classes} classes · {attendees} attendees" subline, an Available/Day-off
-//      badge, today's availability range chips, today's classes (time · type dot ·
+//      "{classes} classes · {attendees} attendees" subline, today's availability
+//      range chips (only when set), today's classes (time · type dot ·
 //      short label · booked/cap), and an "Edit availability" button.
 //   2. The weekly availability editor in the shared Drawer: 7 day rows (Mon–Sun),
 //      each with an on/off toggle and (when on) range chips with a remove × plus a
@@ -21,7 +21,7 @@
 import { useEffect, useId, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminLang } from "./admin-context";
-import { Avatar, Badge, Dot, Drawer } from "./ui";
+import { Avatar, Dot, Drawer } from "./ui";
 import {
   createInstructor,
   setInstructorActive,
@@ -273,22 +273,17 @@ function InstructorCard({
         </div>
       </div>
 
-      {/* availability badge */}
-      <div className="mb-3.5">
-        <Badge tone={ins.offToday ? "rose" : "green"}>
-          {t(ins.offToday ? "day_off" : "available")}
-        </Badge>
-      </div>
-
-      {/* today's availability range chips */}
-      <div className="mb-3.5 flex flex-wrap items-center gap-2">
-        <span className="font-body text-[11.5px] font-semibold text-muted">{t("avail_today")}</span>
-        {ins.offToday ? (
-          <span className="font-body text-[13px] text-muted">— {t("day_off")}</span>
-        ) : (
-          ins.todayAvailability.map((rg, i) => <RangeChip key={i} range={rg} />)
-        )}
-      </div>
+      {/* today's availability range chips — only when hours are set. No "day off"
+          status (2026-10-11): availability is rarely filled in, so an empty day read
+          as วันหยุด on instructors who were teaching that day. */}
+      {!ins.offToday && (
+        <div className="mb-3.5 flex flex-wrap items-center gap-2">
+          <span className="font-body text-[11.5px] font-semibold text-muted">{t("avail_today")}</span>
+          {ins.todayAvailability.map((rg, i) => (
+            <RangeChip key={i} range={rg} />
+          ))}
+        </div>
+      )}
 
       {/* today's classes */}
       {ins.todaysClasses.length === 0 ? (
