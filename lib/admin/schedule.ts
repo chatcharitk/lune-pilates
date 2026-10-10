@@ -14,6 +14,7 @@
 import { and, asc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { bookings, classInstances, instructors } from "@/lib/db/schema";
+import { OUTER_CLASS_ID } from "@/lib/db/outer-refs";
 import type { ClassLevel, ClassStatus, ClassType } from "@/lib/domain/types";
 import { effectiveCapacity } from "@/lib/domain/types";
 import {
@@ -236,7 +237,7 @@ export async function getWeekSchedule(
 
   const bookedCount = sql<number>`(
     select count(*)::int from ${bookings}
-    where ${bookings.classInstanceId} = ${classInstances.id}
+    where ${bookings.classInstanceId} = ${OUTER_CLASS_ID}
       and ${bookings.status} = 'booked'
   )`;
 

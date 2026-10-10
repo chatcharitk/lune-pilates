@@ -23,6 +23,7 @@ import {
   instructorAvailability,
   instructors,
 } from "@/lib/db/schema";
+import { OUTER_CLASS_ID } from "@/lib/db/outer-refs";
 import type { Bilingual } from "@/lib/i18n";
 import type { ClassType } from "@/lib/domain/types";
 import { effectiveCapacity } from "@/lib/domain/types";
@@ -212,7 +213,7 @@ export async function getAdminInstructors(now: Date = new Date()): Promise<Admin
   // `instrIds`, so they run in ONE parallel round trip.
   const bookedCount = sql<number>`(
     select count(*)::int from ${bookings}
-    where ${bookings.classInstanceId} = ${classInstances.id}
+    where ${bookings.classInstanceId} = ${OUTER_CLASS_ID}
       and ${bookings.status} = 'booked'
   )`;
   const [classRows, availRows] = await Promise.all([

@@ -13,6 +13,7 @@
 import { and, asc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { bookings, classInstances, classTemplates, instructors } from "@/lib/db/schema";
+import { OUTER_CLASS_ID } from "@/lib/db/outer-refs";
 import type { Bilingual } from "@/lib/i18n";
 import type { ClassLevel, ClassType, ReformerPosition } from "@/lib/domain/types";
 import { CAPACITY, effectiveCapacity } from "@/lib/domain/types";
@@ -271,7 +272,7 @@ export async function listBookableClasses(args: ListBookableArgs): Promise<Booka
   // Live booked count per class via a correlated aggregate.
   const bookedCount = sql<number>`(
     select count(*)::int from ${bookings}
-    where ${bookings.classInstanceId} = ${classInstances.id}
+    where ${bookings.classInstanceId} = ${OUTER_CLASS_ID}
       and ${bookings.status} = 'booked'
   )`;
 

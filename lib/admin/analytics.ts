@@ -37,6 +37,7 @@ import {
   packages,
   users,
 } from "@/lib/db/schema";
+import { OUTER_CLASS_ID } from "@/lib/db/outer-refs";
 import type { Bilingual } from "@/lib/i18n";
 import type { ClassType, PackageCategory } from "@/lib/domain/types";
 import { effectiveCapacity } from "@/lib/domain/types";
@@ -504,11 +505,11 @@ async function buildCapacitySection(now: Date): Promise<CapacitySection> {
 
   const bookedCount = sql<number>`(
     select count(*)::int from ${bookings}
-    where ${bookings.classInstanceId} = ${classInstances.id} and ${bookings.status} = 'booked'
+    where ${bookings.classInstanceId} = ${OUTER_CLASS_ID} and ${bookings.status} = 'booked'
   )`;
   const waitlistCount = sql<number>`(
     select count(*)::int from waitlist
-    where waitlist.class_instance_id = ${classInstances.id} and waitlist.status in ('waiting','offered')
+    where waitlist.class_instance_id = ${OUTER_CLASS_ID} and waitlist.status in ('waiting','offered')
   )`;
 
   // Fill rate (published classes already started in the window) and alerts
