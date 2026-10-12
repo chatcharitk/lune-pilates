@@ -33,7 +33,17 @@ describe("groupChanges", () => {
         { type: "message", source: { type: "user" } },
         { type: "follow", source: { type: "user" } },
       ]),
-    ).toEqual({ joined: ["G1"], left: ["G2"], seen: ["G3"] });
+    ).toEqual({ joined: ["G1"], left: ["G2"], seen: ["G3"], tests: [] });
+  });
+
+  it("spots the test command in a group, and only there", () => {
+    expect(
+      groupChanges([
+        { type: "message", source: { type: "group", groupId: "G1" }, message: { type: "text", text: " #ทดสอบ " } },
+        { type: "message", source: { type: "group", groupId: "G2" }, message: { type: "text", text: "ทดสอบ" } },
+        { type: "message", source: { type: "user" }, message: { type: "text", text: "#ทดสอบ" } },
+      ]).tests,
+    ).toEqual(["G1"]);
   });
 });
 

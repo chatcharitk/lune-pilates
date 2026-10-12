@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { sendTestNotification } from "@/lib/events/staff-notify";
 import {
   applyGroupChanges,
   groupChanges,
@@ -49,5 +50,9 @@ export async function POST(req: Request) {
   // LINE's "Verify" button sends an empty events list — answer 200.
   const changes = groupChanges(events);
   if (changes.joined.length || changes.left.length || changes.seen.length) await applyGroupChanges(changes);
+  // After registering, so a test from a brand-new group still goes through.
+  for (const groupId of changes.tests) {
+    await sendTestNotification(groupId).catch((err) => console.error("[line webhook] test failed", err));
+  }
   return NextResponse.json({ ok: true });
 }

@@ -35,7 +35,11 @@ export function verifyLineSignature(rawBody: string, signature: string | null, s
 export interface LineWebhookEvent {
   type: string;
   source?: { type?: string; groupId?: string };
+  message?: { type?: string; text?: string };
 }
+
+/** Typed in a staff group, re-posts the latest booking as a test notification. */
+export const TEST_COMMAND = "#ทดสอบ";
 
 export interface GroupChanges {
   joined: string[];
@@ -46,6 +50,8 @@ export interface GroupChanges {
    * produced one — any message posted there registers it instead.
    */
   seen: string[];
+  /** Groups where someone typed TEST_COMMAND. */
+  tests: string[];
 }
 
 /** Pull out the group joins/leaves/messages — the only events acted on. Pure. */
@@ -53,14 +59,18 @@ export function groupChanges(events: readonly LineWebhookEvent[]): GroupChanges 
   const joined: string[] = [];
   const left: string[] = [];
   const seen: string[] = [];
+  const tests: string[] = [];
   for (const e of events) {
     const groupId = e.source?.type === "group" ? e.source.groupId : undefined;
     if (!groupId) continue;
     if (e.type === "join") joined.push(groupId);
     else if (e.type === "leave") left.push(groupId);
-    else if (e.type === "message" && !seen.includes(groupId)) seen.push(groupId);
+    else if (e.type === "message") {
+      if (!seen.includes(groupId)) seen.push(groupId);
+      if (e.message?.text?.trim() === TEST_COMMAND && !tests.includes(groupId)) tests.push(groupId);
+    }
   }
-  return { joined, left, seen };
+  return { joined, left, seen, tests };
 }
 
 const GREETING = "สวัสดีค่ะ LUNE จะแจ้งเตือนทุกการจองคลาสใหม่ในกลุ่มนี้นะคะ 🌙";

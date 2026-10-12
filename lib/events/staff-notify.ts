@@ -9,7 +9,7 @@
 // LINE_NOTIFICATIONS_ENABLED (which gates CUSTOMER pushes): having a group on file
 // is the opt-in, and removing the bot from the group is the opt-out.
 
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { bookings, classInstances, households, instructors, lineNotifyGroups, users } from "@/lib/db/schema";
 import { getLineClient } from "@/lib/line";
@@ -118,6 +118,37 @@ async function loadFacts(e: BookingConfirmed): Promise<StaffBookingFacts | null>
     remaining,
     source: e.source,
   };
+}
+
+/**
+ * "#ทดสอบ" in a registered staff group: post the most recent live booking as it
+ * would have been announced, marked as a test — proof the whole path works without
+ * making a fake booking. Ignored for a group that isn't registered.
+ */
+export async function sendTestNotification(groupId: string): Promise<void> {
+  const db = getDb();
+  const [group] = await db
+    .select({ groupId: lineNotifyGroups.groupId })
+    .from(lineNotifyGroups)
+    .where(and(eq(lineNotifyGroups.groupId, groupId), isNull(lineNotifyGroups.leftAt)))
+    .limit(1);
+  if (!group) return;
+  const line = getLineClient();
+  const [latest] = await db
+    .select({ id: bookings.id, userId: bookings.userId, classInstanceId: bookings.classInstanceId })
+    .from(bookings)
+    .where(eq(bookings.status, "booked"))
+    .orderBy(desc(bookings.createdAt))
+    .limit(1);
+  const facts = latest
+    ? await loadFacts({ type: "booking.confirmed", bookingId: latest.id, ...latest, source: "customer" })
+    : null;
+  await line.push(
+    groupId,
+    facts
+      ? `🧪 ทดสอบ — การจองล่าสุด\n\n${staffBookingMessage(facts)}`
+      : "🧪 ทดสอบ — เชื่อมต่อแล้ว แต่ยังไม่มีการจองให้แสดงค่ะ",
+  );
 }
 
 /** The `booking.confirmed` listener. A reschedule is a move, not a new booking. */
