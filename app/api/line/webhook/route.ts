@@ -13,6 +13,15 @@ import {
 // else is acknowledged and ignored. See lib/line/webhook.ts.
 export const dynamic = "force-dynamic";
 
+// Opened in a browser: say what this address is, rather than a blank 405 that
+// browsers save as an empty "webhook" file.
+export function GET() {
+  return new Response(
+    "LUNE LINE webhook ✓\nใส่ลิงก์นี้ใน LINE Developers → Messaging API → Webhook URL แล้วกด Verify\n(เปิดในเบราว์เซอร์จะไม่มีอะไรเกิดขึ้น — ลิงก์นี้สำหรับ LINE เท่านั้น)\n",
+    { headers: { "content-type": "text/plain; charset=utf-8" } },
+  );
+}
+
 export async function POST(req: Request) {
   const secret = messagingChannelSecret();
   if (!secret) return NextResponse.json({ error: "not configured" }, { status: 503 });
