@@ -39,6 +39,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "bad body" }, { status: 400 });
   }
 
+  // What arrived, without message text or user ids — enough to see why a group did
+  // or didn't register (e.g. a "room" or a 1:1 chat instead of a group).
+  console.info(
+    "[line webhook]",
+    events.length === 0 ? "verify (no events)" : events.map((e) => `${e.type}/${e.source?.type ?? "?"}`).join(", "),
+  );
+
   // LINE's "Verify" button sends an empty events list — answer 200.
   const changes = groupChanges(events);
   if (changes.joined.length || changes.left.length || changes.seen.length) await applyGroupChanges(changes);
