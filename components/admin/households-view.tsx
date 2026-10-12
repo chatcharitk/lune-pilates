@@ -8,10 +8,12 @@
 //
 // Balances are the server's (lib/admin/households.ts); this view imports only types.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { useAdminLang } from "./admin-context";
 import { Avatar, Badge, Dot, Drawer, Sparkle } from "./ui";
 import type { AdminHousehold, HouseholdPackage } from "@/lib/admin/households";
+import { deleteHousehold } from "@/app/actions/admin-households";
 import type { PackageCategory } from "@/lib/domain/types";
 import type { StrKey } from "@/lib/i18n";
 import { formatStudioDate } from "@/lib/time";
@@ -250,9 +252,88 @@ function HouseDrawer({ house, onClose }: { house: AdminHousehold | null; onClose
               </ul>
             )}
           </section>
+
+          {/* Delete — only for a house nobody lives in (members would lose their pool). */}
+          {house.members.length === 0 && <DeleteHouse house={house} onDeleted={onClose} />}
         </div>
       )}
     </Drawer>
+  );
+}
+
+function DeleteHouse({ house, onDeleted }: { house: AdminHousehold; onDeleted: () => void }) {
+  const { t } = useAdminLang();
+  const router = useRouter();
+  const [confirming, setConfirming] = useState(false);
+  const [errorKey, setErrorKey] = useState<StrKey | null>(null);
+  const [pending, startTransition] = useTransition();
+  // Every class still on the house's packages, started or not — all are written off.
+  const classesLeft = house.packages.reduce((sum, p) => sum + p.hoursLeft, 0);
+
+  useEffect(() => {
+    setConfirming(false);
+    setErrorKey(null);
+  }, [house.id]);
+
+  function remove() {
+    setErrorKey(null);
+    startTransition(async () => {
+      const res = await deleteHousehold({ householdId: house.id });
+      if (res.ok) {
+        onDeleted();
+        router.refresh();
+      } else {
+        setErrorKey(res.code === "HAS_MEMBERS" ? "hh_delete_has_members" : "err_generic");
+      }
+    });
+  }
+
+  return (
+    <div className="border-t border-line pt-4">
+      {!confirming ? (
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          className="inline-flex h-11 items-center gap-2 rounded-xl border border-rose/40 bg-rose/10 px-4 font-body text-sm font-semibold text-[#a56a52]"
+        >
+          {t("hh_delete")}
+        </button>
+      ) : (
+        <div className="rounded-2xl border border-rose/30 bg-rose/[0.06] p-4">
+          <p className="font-body text-sm font-semibold text-ink">
+            {t("hh_delete_confirm_title").replace("{house}", house.houseNumber)}
+          </p>
+          <p className="mt-1 font-body text-[13px] leading-relaxed text-ink-soft">
+            {classesLeft > 0
+              ? t("hh_delete_confirm_classes").replace("{n}", String(classesLeft))
+              : t("hh_delete_confirm_empty")}
+          </p>
+          {errorKey && (
+            <p role="alert" className="mt-2 font-body text-[13px] font-medium text-[#a56a52]">
+              {t(errorKey)}
+            </p>
+          )}
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={remove}
+              disabled={pending}
+              className="inline-flex h-11 items-center rounded-xl bg-[#a56a52] px-4 font-body text-sm font-semibold text-cream disabled:opacity-50"
+            >
+              {pending ? t("loading") : t("hh_delete_confirm_btn")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              disabled={pending}
+              className="inline-flex h-11 items-center rounded-xl border border-line-strong bg-surface px-4 font-body text-sm font-semibold text-ink-soft disabled:opacity-50"
+            >
+              {t("cancel")}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

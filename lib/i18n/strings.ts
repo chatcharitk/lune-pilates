@@ -912,6 +912,21 @@ export const STR = {
   hh_not_started: { en: "Not started yet", th: "ยังไม่เริ่มนับวันหมดอายุ" },
   hh_of_total: { en: "{left} of {total} left", th: "เหลือ {left} จาก {total}" },
   hh_people: { en: "{n} people", th: "{n} คน" },
+  hh_delete: { en: "Delete this house", th: "ลบบ้านเลขที่นี้" },
+  hh_delete_confirm_title: { en: "Delete house {house}?", th: "ลบบ้านเลขที่ {house}?" },
+  hh_delete_confirm_classes: {
+    en: "The {n} classes left in this house will be written off and can't be used. Past purchases and bookings stay in the records.",
+    th: "คลาสที่เหลือ {n} คลาสในบ้านนี้จะถูกตัดออกและใช้ไม่ได้อีก ประวัติการซื้อและการจองเดิมยังเก็บไว้ตามเดิม",
+  },
+  hh_delete_confirm_empty: {
+    en: "This house has no classes left. It will be removed from the list.",
+    th: "บ้านนี้ไม่มีคลาสคงเหลือ จะถูกนำออกจากรายการ",
+  },
+  hh_delete_confirm_btn: { en: "Delete house", th: "ลบบ้าน" },
+  hh_delete_has_members: {
+    en: "Someone lives in this house now — move them out on the Members page first.",
+    th: "มีลูกค้าอยู่ในบ้านนี้ ย้ายลูกค้าออกที่หน้าสมาชิกก่อน",
+  },
   // toasts / errors
   toast_customer_added: { en: "Customer added", th: "เพิ่มลูกค้าแล้ว" },
   toast_customer_removed: { en: "Customer removed", th: "ลบลูกค้าแล้ว" },
