@@ -37,23 +37,46 @@ export interface LineWebhookEvent {
   source?: { type?: string; groupId?: string };
 }
 
-/** Pull out the group joins/leaves — the only events acted on. Pure. */
-export function groupChanges(events: readonly LineWebhookEvent[]): { joined: string[]; left: string[] } {
+export interface GroupChanges {
+  joined: string[];
+  left: string[];
+  /**
+   * Groups heard from by a message. LINE sends "join" only once, at invite time, so
+   * a group the account was ALREADY in when the webhook was switched on never
+   * produced one — any message posted there registers it instead.
+   */
+  seen: string[];
+}
+
+/** Pull out the group joins/leaves/messages — the only events acted on. Pure. */
+export function groupChanges(events: readonly LineWebhookEvent[]): GroupChanges {
   const joined: string[] = [];
   const left: string[] = [];
+  const seen: string[] = [];
   for (const e of events) {
     const groupId = e.source?.type === "group" ? e.source.groupId : undefined;
     if (!groupId) continue;
     if (e.type === "join") joined.push(groupId);
     else if (e.type === "leave") left.push(groupId);
+    else if (e.type === "message" && !seen.includes(groupId)) seen.push(groupId);
   }
-  return { joined, left };
+  return { joined, left, seen };
 }
 
-/** Record joins (re-joining clears left_at) and leaves; greet a newly joined group. */
-export async function applyGroupChanges(changes: { joined: string[]; left: string[] }): Promise<void> {
+const GREETING = "สวัสดีค่ะ LUNE จะแจ้งเตือนทุกการจองคลาสใหม่ในกลุ่มนี้นะคะ 🌙";
+
+/**
+ * Record joins (re-joining clears left_at), first-time message groups, and leaves;
+ * greet a group the first time it is registered. A message from a group already on
+ * file does nothing — in particular it never re-subscribes a group whose leave was
+ * recorded (a bot that left can't receive messages there anyway).
+ */
+export async function applyGroupChanges(changes: GroupChanges): Promise<void> {
   const db = getDb();
   const line = getLineClient();
+  const greet = (groupId: string) =>
+    line.push(groupId, GREETING).catch((err) => console.error("[line webhook] greeting failed", err));
+
   for (const groupId of changes.joined) {
     const name = await line.groupName(groupId).catch(() => null);
     await db
@@ -63,9 +86,24 @@ export async function applyGroupChanges(changes: { joined: string[]; left: strin
         target: lineNotifyGroups.groupId,
         set: { name, joinedAt: new Date(), leftAt: null },
       });
-    await line
-      .push(groupId, "สวัสดีค่ะ LUNE จะแจ้งเตือนทุกการจองคลาสใหม่ในกลุ่มนี้นะคะ 🌙")
-      .catch((err) => console.error("[line webhook] greeting failed", err));
+    await greet(groupId);
+  }
+  for (const groupId of changes.seen) {
+    if (changes.joined.includes(groupId)) continue;
+    // Already on file (the usual case for a chatty group) — nothing to do, no LINE call.
+    const [known] = await db
+      .select({ groupId: lineNotifyGroups.groupId })
+      .from(lineNotifyGroups)
+      .where(eq(lineNotifyGroups.groupId, groupId))
+      .limit(1);
+    if (known) continue;
+    const name = await line.groupName(groupId).catch(() => null);
+    const inserted = await db
+      .insert(lineNotifyGroups)
+      .values({ groupId, name })
+      .onConflictDoNothing({ target: lineNotifyGroups.groupId })
+      .returning({ groupId: lineNotifyGroups.groupId });
+    if (inserted.length === 1) await greet(groupId);
   }
   for (const groupId of changes.left) {
     await db.update(lineNotifyGroups).set({ leftAt: new Date() }).where(eq(lineNotifyGroups.groupId, groupId));

@@ -9,7 +9,7 @@ import {
 
 // LINE Messaging API webhook. Set in LINE Developers → Messaging API → Webhook URL:
 //   https://<site>/api/line/webhook
-// Only group join/leave events are acted on (staff notification groups); everything
+// Only group join/leave/message events are acted on (staff notification groups); everything
 // else is acknowledged and ignored. See lib/line/webhook.ts.
 export const dynamic = "force-dynamic";
 
@@ -41,6 +41,6 @@ export async function POST(req: Request) {
 
   // LINE's "Verify" button sends an empty events list — answer 200.
   const changes = groupChanges(events);
-  if (changes.joined.length || changes.left.length) await applyGroupChanges(changes);
+  if (changes.joined.length || changes.left.length || changes.seen.length) await applyGroupChanges(changes);
   return NextResponse.json({ ok: true });
 }

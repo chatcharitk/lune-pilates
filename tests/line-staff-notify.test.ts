@@ -29,9 +29,11 @@ describe("groupChanges", () => {
         { type: "leave", source: { type: "group", groupId: "G2" } },
         { type: "join", source: { type: "room" } },
         { type: "message", source: { type: "group", groupId: "G3" } },
+        { type: "message", source: { type: "group", groupId: "G3" } },
+        { type: "message", source: { type: "user" } },
         { type: "follow", source: { type: "user" } },
       ]),
-    ).toEqual({ joined: ["G1"], left: ["G2"] });
+    ).toEqual({ joined: ["G1"], left: ["G2"], seen: ["G3"] });
   });
 });
 
