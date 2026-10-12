@@ -161,6 +161,7 @@ export async function bookClass(raw: BookClassInput): Promise<BookResult> {
     bookingId: result.bookingId,
     userId: viewer.id,
     classInstanceId: input.classInstanceId,
+    source: "customer",
   });
 
   // Surface the locked free-cancel window so the "You're booked" success screen

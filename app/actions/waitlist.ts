@@ -363,6 +363,7 @@ export async function confirmWaitlistOffer(
     bookingId: booked.bookingId,
     userId: viewer.id,
     classInstanceId: gate.classInstanceId,
+    source: "waitlist",
   });
 
   return {

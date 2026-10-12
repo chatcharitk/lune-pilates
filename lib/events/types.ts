@@ -3,7 +3,18 @@
 
 export type DomainEvent =
   | { type: "schedule.published"; weekStart: string }
-  | { type: "booking.confirmed"; bookingId: string; userId: string; classInstanceId: string }
+  | {
+      type: "booking.confirmed";
+      bookingId: string;
+      userId: string;
+      classInstanceId: string;
+      /**
+       * Where it came from: the customer, a waitlist claim, the front desk adding it,
+       * or the front desk MOVING an existing booking (not a new booking — the staff
+       * group is not told about those).
+       */
+      source: "customer" | "waitlist" | "admin" | "admin_reschedule";
+    }
   | { type: "booking.cancelled"; bookingId: string; userId: string; refunded: boolean }
   | { type: "waitlist.offered"; waitlistId: string; userId: string; holdExpiresAt: string }
   | {

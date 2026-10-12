@@ -393,6 +393,7 @@ export async function adminBookForCustomer(
     bookingId: result.bookingId,
     userId: input.userId,
     classInstanceId: input.classInstanceId,
+    source: "admin",
   });
 
   revalidatePath("/admin/bookings");
@@ -544,6 +545,7 @@ export async function adminReschedule(raw: AdminRescheduleInput): Promise<AdminR
     bookingId: result.newBookingId,
     userId: old.bookingUserId,
     classInstanceId: input.newClassInstanceId,
+    source: "admin_reschedule",
   });
   await emit({
     type: "booking.cancelled",

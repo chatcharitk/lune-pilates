@@ -44,6 +44,15 @@ export class LiveLineClient implements LineClient {
     await this.send(PUSH_URL, { to: lineUserId, messages: [{ type: "text", text }] });
   }
 
+  async groupName(groupId: string): Promise<string | null> {
+    const res = await fetch(`https://api.line.me/v2/bot/group/${encodeURIComponent(groupId)}/summary`, {
+      headers: { authorization: `Bearer ${this.token}` },
+    });
+    if (!res.ok) return null;
+    const body = (await res.json().catch(() => null)) as { groupName?: unknown } | null;
+    return typeof body?.groupName === "string" ? body.groupName : null;
+  }
+
   async broadcast(text: string): Promise<void> {
     await this.send(BROADCAST_URL, { messages: [{ type: "text", text }] });
   }
@@ -56,7 +65,7 @@ export class LiveLineClient implements LineClient {
       "จองคลาสสำเร็จ ✓",
       `${card.classType} · ${time} น.`,
       card.instructor ? `ครูผู้สอน: ${card.instructor}` : null,
-      `เครดิตคงเหลือ: ${card.balanceLeft} ชั่วโมง`,
+      `คลาสคงเหลือ: ${card.balanceLeft} คลาส`,
     ].filter(Boolean);
     await this.push(lineUserId, lines.join("\n"));
   }

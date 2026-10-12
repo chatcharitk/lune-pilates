@@ -744,6 +744,18 @@ export const uploads = pgTable("uploads", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// LINE group chats that receive staff notifications (2026-10-12). Filled by the
+// LINE webhook: the Official Account is invited into a staff group → a "join" event
+// records the group id; "leave" stamps left_at. New bookings are pushed to every
+// group with left_at null (lib/events/staff-notify.ts).
+export const lineNotifyGroups = pgTable("line_notify_groups", {
+  groupId: text("group_id").primaryKey(),
+  /** The group's display name from LINE (best-effort lookup at join). */
+  name: text("name"),
+  joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
+  leftAt: timestamp("left_at", { withTimezone: true }),
+});
+
 // ───────────────────────── instructors ─────────────────────────
 export const instructors = pgTable("instructors", {
   id: text("id").primaryKey(), // "mai", "ploy", "nina"

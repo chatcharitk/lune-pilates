@@ -5,6 +5,9 @@ export class MockLineClient implements LineClient {
   async push(lineUserId: string, text: string): Promise<void> {
     console.info(`[LINE mock] push → ${lineUserId}: ${text}`);
   }
+  async groupName(): Promise<string | null> {
+    return null;
+  }
   async broadcast(text: string): Promise<void> {
     console.info(`[LINE mock] broadcast: ${text}`);
   }

@@ -13,6 +13,7 @@ import { getDb } from "@/lib/db/client";
 import { bookings, users } from "@/lib/db/schema";
 import { formatStudioTime } from "@/lib/time";
 import { on } from "./bus";
+import { notifyStaffOfBooking } from "./staff-notify";
 
 /**
  * Resolve a user's linked LINE id from their users.id (the id domain events carry).
@@ -64,6 +65,9 @@ function notificationsEnabled(): boolean {
 export function registerNotificationHandlers(): void {
   if (registered) return;
   registered = true;
+  // Staff group posts are opted into by inviting the bot to a group, not by the
+  // customer-push switch below (lib/events/staff-notify.ts).
+  on("booking.confirmed", notifyStaffOfBooking);
   if (!notificationsEnabled()) return;
   const line = getLineClient();
 

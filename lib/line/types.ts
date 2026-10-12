@@ -9,8 +9,10 @@ export interface FlexBookingCard {
 }
 
 export interface LineClient {
-  /** Direct push to one linked user. */
+  /** Direct push to one linked user — or a group chat (a group id works as `to`). */
   push(lineUserId: string, text: string): Promise<void>;
+  /** A group chat's display name, or null when it can't be read. */
+  groupName(groupId: string): Promise<string | null>;
   /** Broadcast to all linked users (e.g. weekly schedule published). */
   broadcast(text: string): Promise<void>;
   /** Rich booking-confirmation flex card. */

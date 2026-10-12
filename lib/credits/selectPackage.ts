@@ -29,7 +29,7 @@ import { mockDataMode } from "@/lib/mock-mode";
  * or member without a household reads only their own. The single place this
  * member-vs-guest ownership rule lives, shared by selection and balance reads.
  */
-function ownerWhere(viewer: SessionUser): SQL {
+function ownerWhere(viewer: PoolOwner): SQL {
   const sharesHousehold = viewer.tier === "member" && viewer.householdId !== null;
   return sharesHousehold
     ? (and(eq(packages.ownerHouseholdId, viewer.householdId!), isNull(packages.ownerUserId)) as SQL)
@@ -323,7 +323,7 @@ export async function selectPackageForRescheduleForUser(
  * No-DB dev fallback: the mock pool balance so the UI renders without a database.
  */
 export async function getPoolBalance(
-  viewer: SessionUser,
+  viewer: PoolOwner,
   classType: ClassType,
   now: Date = new Date(),
 ): Promise<number> {
