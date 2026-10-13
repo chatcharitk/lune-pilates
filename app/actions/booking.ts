@@ -258,6 +258,7 @@ export async function cancelBookingAction(raw: CancelBookingInput): Promise<Canc
     bookingId,
     userId: viewer.id,
     refunded: cancelled.refunded,
+    source: "customer",
   });
 
   // A seat just freed up → offer it to the head of this class's waitlist queue

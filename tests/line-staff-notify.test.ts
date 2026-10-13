@@ -1,7 +1,12 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { groupChanges, verifyLineSignature } from "@/lib/line/webhook";
-import { staffBookingMessage, type StaffBookingFacts } from "@/lib/events/staff-notify";
+import {
+  staffBookingMessage,
+  staffCancelMessage,
+  staffClassCancelledMessage,
+  type StaffBookingFacts,
+} from "@/lib/events/staff-notify";
 
 const secret = "test-channel-secret";
 const sign = (body: string, key = secret) => createHmac("sha256", key).update(body).digest("base64");
@@ -79,5 +84,29 @@ describe("staffBookingMessage", () => {
     const rental = staffBookingMessage({ ...base, partySize: 2, capacity: 1, booked: 1 });
     expect(rental).toContain("เช่าสตูดิโอ 2 คน");
     expect(rental).not.toContain("ผู้เข้าเรียน");
+  });
+
+  it("reports a cancellation with the class's new count and the refund", () => {
+    const msg = staffCancelMessage({ ...base, booked: 1 }, { refunded: true, byAdmin: false });
+    expect(msg).toContain("❌ ยกเลิกการจอง");
+    expect(msg).not.toContain("แอดมินยกเลิก");
+    expect(msg).toContain("ผู้เข้าเรียนตอนนี้ 1/3 คน");
+    expect(msg).toContain("คืนคลาสแล้ว — คงเหลือ 18 คลาส");
+    const admin = staffCancelMessage(base, { refunded: false, byAdmin: true });
+    expect(admin).toContain("(แอดมินยกเลิก)");
+    expect(admin).toContain("ไม่คืนคลาส");
+  });
+
+  it("reports a whole-class cancellation once, with how many were refunded", () => {
+    const msg = staffClassCancelledMessage({
+      className: "Essential Reformer",
+      typeLabel: "กลุ่ม",
+      startsAt: base.startsAt,
+      instructor: "ครูจ๋า",
+      cancelledBookings: 3,
+    });
+    expect(msg).toContain("🚫 ยกเลิกคลาส");
+    expect(msg).toContain("09:00 น. · ครูจ๋า");
+    expect(msg).toContain("คืนคลาสให้ 3 การจองแล้ว");
   });
 });

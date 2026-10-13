@@ -160,6 +160,7 @@ export async function adminCancelBooking(raw: AdminCancelBookingInput): Promise<
     bookingId,
     userId: loaded.bookingUserId,
     refunded: cancelled.refunded,
+    source: "admin",
   });
 
   // A seat just freed up → offer it to the head of this class's waitlist queue.
@@ -552,6 +553,7 @@ export async function adminReschedule(raw: AdminRescheduleInput): Promise<AdminR
     bookingId: input.bookingId,
     userId: old.bookingUserId,
     refunded: true,
+    source: "admin_reschedule",
   });
 
   // The OLD class's seat just freed up → offer it to its waitlist head. Best-effort:

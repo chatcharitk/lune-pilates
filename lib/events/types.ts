@@ -15,7 +15,14 @@ export type DomainEvent =
        */
       source: "customer" | "waitlist" | "admin" | "admin_reschedule";
     }
-  | { type: "booking.cancelled"; bookingId: string; userId: string; refunded: boolean }
+  | {
+      type: "booking.cancelled";
+      bookingId: string;
+      userId: string;
+      refunded: boolean;
+      /** Who cancelled: the customer, the front desk, or a front-desk MOVE (not a cancel). */
+      source: "customer" | "admin" | "admin_reschedule";
+    }
   | { type: "waitlist.offered"; waitlistId: string; userId: string; holdExpiresAt: string }
   | {
       /**
