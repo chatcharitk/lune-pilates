@@ -51,16 +51,24 @@ export function MembersView({
   const [adding, setAdding] = useState(false);
   const [toast, setToast] = useState<StrKey | null>(null);
 
+  // Column sorting (2026-10-14): tap a header for ascending, again for descending.
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "name", dir: "asc" });
+  function sortBy(key: SortKey) {
+    setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
+  }
+
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
-    if (!term) return customers;
-    return customers.filter(
-      (c) =>
-        c.name.toLowerCase().includes(term) ||
-        (c.house ?? "").toLowerCase().includes(term) ||
-        c.phone.toLowerCase().includes(term),
-    );
-  }, [customers, q]);
+    const matching = !term
+      ? customers
+      : customers.filter(
+          (c) =>
+            c.name.toLowerCase().includes(term) ||
+            (c.house ?? "").toLowerCase().includes(term) ||
+            c.phone.toLowerCase().includes(term),
+        );
+    return sortCustomers(matching, sort.key, sort.dir);
+  }, [customers, q, sort]);
 
   const open = useMemo(
     () => customers.find((c) => c.id === openId) ?? null,
@@ -133,10 +141,14 @@ export function MembersView({
           <div
             className={`${grid} border-b border-line bg-surface px-[18px] py-3 font-body text-[11px] font-semibold uppercase tracking-[0.06em] text-muted`}
           >
-            <span>{t("member")}</span>
-            <span className="hidden sm:block">{t("house_label")}</span>
-            <span>{t("credits")}</span>
-            <span className="hidden sm:block">{t("sharing")}</span>
+            <SortHeader label={t("member")} active={sort.key === "name"} dir={sort.dir} onClick={() => sortBy("name")} />
+            <span className="hidden sm:block">
+              <SortHeader label={t("house_label")} active={sort.key === "house"} dir={sort.dir} onClick={() => sortBy("house")} />
+            </span>
+            <SortHeader label={t("credits")} active={sort.key === "classes"} dir={sort.dir} onClick={() => sortBy("classes")} />
+            <span className="hidden sm:block">
+              <SortHeader label={t("sharing")} active={sort.key === "sharing"} dir={sort.dir} onClick={() => sortBy("sharing")} />
+            </span>
             <span aria-hidden className="hidden sm:block" />
           </div>
 
@@ -238,6 +250,80 @@ export function MembersView({
         }}
       />
     </div>
+  );
+}
+
+// ───────────────────────── sorting ─────────────────────────
+
+type SortKey = "name" | "house" | "classes" | "sharing";
+type SortDir = "asc" | "desc";
+
+/**
+ * Sort the customer list by a column. Blanks (no house number; guests for sharing)
+ * stay at the BOTTOM in both directions — flipping the order is for comparing
+ * values, not for bringing a wall of "—" to the top. Ties fall back to the name.
+ */
+function sortCustomers(list: AdminCustomer[], key: SortKey, dir: SortDir): AdminCustomer[] {
+  const sign = dir === "asc" ? 1 : -1;
+  const byName = (a: AdminCustomer, b: AdminCustomer) => a.name.localeCompare(b.name, "th");
+  const value = (c: AdminCustomer): string | number | null =>
+    key === "name"
+      ? c.name
+      : key === "house"
+        ? c.house
+        : key === "classes"
+          ? c.balance
+          : c.tier === "member" ? (c.sharing?.householdSize ?? 1) : null;
+  return [...list].sort((a, b) => {
+    const va = value(a);
+    const vb = value(b);
+    if (va === null && vb === null) return byName(a, b);
+    if (va === null) return 1;
+    if (vb === null) return -1;
+    const cmp =
+      typeof va === "number" && typeof vb === "number"
+        ? va - vb
+        : String(va).localeCompare(String(vb), "th", { numeric: true });
+    return cmp !== 0 ? sign * cmp : byName(a, b);
+  });
+}
+
+function SortHeader({
+  label,
+  active,
+  dir,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  dir: SortDir;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`inline-flex items-center gap-1 uppercase tracking-[0.06em] transition-colors hover:text-ink ${
+        active ? "text-ink" : ""
+      }`}
+    >
+      {label}
+      <svg
+        width="12"
+        height="12"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden
+        className={active ? "" : "opacity-30"}
+      >
+        {active && dir === "desc" ? <path d="M12 5v14M6 13l6 6 6-6" /> : <path d="M12 19V5M6 11l6-6 6 6" />}
+      </svg>
+    </button>
   );
 }
 
