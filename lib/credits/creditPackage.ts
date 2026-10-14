@@ -35,7 +35,7 @@ import { and, asc, eq, ne } from "drizzle-orm";
 import { getDb, type Database } from "@/lib/db/client";
 import { charges, creditLedger, packages } from "@/lib/db/schema";
 import type { CatalogItem } from "@/lib/catalog/packages";
-import { expiryFromFixedDay, expiryFromValidity } from "@/lib/catalog/validity";
+import { FIRST_CLASS_START_DEADLINE_DAYS, expiryFromFixedDay, expiryFromValidity } from "@/lib/catalog/validity";
 import {
   componentsForItem,
   topoSortComponents,
@@ -317,9 +317,22 @@ export async function creditPackage(params: {
         // `item` here is the charge's frozen snapshot, so the date honoured is the
         // one the customer bought under.
         const fixed = item.expiresOn ? expiryFromFixedDay(item.expiresOn) : null;
+        // VALIDITY FROM THE FIRST CLASS (2026-10-14): an ordinary package's window
+        // starts at its first class, no later than FIRST_CLASS_START_DEADLINE_DAYS
+        // after purchase. Not for packages whose dates are part of the offer: a fixed
+        // campaign end, event-day packs, and promo-shelf packs ("use within 14 days of
+        // buying"). Until the first class, expires_at holds the latest it could end
+        // (deadline + window); bookings recompute it (recomputeFirstClassClock).
+        const fromFirstClass =
+          !anchored && !fixed && !(item.classDays && item.classDays.length > 0) && !item.promoShelf;
+        const firstClassDeadline = fromFirstClass
+          ? expiryFromValidity(FIRST_CLASS_START_DEADLINE_DAYS, "day", now)
+          : null;
         const expiresAt = anchored
           ? null
-          : (fixed ?? expiryFromValidity(c.validity.amount, c.validity.unit, now));
+          : firstClassDeadline
+            ? expiryFromValidity(c.validity.amount, c.validity.unit, firstClassDeadline)
+            : (fixed ?? expiryFromValidity(c.validity.amount, c.validity.unit, now));
 
         const [pkg] = await tx
           .insert(packages)
@@ -335,6 +348,9 @@ export async function creditPackage(params: {
               : null,
             activationAmount: anchored ? c.validity.amount : null,
             activationUnit: anchored ? c.validity.unit : null,
+            firstClassDeadline,
+            firstClassWindowAmount: firstClassDeadline ? c.validity.amount : null,
+            firstClassWindowUnit: firstClassDeadline ? c.validity.unit : null,
             ownerHouseholdId: owner.ownerHouseholdId,
             ownerUserId: owner.ownerUserId,
             purchaseChargeId: chargeId,

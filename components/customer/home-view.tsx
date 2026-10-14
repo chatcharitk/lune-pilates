@@ -50,6 +50,8 @@ export interface HomeViewProps {
     eventCredits: { days: string[]; classes: number }[];
     /** Bonus classes waiting for their first class to be taken. */
     pendingClasses: number;
+    /** Classes whose validity hasn't started — it counts from their first class. */
+    notStartedClasses: number;
     /** Studio rental only: the head-count these credits hire the studio for. */
     partySize: number | null;
   }[];
@@ -201,6 +203,16 @@ export function HomeView({
                     {expiry && (
                       <span className="mt-0.5 block font-body text-[11.5px] leading-tight text-muted">
                         {t("balance_expires").replace("{date}", expiry)}
+                      </span>
+                    )}
+                    {/* Validity counts from the first class (2026-10-14): until one
+                        is booked there is no end date yet, so say when it starts. */}
+                    {b.notStartedClasses > 0 && (
+                      <span className="mt-0.5 block font-body text-[11.5px] leading-tight text-muted">
+                        {(b.notStartedClasses === b.classes
+                          ? t("balance_not_started_all")
+                          : t("balance_not_started_some")
+                        ).replace("{n}", String(b.notStartedClasses))}
                       </span>
                     )}
                     {/* Part of this number may be EVENT credits, good only for the

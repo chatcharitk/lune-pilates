@@ -522,11 +522,16 @@ function ClassEditor({
 
       {/* "About this class" as the customer reads it on the class page. Left blank,
           the weekly slot's text shows (or the class type's built-in sentence). */}
-      <Field label={t("class_desc_label")} hint={t("class_desc_hint_week")}>
+      <Field
+        label={t("class_desc_label")}
+        hint={t(c?.templateDescription ? "class_desc_hint_from_template" : "class_desc_hint_week")}
+      >
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder={t("class_desc_ph")}
+          // A class linked to its weekly slot shows the slot's text here, greyed, so
+          // it's visible what customers read while this box stays empty (2026-10-14).
+          placeholder={c?.templateDescription ?? t("class_desc_ph")}
           maxLength={500}
           rows={3}
           className="w-full resize-y rounded-xl border border-line-strong bg-surface-2 px-3.5 py-2.5 font-body text-sm leading-relaxed text-ink placeholder:text-muted"

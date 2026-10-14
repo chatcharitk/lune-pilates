@@ -74,6 +74,24 @@ export interface AdminCustomer {
   sharing: SharingSummary | null;
   /** LINE profile photo URL (saved at each LINE login), or null → initial avatar. */
   photoUrl: string | null;
+  /**
+   * The same balance split by class type (2026-10-14): group, 1:1, duo, trio and each
+   * rental size are separate credits that only book their own type, so a single
+   * total hides what the customer can actually book. Empty when they hold nothing.
+   */
+  byCategory: CategoryCredit[];
+}
+
+/** One class type's share of a customer's balance. */
+export interface CategoryCredit {
+  category: PackageCategory;
+  /** Rental head-count (rental credits never mix sizes); null otherwise. */
+  partySize: number | null;
+  classes: number;
+  /** Soonest end date among this type's STARTED packages (ISO), or null. */
+  expiry: string | null;
+  /** Classes whose validity starts at their first class, not booked yet. */
+  notStarted: number;
 }
 
 export type CustomerCreditStatus = "active" | "expiring";
@@ -126,6 +144,10 @@ export interface CustomerLedgerEntry {
    * The newest row's balanceAfter reconciles to the pool's current hours_left.
    */
   balanceAfter: number;
+  /** The class type this row moved (its running balance is that type's). */
+  category?: PackageCategory;
+  /** Rental head-count, for a rental row; null otherwise. */
+  partySize?: number | null;
 }
 
 /** Optional filter for the customers list. */
@@ -140,6 +162,13 @@ export interface ListCustomersFilter {
 export interface UsablePackageSummary {
   hoursLeft: number;
   expiresAt: Date;
+  category?: PackageCategory;
+  partySize?: number | null;
+  /**
+   * Validity counts from a first class not yet booked (2026-10-14): expiresAt is
+   * only the latest it could end, so it is not shown as an expiry.
+   */
+  notStarted?: boolean;
 }
 
 export interface CreditSummary {
@@ -164,11 +193,13 @@ export function summariseCredits(
     return { balance: 0, expiry: null, status: "active" };
   }
   let balance = 0;
-  let soonest = pkgs[0]!.expiresAt;
+  let soonest: Date | null = null;
   for (const p of pkgs) {
     balance += p.hoursLeft;
-    if (p.expiresAt.getTime() < soonest.getTime()) soonest = p.expiresAt;
+    if (p.notStarted) continue;
+    if (soonest === null || p.expiresAt.getTime() < soonest.getTime()) soonest = p.expiresAt;
   }
+  if (soonest === null) return { balance, expiry: null, status: "active" };
   const msUntil = soonest.getTime() - now.getTime();
   const expiringSoon = msUntil <= EXPIRING_SOON_DAYS * 24 * 3_600_000;
   return {
@@ -176,6 +207,31 @@ export function summariseCredits(
     expiry: soonest.toISOString(),
     status: expiringSoon ? "expiring" : "active",
   };
+}
+
+const CATEGORY_ORDER: PackageCategory[] = ["group", "private", "duo", "trio", "rental"];
+
+/** Split a pool's usable packages by class type (and rental size). Pure. */
+export function summariseByCategory(pkgs: readonly UsablePackageSummary[]): CategoryCredit[] {
+  const map = new Map<string, CategoryCredit>();
+  for (const p of pkgs) {
+    if (!p.category) continue;
+    const partySize = p.category === "rental" ? (p.partySize ?? null) : null;
+    const key = `${p.category}:${partySize ?? ""}`;
+    const row = map.get(key) ?? { category: p.category, partySize, classes: 0, expiry: null, notStarted: 0 };
+    row.classes += p.hoursLeft;
+    if (p.notStarted) row.notStarted += p.hoursLeft;
+    else {
+      const iso = p.expiresAt.toISOString();
+      if (row.expiry === null || iso < row.expiry) row.expiry = iso;
+    }
+    map.set(key, row);
+  }
+  return [...map.values()].sort(
+    (a, b) =>
+      CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category) ||
+      (a.partySize ?? 0) - (b.partySize ?? 0),
+  );
 }
 
 /** Does `q` match any of name / house / phone (case-insensitive, trimmed)? */
@@ -253,6 +309,10 @@ export async function listCustomers(filter: ListCustomersFilter = {}, now: Date 
         ownerUserId: packages.ownerUserId,
         hoursLeft: packages.hoursLeft,
         expiresAt: packages.expiresAt,
+        category: packages.category,
+        partySize: packages.partySize,
+        firstClassDeadline: packages.firstClassDeadline,
+        firstClassStartedAt: packages.firstClassStartedAt,
       })
       .from(packages)
       .where(and(gt(packages.hoursLeft, 0), gt(packages.expiresAt, now))),
@@ -266,7 +326,13 @@ export async function listCustomers(filter: ListCustomersFilter = {}, now: Date 
     // usable credit. The `expires_at > now()` filter above already excludes it in
     // SQL; restating it here narrows the type without an assertion.
     if (p.expiresAt === null) continue;
-    const summary = { hoursLeft: p.hoursLeft, expiresAt: p.expiresAt };
+    const summary: UsablePackageSummary = {
+      hoursLeft: p.hoursLeft,
+      expiresAt: p.expiresAt,
+      category: p.category,
+      partySize: p.partySize ?? null,
+      notStarted: p.firstClassDeadline !== null && p.firstClassStartedAt === null && p.firstClassDeadline > now,
+    };
     if (p.ownerHouseholdId) {
       (byHousehold.get(p.ownerHouseholdId) ?? setGet(byHousehold, p.ownerHouseholdId)).push(summary);
     } else if (p.ownerUserId) {
@@ -289,6 +355,7 @@ export async function listCustomers(filter: ListCustomersFilter = {}, now: Date 
       { id: u.id, name: u.name, phone: u.phone, tier: u.tier, house: u.house ?? null, photoUrl: u.photoUrl ?? null },
       credit,
       size,
+      summariseByCategory(pkgs),
     );
   });
 
@@ -416,7 +483,7 @@ export async function getCustomerLedger(
 
   // Packages in this customer's pool (invariant 3 via poolOwnerWhere).
   const pkgRows = await db
-    .select({ id: packages.id })
+    .select({ id: packages.id, category: packages.category, partySize: packages.partySize })
     .from(packages)
     .where(poolOwnerWhere(owner));
   if (pkgRows.length === 0) return [];
@@ -431,12 +498,19 @@ export async function getCustomerLedger(
       delta: creditLedger.delta,
       reason: creditLedger.reason,
       note: creditLedger.note,
+      packageId: creditLedger.packageId,
     })
     .from(creditLedger)
     .where(inArray(creditLedger.packageId, pkgIds))
     .orderBy(asc(creditLedger.createdAt), asc(creditLedger.id));
 
-  return toLedgerEntries(rows);
+  const typeOf = new Map(pkgRows.map((p) => [p.id, p]));
+  return toLedgerEntries(
+    rows.map((r) => {
+      const p = typeOf.get(r.packageId);
+      return { ...r, category: p?.category, partySize: p?.category === "rental" ? (p.partySize ?? null) : null };
+    }),
+  );
 }
 
 /**
@@ -445,19 +519,33 @@ export async function getCustomerLedger(
  * here but kept off the signature — balances are pure delta sums.
  */
 function toLedgerEntries(
-  rows: readonly { id: string; createdAt: Date; delta: number; reason: string; note?: string | null }[],
+  rows: readonly {
+    id: string;
+    createdAt: Date;
+    delta: number;
+    reason: string;
+    note?: string | null;
+    category?: PackageCategory;
+    partySize?: number | null;
+  }[],
 ): CustomerLedgerEntry[] {
-  let running = 0;
+  // One running balance PER CLASS TYPE (2026-10-14): a group class and a rental are
+  // different credits, so "balance after" adds up only the row's own type. Rows with
+  // no type (the mock) share one running total, as before.
+  const running = new Map<string, number>();
   // Accumulate ascending, stamping each row's post-balance.
   const ascending = rows.map((r) => {
-    running += r.delta;
+    const key = r.category ? `${r.category}:${r.partySize ?? ""}` : "";
+    const after = (running.get(key) ?? 0) + r.delta;
+    running.set(key, after);
     return {
       id: r.id,
       createdAt: r.createdAt.toISOString(),
       delta: r.delta,
       reason: r.reason as LedgerReason,
       note: r.note ?? null,
-      balanceAfter: running,
+      balanceAfter: after,
+      ...(r.category ? { category: r.category, partySize: r.partySize ?? null } : {}),
     };
   });
   // Return newest-first for display (reverse the ascending list).
@@ -471,6 +559,7 @@ function shapeCustomer(
   who: { id: string; name: string; phone: string; tier: UserTier; house: string | null; photoUrl: string | null },
   credit: CreditSummary,
   householdSize: number,
+  byCategory: CategoryCredit[] = [],
 ): AdminCustomer {
   // Sharing summary only for members; guests are non-transferable (invariant 3).
   const sharing: SharingSummary | null =
@@ -488,6 +577,7 @@ function shapeCustomer(
     status: credit.status,
     sharing,
     photoUrl: who.photoUrl,
+    byCategory,
   };
 }
 

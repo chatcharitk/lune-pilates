@@ -16,8 +16,8 @@
 // customer could book the private purely to unlock the free class, cancel the
 // private, and keep the unlocked credit.
 
-import { and, eq, isNull } from "drizzle-orm";
-import { packages } from "@/lib/db/schema";
+import { and, eq, isNull, min } from "drizzle-orm";
+import { bookings, classInstances, packages } from "@/lib/db/schema";
 import { expiryFromValidity } from "@/lib/catalog/validity";
 import type { ValidityUnit } from "@/lib/catalog/packages";
 import type { Database } from "@/lib/db/client";
@@ -94,4 +94,54 @@ export async function deactivateAnchoredPackages(tx: Tx, bookingId: string): Pro
     .update(packages)
     .set({ activatesAt: null, expiresAt: null, activationBookingId: null })
     .where(eq(packages.activationBookingId, bookingId));
+}
+
+// ───────────────────────── validity from the first class ─────────────────────────
+
+/**
+ * Recompute the expiry of a package whose validity counts from its FIRST CLASS
+ * (2026-10-14). A no-op for every other package (first_class_deadline null).
+ *
+ *   start   = the earliest class still BOOKED on this package (attended classes stay
+ *             "booked"), capped at first_class_deadline; the deadline itself when
+ *             nothing is booked
+ *   expires = start + the window, by the same whole-Bangkok-day rule as every expiry
+ *
+ * Deriving it from the bookings rather than stamping it once keeps it right in every
+ * order of events: a later booking for an EARLIER class pulls the start forward,
+ * and cancelling the only booking puts the clock back to "not started" — so a
+ * customer can't start the clock and then cancel to keep a running window, or lose
+ * one to a booking they cancelled.
+ *
+ * Call INSIDE the transaction that changed the package's bookings, after the change.
+ */
+export async function recomputeFirstClassClock(tx: Tx, packageId: string): Promise<void> {
+  const [pkg] = await tx
+    .select({
+      deadline: packages.firstClassDeadline,
+      amount: packages.firstClassWindowAmount,
+      unit: packages.firstClassWindowUnit,
+    })
+    .from(packages)
+    .where(eq(packages.id, packageId))
+    .limit(1);
+  if (!pkg?.deadline || pkg.amount === null || !isValidityUnit(pkg.unit)) return;
+
+  const [first] = await tx
+    .select({ startsAt: min(classInstances.startsAt) })
+    .from(bookings)
+    .innerJoin(classInstances, eq(classInstances.id, bookings.classInstanceId))
+    .where(and(eq(bookings.packageId, packageId), eq(bookings.status, "booked")));
+
+  const firstClass = first?.startsAt ?? null;
+  const start = firstClass && firstClass < pkg.deadline ? firstClass : pkg.deadline;
+  await tx
+    .update(packages)
+    .set({
+      expiresAt: expiryFromValidity(pkg.amount, pkg.unit, start),
+      // Started once a class is booked on it; otherwise only when the deadline has
+      // passed (readers treat a past deadline as started either way).
+      firstClassStartedAt: firstClass ? start : null,
+    })
+    .where(eq(packages.id, packageId));
 }

@@ -391,6 +391,12 @@ export interface CreditBalance {
    */
   pendingClasses: number;
   /**
+   * Classes in this pool whose validity hasn't started yet — it counts from the
+   * first class (2026-10-14). They ARE bookable and counted in `classes`; they
+   * just have no end date to show yet, so they are left out of `nearestExpiry`.
+   */
+  notStartedClasses?: number;
+  /**
    * STUDIO RENTAL head-count (2026-09-29). Rental credits come in three sizes that
    * never mix, so rental balances are reported ONE ROW PER SIZE — a single "rental: 2"
    * would not say whether they can hire the studio for one person or for three.
@@ -414,7 +420,12 @@ export async function getCreditOverview(
   }
   const db = getDb();
   const rows = await db
-    .select({ hoursLeft: packages.hoursLeft, expiresAt: packages.expiresAt })
+    .select({
+      hoursLeft: packages.hoursLeft,
+      expiresAt: packages.expiresAt,
+      firstClassDeadline: packages.firstClassDeadline,
+      firstClassStartedAt: packages.firstClassStartedAt,
+    })
     .from(packages)
     .where(
       and(
@@ -427,7 +438,11 @@ export async function getCreditOverview(
     )
     .orderBy(asc(packages.expiresAt));
   const hours = rows.reduce((total, r) => total + r.hoursLeft, 0);
-  return { hours, nearestExpiry: rows[0]?.expiresAt ?? null, isHouseholdPool };
+  // A package counting from a first class not yet booked has no end date to show.
+  const started = rows.find(
+    (r) => !(r.firstClassDeadline !== null && r.firstClassStartedAt === null && r.firstClassDeadline > now),
+  );
+  return { hours, nearestExpiry: started?.expiresAt ?? null, isHouseholdPool };
 }
 
 /**
@@ -471,6 +486,8 @@ export async function getCreditBalances(
         expiresAt: packages.expiresAt,
         classDays: packages.classDays,
         partySize: packages.partySize,
+        firstClassDeadline: packages.firstClassDeadline,
+        firstClassStartedAt: packages.firstClassStartedAt,
       })
       .from(packages)
       .where(
@@ -503,19 +520,26 @@ export async function getCreditBalances(
   const byCategory = new Map<string, CreditBalance>();
   for (const r of rows) {
     const key = keyOf(r.category, r.partySize);
+    // Validity counting from a first class not yet booked (deadline still ahead):
+    // its expires_at is only the latest it could end, not a date to show.
+    const notStarted =
+      r.firstClassDeadline !== null && r.firstClassStartedAt === null && r.firstClassDeadline > now;
     const current = byCategory.get(key);
     const row =
       current ??
-      // Rows arrive expiry-ascending, so the first one seen carries the soonest.
       ({
         category: r.category,
         classes: 0,
-        nearestExpiry: r.expiresAt,
+        nearestExpiry: null,
         eventCredits: [],
         pendingClasses: 0,
+        notStartedClasses: 0,
         ...(r.category === "rental" && r.partySize !== null ? { partySize: r.partySize } : {}),
       } satisfies CreditBalance);
     row.classes += r.hoursLeft;
+    if (notStarted) row.notStartedClasses = (row.notStartedClasses ?? 0) + r.hoursLeft;
+    // Rows arrive expiry-ascending, so the first STARTED one carries the soonest.
+    else if (row.nearestExpiry === null) row.nearestExpiry = r.expiresAt;
     if (r.classDays && r.classDays.length > 0) {
       // Group by the day SET, so two packages sold for the same event read as one
       // line rather than two identical ones.

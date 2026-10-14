@@ -125,3 +125,10 @@ export function isOnSale(
   }
   return true;
 }
+
+/**
+ * Validity counts from the customer's FIRST CLASS (2026-10-14), but the clock starts
+ * no later than this many days after purchase — a package can't sit unstarted
+ * forever. Change here to change the rule for new purchases.
+ */
+export const FIRST_CLASS_START_DEADLINE_DAYS = 30;

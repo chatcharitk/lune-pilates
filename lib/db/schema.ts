@@ -115,6 +115,17 @@ export const packages = pgTable(
     // book the anchor class to unlock the free one, then cancel the anchor and keep
     // the unlocked credit. Null while dormant and for everything non-anchored.
     activationBookingId: uuid("activation_booking_id"),
+    /**
+     * Validity counts from the FIRST CLASS (2026-10-14). Null = expiry fixed at
+     * purchase. When set: the latest the clock can start (purchase + 30 days), and the
+     * window to count from there; expires_at is recomputed from the earliest live
+     * booked class on this package (lib/credits/activation.ts recomputeFirstClassClock).
+     */
+    firstClassDeadline: timestamp("first_class_deadline", { withTimezone: true }),
+    firstClassWindowAmount: integer("first_class_window_amount"),
+    firstClassWindowUnit: text("first_class_window_unit"),
+    /** When that clock started (first class, or the deadline); null while it hasn't. */
+    firstClassStartedAt: timestamp("first_class_started_at", { withTimezone: true }),
     ownerHouseholdId: uuid("owner_household_id").references(() => households.id),
     ownerUserId: uuid("owner_user_id").references(() => users.id),
     // The PromptPay charge this package was credited from. Nullable: admin/POS or

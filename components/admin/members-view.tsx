@@ -13,7 +13,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminLang } from "./admin-context";
-import { Avatar, Badge, Drawer, MiniStat, Sparkle } from "./ui";
+import { Avatar, Badge, Dot, Drawer, MiniStat, Sparkle } from "./ui";
 import { createCustomer, removeCustomer, updateCustomer } from "@/app/actions/admin-members";
 import {
   adjustCredits,
@@ -24,7 +24,8 @@ import {
   type AdjustablePackage,
   type AdjustFailureCode,
 } from "@/app/actions/admin-credits";
-import type { AdminCustomer, CustomerLedgerEntry, LedgerReason } from "@/lib/admin/members";
+import type { AdminCustomer, CategoryCredit, CustomerLedgerEntry, LedgerReason } from "@/lib/admin/members";
+import type { PackageCategory } from "@/lib/domain/types";
 import type { StrKey } from "@/lib/i18n";
 import { formatStudioDate, studioParts } from "@/lib/time";
 
@@ -305,6 +306,9 @@ function CustomerDrawer({
               sub={customer.house ? t("in_house").replace("{n}", String(housemates.length)) : undefined}
             />
           </div>
+
+          {/* the balance by class type — they only book their own type */}
+          {customer.byCategory.length > 0 && <CategoryCredits rows={customer.byCategory} />}
 
           {/* edit name / phone — OWNER-ONLY */}
           {isOwner && <EditCustomerControl customer={customer} onEdited={onEdited} />}
@@ -903,7 +907,60 @@ function CoinIcon() {
 /** Reason → keyed label for a ledger row. Includes "promo" (free trial 1+1 grant),
  *  which the backend may emit ahead of the LedgerReason union — lookups fall back
  *  to the raw reason string when unmapped, so unknown reasons still render. */
-const LEDGER_REASON_KEY: Record<LedgerReason | "promo", StrKey> = {
+/** Class type → label (1:1 for private, as on the packages screen). */
+const CATEGORY_LABEL: Record<PackageCategory, StrKey> = {
+  group: "cat_group",
+  private: "cat_private",
+  duo: "cat_duo",
+  trio: "cat_trio",
+  rental: "cat_rental",
+};
+
+function categoryName(c: { category: PackageCategory; partySize?: number | null }, t: (k: StrKey) => string): string {
+  const base = t(CATEGORY_LABEL[c.category]);
+  return c.partySize ? `${base} · ${t("hh_people").replace("{n}", String(c.partySize))}` : base;
+}
+
+/** One line per class type: classes left and when they end (2026-10-14). */
+function CategoryCredits({ rows }: { rows: CategoryCredit[] }) {
+  const { t, lang } = useAdminLang();
+  return (
+    <div>
+      <p className="mb-2.5 font-body text-[11.5px] font-semibold uppercase tracking-[0.06em] text-muted">
+        {t("credits_by_type")}
+      </p>
+      <ul className="overflow-hidden rounded-2xl border border-line bg-surface-2">
+        {rows.map((r) => (
+          <li
+            key={`${r.category}:${r.partySize ?? ""}`}
+            className="flex items-center gap-3 border-b border-line px-4 py-3 last:border-b-0"
+          >
+            <Dot type={r.category} />
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-body text-sm font-semibold text-ink">{categoryName(r, t)}</p>
+              <p className="font-body text-xs text-muted">
+                {r.expiry
+                  ? t("expires_on").replace("{date}", fmtDate(r.expiry, lang))
+                  : r.notStarted > 0
+                    ? t("starts_at_first_class")
+                    : "—"}
+                {r.expiry && r.notStarted > 0 &&
+                  ` · ${t("plus_not_started").replace("{n}", String(r.notStarted))}`}
+              </p>
+            </div>
+            <span className="shrink-0 font-head text-[15px] font-bold text-ink tabular-nums">
+              {r.classes}
+              <span className="ml-1 font-body text-[11.5px] font-medium text-muted">{t("hrs")}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+const LEDGER_REASON_KEY: Record<LedgerReason | "promo" | "purchase_cancelled", StrKey> = {
+  purchase_cancelled: "ledger_purchase_cancelled",
   booking: "ledger_booking",
   cancel_refund: "ledger_cancel_refund",
   purchase: "ledger_purchase",
@@ -980,6 +1037,10 @@ function LedgerSection({ customerId }: { customerId: string }) {
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-body text-[13.5px] font-semibold text-ink">
                     {ledgerReasonLabel(e.reason, t)}
+                    {/* which balance moved — group and rental never mix */}
+                    {e.category && (
+                      <span className="ml-1.5 font-normal text-muted">· {categoryName({ category: e.category, partySize: e.partySize }, t)}</span>
+                    )}
                   </p>
                   <p className="font-body text-[11.5px] text-muted">
                     {fmtLedgerDate(e.createdAt, lang)}

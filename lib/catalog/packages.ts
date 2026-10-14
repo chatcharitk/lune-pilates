@@ -255,6 +255,16 @@ export function sublabelForValidity(validity: Validity): Bilingual {
     : { en: `Valid ${amount} months`, th: `ใช้ได้ ${amount} เดือน` };
 }
 
+/**
+ * "Valid 3 months from your first class" — for packages whose validity counts from
+ * the first class (2026-10-14; the rule in lib/credits/creditPackage.ts: everything
+ * without a fixed end date, event days, or a promo-shelf place).
+ */
+export function sublabelFromFirstClass(validity: Validity): Bilingual {
+  const base = sublabelForValidity(validity);
+  return { en: `${base.en} from your first class`, th: `${base.th} นับจากคลาสแรก` };
+}
+
 const FMT_LABEL = {
   solo: { en: "1:1", th: "1:1" },
   duo: { en: "Duo", th: "ดูโอ" },
@@ -462,8 +472,14 @@ function rowToAdminItem(r: CatalogRow): AdminCatalogItem {
   };
   return {
     ...toCatalogItem(seed),
-    // A fixed end date replaces the "valid N days" line everywhere it is shown.
-    ...(r.expiresOn ? { sublabel: sublabelForFixedExpiry(r.expiresOn) } : {}),
+    // A fixed end date replaces the "valid N days" line everywhere it is shown; an
+    // item whose validity counts from the first class says so (same rule as
+    // creditPackage, so the card never promises a different clock than the credit).
+    ...(r.expiresOn
+      ? { sublabel: sublabelForFixedExpiry(r.expiresOn) }
+      : !(r.classDays && r.classDays.length > 0) && !r.promoShelf
+        ? { sublabel: sublabelFromFirstClass(validityFromRow(r.validityAmount, r.validityUnit, r.validity)) }
+        : {}),
     ...(r.classDays && r.classDays.length > 0 ? { classDays: r.classDays } : {}),
     ...(r.promoShelf ? { promoShelf: true } : {}),
     ...(r.maxPerCustomer !== null ? { maxPerCustomer: r.maxPerCustomer } : {}),

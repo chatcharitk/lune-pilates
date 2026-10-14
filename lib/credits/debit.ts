@@ -18,7 +18,7 @@ import { hasRoomConflict, isRentalBookingOpen } from "@/lib/schedule/rental";
 import { creditCostForClassType } from "./cost";
 import { studioYmd } from "@/lib/time";
 import { packageDebitBlock } from "./guards";
-import { activateAnchoredPackages, deactivateAnchoredPackages } from "./activation";
+import { activateAnchoredPackages, deactivateAnchoredPackages, recomputeFirstClassClock } from "./activation";
 
 export const bookInput = z.object({
   classInstanceId: z.string().uuid(),
@@ -330,6 +330,9 @@ export async function bookClassWithDebit(
     // this class's START. In the same transaction as the debit, so the unlock can
     // never exist without the booking that earned it. A no-op for ordinary packages.
     await activateAnchoredPackages(tx, pkg.id, cls.startsAt, bk!.id);
+    // Validity from the first class (2026-10-14): this booking may be the package's
+    // first class, or an earlier one. A no-op for packages dated at purchase.
+    await recomputeFirstClassClock(tx, pkg.id);
 
     return { ok: true, bookingId: bk!.id, hoursLeft, freeCancelHours } as const;
     });
@@ -615,6 +618,11 @@ export async function rescheduleWithinTransaction(
         .where(eq(packages.id, newPkg.id));
     }
 
+    // Validity from the first class: the old booking is gone and the new one is in,
+    // so both packages' first class may have moved.
+    await recomputeFirstClassClock(tx, newPkg.id);
+    if (!samePackage) await recomputeFirstClassClock(tx, oldBk.packageId);
+
     // Report the NEW package's resulting balance (what the booking debited from).
     const reportedHoursLeft = samePackage
       ? newPkg.hoursLeft + refundCost - newCost
@@ -698,6 +706,9 @@ export async function cancelBooking(
     // they never took. Runs whether or not the cancel refunds: the unlock was earned
     // by the booking existing, so it dies with the booking either way.
     await deactivateAnchoredPackages(tx, bk.id);
+    // Validity from the first class: with this booking gone the package's first
+    // class may be later — or none, and the clock is back to not started.
+    await recomputeFirstClassClock(tx, bk.packageId);
 
     return { ok: true, refunded: params.refund } as const;
   });

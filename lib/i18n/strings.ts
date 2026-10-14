@@ -50,6 +50,15 @@ export const STR = {
   hours: { en: "classes", th: "คลาส" },
   hour: { en: "class", th: "คลาส" },
   valid_until: { en: "Valid until", th: "หมดอายุ" },
+  // Validity counts from the first class (2026-10-14).
+  balance_not_started_all: {
+    en: "Validity starts from your first class",
+    th: "เริ่มนับวันหมดอายุตั้งแต่คลาสแรก",
+  },
+  balance_not_started_some: {
+    en: "+ {n} more — validity starts from their first class",
+    th: "อีก {n} คลาส เริ่มนับวันหมดอายุตั้งแต่คลาสแรก",
+  },
   member: { en: "Member", th: "สมาชิก" },
   household: { en: "Household", th: "ครัวเรือน" },
   shared_pool: { en: "Shared pool", th: "คลาสรวมของบ้าน" },
@@ -960,6 +969,11 @@ export const STR = {
   ledger_purchase: { en: "Package purchase", th: "ซื้อแพ็กเกจ" },
   ledger_adjustment: { en: "Manual adjustment", th: "ปรับด้วยตนเอง" },
   ledger_promo: { en: "Free trial class (1+1)", th: "คลาสทดลองฟรี (1+1)" },
+  ledger_purchase_cancelled: { en: "Sale cancelled", th: "ยกเลิกการขาย" },
+  // Customer drawer — balance by class type (2026-10-14).
+  credits_by_type: { en: "Classes by type", th: "คลาสแยกตามประเภท" },
+  starts_at_first_class: { en: "Starts from first class", th: "เริ่มนับวันหมดอายุตั้งแต่คลาสแรก" },
+  plus_not_started: { en: "+{n} not started", th: "อีก {n} คลาสยังไม่เริ่มนับ" },
   // running-balance caption + empty state + loading
   ledger_running_balance: { en: "Balance: {n}", th: "คงเหลือ: {n}" },
   ledger_empty: { en: "No transactions yet", th: "ยังไม่มีรายการ" },
@@ -1311,6 +1325,10 @@ export const STR = {
   class_desc_hint_week: {
     en: "For this class only. Leave blank to use the weekly template's text.",
     th: "ใช้เฉพาะคลาสนี้ ถ้าเว้นว่างจะใช้ข้อความจากตารางประจำสัปดาห์",
+  },
+  class_desc_hint_from_template: {
+    en: "The grey text is this class's weekly template text — customers see it. Type here only to change it for this class.",
+    th: "ข้อความสีเทาคือข้อความจากตารางประจำสัปดาห์ ลูกค้าเห็นข้อความนี้อยู่แล้ว พิมพ์ในช่องนี้เฉพาะเมื่อต้องการเปลี่ยนสำหรับคลาสนี้",
   },
   class_desc_hint_template: {
     en: "Shown on every class of this slot, including weeks already on the timetable. Leave blank for the standard text.",

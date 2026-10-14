@@ -13,7 +13,7 @@
 
 import { and, asc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
-import { bookings, classInstances, instructors } from "@/lib/db/schema";
+import { bookings, classInstances, classTemplates, instructors } from "@/lib/db/schema";
 import { OUTER_CLASS_ID } from "@/lib/db/outer-refs";
 import type { ClassLevel, ClassStatus, ClassType } from "@/lib/domain/types";
 import { effectiveCapacity } from "@/lib/domain/types";
@@ -53,6 +53,8 @@ export interface AdminScheduleClass {
   level: ClassLevel | null;
   /** This class's own "about" text; null → the weekly slot's text (or the type's). */
   description: string | null;
+  /** The linked weekly slot's "about" text — what customers see when `description` is null. */
+  templateDescription: string | null;
   instructorId: string | null;
   instructor: InstructorMeta | null;
   capacity: number;
@@ -150,6 +152,7 @@ function shape(row: {
   name: string | null;
   level: ClassLevel | null;
   description: string | null;
+  templateDescription: string | null;
   capacity: number;
   status: ClassStatus;
   instructorId: string | null;
@@ -168,6 +171,7 @@ function shape(row: {
     name: row.name,
     level: row.level,
     description: row.description,
+    templateDescription: row.templateDescription,
     instructorId: row.instructorId,
     instructor: instructorMetaFor(
       row.instructorId,
@@ -256,6 +260,7 @@ export async function getWeekSchedule(
       name: classInstances.name,
       level: classInstances.level,
       description: classInstances.description,
+      templateDescription: classTemplates.description,
       capacity: classInstances.capacity,
       status: classInstances.status,
       instructorId: classInstances.instructorId,
@@ -266,6 +271,7 @@ export async function getWeekSchedule(
     })
     .from(classInstances)
     .leftJoin(instructors, eq(classInstances.instructorId, instructors.id))
+    .leftJoin(classTemplates, eq(classInstances.templateId, classTemplates.id))
     .where(
       and(
         sql`${classInstances.startsAt} >= ${weekStart}`,
@@ -322,6 +328,7 @@ function mockWeekSchedule(weekStart: Date): AdminWeekSchedule {
         time: slot.time,
         level: null,
         description: null,
+        templateDescription: null,
         durationMin: slot.durationMin,
         type: "group",
         typeMeta: metaFor("group"),
@@ -344,6 +351,7 @@ function mockWeekSchedule(weekStart: Date): AdminWeekSchedule {
       time: a.time,
       level: null,
       description: null,
+      templateDescription: null,
       durationMin: a.type === "group" ? 60 : 50,
       type: a.type,
       typeMeta: metaFor(a.type),

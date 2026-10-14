@@ -21,7 +21,7 @@
 // (UNAUTHORIZED). All money- and capacity-critical values are recomputed
 // server-side.
 
-import { and, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getDb } from "@/lib/db/client";
@@ -423,7 +423,13 @@ function weekStartOf(raw: string): Date {
 }
 
 export type GenerateResult =
-  | { ok: true; created: number; skippedConflicts: number }
+  | {
+      ok: true;
+      created: number;
+      skippedConflicts: number;
+      /** Existing classes in the week, made by hand, now linked to their template slot. */
+      linked: number;
+    }
   | { ok: false; code: "UNAUTHORIZED" | "INVALID_INPUT" };
 
 /**
@@ -450,7 +456,7 @@ export async function generateWeekFromBaseline(raw: WeekInput): Promise<Generate
   if (!parsed.success) return { ok: false, code: "INVALID_INPUT" };
   const weekStart = weekStartOf(parsed.data.weekStart);
 
-  if (mockDataMode()) return { ok: true, created: 0, skippedConflicts: 0 };
+  if (mockDataMode()) return { ok: true, created: 0, skippedConflicts: 0, linked: 0 };
 
   const db = getDb();
   const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 3_600_000);
@@ -461,7 +467,12 @@ export async function generateWeekFromBaseline(raw: WeekInput): Promise<Generate
 
   // Existing starts in the week, to skip already-present template slots.
   const existing = await db
-    .select({ startsAt: classInstances.startsAt, type: classInstances.type })
+    .select({
+      id: classInstances.id,
+      startsAt: classInstances.startsAt,
+      type: classInstances.type,
+      templateId: classInstances.templateId,
+    })
     .from(classInstances)
     .where(
       and(
@@ -469,7 +480,12 @@ export async function generateWeekFromBaseline(raw: WeekInput): Promise<Generate
         sql`${classInstances.startsAt} < ${weekEnd}`,
       ),
     );
-  const present = new Set(existing.map((e) => `${e.startsAt.getTime()}|${e.type}`));
+  const present = new Map(existing.map((e) => [`${e.startsAt.getTime()}|${e.type}`, e]));
+  // Classes already in the week that were made by hand (no template link) but sit
+  // exactly on a template slot get LINKED to it (2026-10-14): that is how they pick
+  // up the slot's "about this class" text, which is read live through template_id.
+  // Only the link is written — name, level, capacity, instructor are the owner's.
+  const toLink: { id: string; templateId: string }[] = [];
 
   // Loaded ONCE per call (not per instance in the loop below) — mirrors the
   // loadCatalogMap convention (lib/catalog/packages.ts).
@@ -485,7 +501,13 @@ export async function generateWeekFromBaseline(raw: WeekInput): Promise<Generate
     const date = addDays(weekStart, i);
     for (const slot of slotsByDow.get(isoDow(date)) ?? []) {
       const startsAt = startsAtFor(date, slot.time);
-      if (present.has(`${startsAt.getTime()}|${slot.type}`)) continue;
+      const already = present.get(`${startsAt.getTime()}|${slot.type}`);
+      if (already) {
+        if (already.templateId === null && slot.templateId) {
+          toLink.push({ id: already.id, templateId: slot.templateId });
+        }
+        continue;
+      }
 
       // Room exclusivity (rental-scoped): SKIP a slot that would overlap an active
       // rental (or, if it IS a rental, any active class) — never error the whole
@@ -521,6 +543,13 @@ export async function generateWeekFromBaseline(raw: WeekInput): Promise<Generate
     }
   }
 
+  for (const l of toLink) {
+    await db
+      .update(classInstances)
+      .set({ templateId: l.templateId })
+      .where(and(eq(classInstances.id, l.id), isNull(classInstances.templateId)));
+  }
+
   if (toInsert.length > 0) {
     await db.insert(classInstances).values(toInsert);
     // ONE broadcast event for the whole generated batch (0 created → no event).
@@ -528,7 +557,7 @@ export async function generateWeekFromBaseline(raw: WeekInput): Promise<Generate
     await emit({ type: "schedule.published", weekStart: weekStart.toISOString() });
   }
   revalidatePath("/admin/schedule");
-  return { ok: true, created: toInsert.length, skippedConflicts };
+  return { ok: true, created: toInsert.length, skippedConflicts, linked: toLink.length };
 }
 
 // ───────────────────────── publish ─────────────────────────
