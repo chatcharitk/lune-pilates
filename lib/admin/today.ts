@@ -12,7 +12,7 @@
 // mirroring admin-data.jsx (TODAY / MEMBERS), anchored to "today", so the screen
 // renders without a database. The DB path is the real one.
 
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { studioInstant, studioParts, studioStartOfDay } from "@/lib/time";
 import { bookings, classInstances, households, instructors, users, waitlist } from "@/lib/db/schema";
@@ -167,6 +167,8 @@ export async function getTodayOverview(
       and(
         sql`${classInstances.startsAt} >= ${dayStart}`,
         sql`${classInstances.startsAt} < ${dayEnd}`,
+        // A cancelled (or removed) class isn't on today's floor.
+        ne(classInstances.status, "cancelled"),
         ...(scopeInstructorId ? [eq(classInstances.instructorId, scopeInstructorId)] : []),
       ),
     )

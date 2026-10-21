@@ -15,7 +15,7 @@
 // mirroring admin-data.jsx (AINSTR) + admin-mobile-data.jsx (GANTT_DAY / AVAIL_DAY /
 // AVAIL_WEEK), anchored to "today", so the screen renders without a database.
 
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import {
   bookings,
@@ -233,6 +233,8 @@ export async function getAdminInstructors(now: Date = new Date()): Promise<Admin
           inArray(classInstances.instructorId, instrIds),
           sql`${classInstances.startsAt} >= ${dayStart}`,
           sql`${classInstances.startsAt} < ${dayEnd}`,
+          // Not teaching a cancelled (or removed) class.
+          ne(classInstances.status, "cancelled"),
         ),
       )
       .orderBy(asc(classInstances.startsAt)),

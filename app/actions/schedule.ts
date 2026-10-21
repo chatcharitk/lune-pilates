@@ -292,13 +292,35 @@ export async function deleteClass(raw: DeleteClassInput): Promise<DeleteClassRes
     .limit(1);
   if (!existing) return { ok: false, code: "NOT_FOUND" };
 
-  const [bookedRow] = await db
+  // Only a LIVE booking blocks removal (2026-10-21) — counting cancelled ones too
+  // made a class that everyone had already cancelled impossible to remove.
+  const [liveRow] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(bookings)
-    .where(eq(bookings.classInstanceId, id));
-  if ((bookedRow?.n ?? 0) > 0) return { ok: false, code: "HAS_BOOKINGS" };
+    .where(and(eq(bookings.classInstanceId, id), eq(bookings.status, "booked")));
+  if ((liveRow?.n ?? 0) > 0) return { ok: false, code: "HAS_BOOKINGS" };
 
-  await db.delete(classInstances).where(eq(classInstances.id, id));
+  // Any history at all (cancelled bookings, waitlist entries) is referenced by the
+  // ledger and the customers' own booking history, so the row must stay: take the
+  // class off the schedule as CANCELLED instead — customers can't see or book it,
+  // and nothing about who once booked it is lost. Quietly, unlike cancelClass: there
+  // is nobody to refund or tell. A class with no history at all is simply deleted.
+  const [historyRow] = await db
+    .select({
+      n: sql<number>`(select count(*)::int from ${bookings} where ${bookings.classInstanceId} = ${id})
+        + (select count(*)::int from ${waitlist} where ${waitlist.classInstanceId} = ${id})`,
+    })
+    .from(classInstances)
+    .where(eq(classInstances.id, id));
+  if ((historyRow?.n ?? 0) > 0) {
+    await db.update(classInstances).set({ status: "cancelled" }).where(eq(classInstances.id, id));
+    await db
+      .update(waitlist)
+      .set({ status: "expired" })
+      .where(and(eq(waitlist.classInstanceId, id), inArray(waitlist.status, ["waiting", "offered"])));
+  } else {
+    await db.delete(classInstances).where(eq(classInstances.id, id));
+  }
   revalidatePath("/admin/schedule");
   return { ok: true };
 }
