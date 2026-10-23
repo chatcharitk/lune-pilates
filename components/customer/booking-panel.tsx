@@ -15,7 +15,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ClassDetail, PositionAvailability } from "@/lib/schedule/queries";
 import type { RentalPartySize, ReformerPosition } from "@/lib/domain/types";
-import { isCustomerBookable } from "@/lib/domain/types";
+import { BOOKING_CUTOFF_MINUTES, isCustomerBookable, isPastBookingCutoff } from "@/lib/domain/types";
 import { bookClass, type BookActionFailureCode } from "@/app/actions/booking";
 import {
   joinWaitlist,
@@ -100,6 +100,8 @@ function errorKey(code: BookActionFailureCode): StrKey {
       return "err_admin_only";
     case "RENTAL_WINDOW_CLOSED":
       return "err_rental_window_closed";
+    case "TOO_LATE_TO_BOOK":
+      return "err_too_late_to_book";
     case "ROOM_CONFLICT":
       return "err_room_conflict";
     case "ALREADY_BOOKED":
@@ -215,6 +217,9 @@ export function BookingPanel({
   // (and any waitlist) is replaced with a "contact front desk" notice. Single source
   // of truth: CUSTOMER_BOOKABLE_TYPES (lib/domain/types).
   const adminOnly = !isCustomerBookable(detail.type);
+  // Within BOOKING_CUTOFF_MINUTES of the start (2026-10-23): no self-booking — the
+  // same contact-admin notice, with the reason. The server enforces it either way.
+  const tooLate = isPastBookingCutoff(new Date(detail.startsAt));
   // A rental whose monthly booking window hasn't opened yet: the server sends the ISO
   // instant it opens, so the CTA is a disabled "not open yet" state showing that date.
   const rentalLocked = detail.rentalOpensAt !== null;
@@ -427,6 +432,25 @@ export function BookingPanel({
             </div>
             <p className="m-0 mt-1 font-body text-[13.5px] leading-[1.5] text-ink-soft">
               {t("book_admin_only_hint")}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ───────── too close to the start — contact admin on LINE ─────────
+  if (tooLate) {
+    return (
+      <div className="px-[18px] pb-10 pt-2">
+        <div className="flex items-start gap-3.5 rounded-lune-sm border border-line bg-surface-2 px-4 py-4 shadow-soft">
+          <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-cream-2 text-taupe-deep">
+            <Info size={18} />
+          </span>
+          <div className="min-w-0">
+            <div className="font-head text-[17px] font-semibold text-ink">{t("book_admin_only")}</div>
+            <p className="m-0 mt-1 font-body text-[13.5px] leading-[1.5] text-ink-soft">
+              {t("book_too_late_hint").replace("{n}", String(BOOKING_CUTOFF_MINUTES))}
             </p>
           </div>
         </div>

@@ -40,6 +40,8 @@ function confirmErrorKey(code: ConfirmWaitlistFailureCode): StrKey {
       return "err_offer_expired";
     case "OFFER_LOST":
       return "err_offer_lost";
+    case "TOO_LATE_TO_BOOK":
+      return "err_too_late_to_book";
     case "NO_USABLE_PACKAGE":
     case "NO_CREDITS":
     case "PACKAGE_NOT_FOUND":

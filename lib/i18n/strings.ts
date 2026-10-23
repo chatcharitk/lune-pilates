@@ -113,6 +113,15 @@ export const STR = {
   // Private/Duo/Trio are front-desk-only (CUSTOMER_BOOKABLE_TYPES) — the customer CTA
   // is replaced with this contact prompt instead of a Book button.
   book_admin_only: { en: "Contact admin on LINE", th: "ติดต่อแอดมินผ่านทางไลน์" },
+  // Less than BOOKING_CUTOFF_MINUTES before the start (2026-10-23).
+  book_too_late_hint: {
+    en: "Less than {n} minutes until this class starts — please contact our admin on LINE to book.",
+    th: "เหลือเวลาไม่ถึง {n} นาทีก่อนคลาสเริ่ม กรุณาติดต่อแอดมินผ่านทางไลน์เพื่อจอง",
+  },
+  err_too_late_to_book: {
+    en: "It's less than 30 minutes before the class — please contact our admin on LINE.",
+    th: "เหลือเวลาไม่ถึง 30 นาทีก่อนคลาสเริ่ม กรุณาติดต่อแอดมินผ่านทางไลน์",
+  },
   book_admin_only_hint: {
     en: "This class is booked by contacting our admin on LINE.",
     th: "คลาสนี้จองโดยติดต่อแอดมินผ่านทางไลน์",

@@ -22,7 +22,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/client";
 import { bookings, classInstances, waitlist } from "@/lib/db/schema";
 import type { ClassType } from "@/lib/domain/types";
-import { effectiveCapacity, isCustomerBookable } from "@/lib/domain/types";
+import { effectiveCapacity, isCustomerBookable, isPastBookingCutoff } from "@/lib/domain/types";
 import { bookClassWithDebit, type BookFailureCode } from "@/lib/credits/debit";
 import { selectUsablePackage } from "@/lib/credits/selectPackage";
 import { creditCostForClassType } from "@/lib/credits/cost";
@@ -227,6 +227,8 @@ export type ConfirmWaitlistFailureCode =
   | "OFFER_LOST"
   | "CLASS_NOT_FOUND"
   | "NO_USABLE_PACKAGE"
+  // Claiming a seat IS a booking, so the same 30-minute cutoff applies.
+  | "TOO_LATE_TO_BOOK"
   // Claiming a seat IS a booking, so the studio's rules apply to it too.
   | "TERMS_NOT_ACCEPTED"
   | "TERMS_OUTDATED"
@@ -312,6 +314,7 @@ export async function confirmWaitlistOffer(
   });
 
   if (!gate.ok) return { ok: false, code: gate.code };
+  if (isPastBookingCutoff(gate.startsAt)) return { ok: false, code: "TOO_LATE_TO_BOOK" };
 
   // 2) Pick the package to debit — cost-aware, never client-supplied. (CLAUDE.md §8)
   const packageId = await selectUsablePackage(

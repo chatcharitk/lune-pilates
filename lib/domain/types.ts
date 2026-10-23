@@ -82,6 +82,18 @@ export function effectiveCapacity(capacity: number, type: ClassType): number {
  */
 export const FREE_CANCEL_HOURS = 6;
 
+/**
+ * Customers can't book themselves within this many minutes of a class starting
+ * (2026-10-23) — the studio needs the notice; the app tells them to contact admin
+ * on LINE instead. The front desk is not bound by it.
+ */
+export const BOOKING_CUTOFF_MINUTES = 30;
+
+/** True once a customer can no longer book this class themselves. */
+export function isPastBookingCutoff(startsAt: Date, now: Date = new Date()): boolean {
+  return startsAt.getTime() - now.getTime() < BOOKING_CUTOFF_MINUTES * 60_000;
+}
+
 /** Waitlist confirm hold, in minutes, once a freed seat is offered. */
 export const WAITLIST_HOLD_MINUTES = 30;
 

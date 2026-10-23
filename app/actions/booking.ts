@@ -22,7 +22,7 @@ import { creditCostForClassType } from "@/lib/credits/cost";
 import { evaluateCancellation } from "@/lib/credits/policy";
 import { bookings, classInstances } from "@/lib/db/schema";
 import type { ClassType } from "@/lib/domain/types";
-import { CAPACITY, isCustomerBookable } from "@/lib/domain/types";
+import { CAPACITY, isCustomerBookable, isPastBookingCutoff } from "@/lib/domain/types";
 import { isRentalBookingOpen } from "@/lib/schedule/rental";
 import { positionsForCapacity } from "@/lib/schedule/queries";
 import { emit } from "@/lib/events/bus";
@@ -59,7 +59,9 @@ export type BookActionFailureCode =
   /** The studio's booking rules have not been accepted (2026-09-27). */
   | "TERMS_NOT_ACCEPTED"
   /** Accepted, but the owner has since published new rules. */
-  | "TERMS_OUTDATED";
+  | "TERMS_OUTDATED"
+  /** Less than BOOKING_CUTOFF_MINUTES before the start — contact admin instead. */
+  | "TOO_LATE_TO_BOOK";
 
 export type BookResult =
   | { ok: true; bookingId: string; hoursLeft: number; freeCancelHours: number }
@@ -97,6 +99,12 @@ export async function bookClass(raw: BookClassInput): Promise<BookResult> {
   // source; the atomic debit re-checks it under the lock as defense in depth).
   if (!isCustomerBookable(cls.type)) {
     return { ok: false, code: "ADMIN_ONLY" };
+  }
+
+  // Too close to the start to self-book (2026-10-23) — the front desk can still add
+  // them. Checked before anything is selected or debited.
+  if (isPastBookingCutoff(cls.startsAt, now)) {
+    return { ok: false, code: "TOO_LATE_TO_BOOK" };
   }
 
   // Rental release window: a customer may book a rental only once its monthly window
