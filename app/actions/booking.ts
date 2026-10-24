@@ -22,7 +22,7 @@ import { creditCostForClassType } from "@/lib/credits/cost";
 import { evaluateCancellation } from "@/lib/credits/policy";
 import { bookings, classInstances } from "@/lib/db/schema";
 import type { ClassType } from "@/lib/domain/types";
-import { CAPACITY, isCustomerBookable, isPastBookingCutoff } from "@/lib/domain/types";
+import { CAPACITY, isCustomerBookable, isTooLateToSelfBook } from "@/lib/domain/types";
 import { isRentalBookingOpen } from "@/lib/schedule/rental";
 import { positionsForCapacity } from "@/lib/schedule/queries";
 import { emit } from "@/lib/events/bus";
@@ -30,6 +30,7 @@ import { registerNotificationHandlers } from "@/lib/events/notifications";
 import { offerNextWaitlistSeat } from "@/lib/waitlist/queries";
 import { eq } from "drizzle-orm";
 import { gateBookingTerms } from "@/lib/settings/terms";
+import { liveBookingCount } from "@/lib/bookings/live-count";
 
 // ───────────────────────── book ─────────────────────────
 
@@ -101,9 +102,10 @@ export async function bookClass(raw: BookClassInput): Promise<BookResult> {
     return { ok: false, code: "ADMIN_ONLY" };
   }
 
-  // Too close to the start to self-book (2026-10-23) — the front desk can still add
-  // them. Checked before anything is selected or debited.
-  if (isPastBookingCutoff(cls.startsAt, now)) {
+  // Too close to the start to be the FIRST booking (2026-10-23/24) — a class with
+  // someone already in it stays bookable; the front desk can always add them.
+  // Checked before anything is selected or debited.
+  if (isTooLateToSelfBook(cls.startsAt, await liveBookingCount(input.classInstanceId), now)) {
     return { ok: false, code: "TOO_LATE_TO_BOOK" };
   }
 

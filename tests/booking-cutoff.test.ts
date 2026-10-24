@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOOKING_CUTOFF_MINUTES, isPastBookingCutoff } from "@/lib/domain/types";
+import { BOOKING_CUTOFF_MINUTES, isPastBookingCutoff, isTooLateToSelfBook } from "@/lib/domain/types";
 
 describe("isPastBookingCutoff", () => {
   const start = new Date("2026-10-23T05:00:00Z"); // 12:00 Bangkok
@@ -15,5 +15,11 @@ describe("isPastBookingCutoff", () => {
     expect(isPastBookingCutoff(start, minutesBefore(29))).toBe(true);
     expect(isPastBookingCutoff(start, minutesBefore(1))).toBe(true);
     expect(isPastBookingCutoff(start, minutesBefore(-5))).toBe(true);
+  });
+
+  it("only blocks the FIRST booking — a class someone is in stays bookable", () => {
+    expect(isTooLateToSelfBook(start, 0, minutesBefore(10))).toBe(true);
+    expect(isTooLateToSelfBook(start, 1, minutesBefore(10))).toBe(false);
+    expect(isTooLateToSelfBook(start, 0, minutesBefore(45))).toBe(false);
   });
 });

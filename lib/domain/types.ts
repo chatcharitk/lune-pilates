@@ -83,15 +83,22 @@ export function effectiveCapacity(capacity: number, type: ClassType): number {
 export const FREE_CANCEL_HOURS = 6;
 
 /**
- * Customers can't book themselves within this many minutes of a class starting
- * (2026-10-23) — the studio needs the notice; the app tells them to contact admin
- * on LINE instead. The front desk is not bound by it.
+ * Within this many minutes of a class starting (2026-10-23), a customer can't be the
+ * FIRST to book it — the studio needs notice to open an empty class; the app tells
+ * them to contact admin on LINE instead. A class someone is already booked into is
+ * running anyway, so it stays bookable until the start (owner's change, 2026-10-24).
+ * The front desk is not bound by any of it.
  */
 export const BOOKING_CUTOFF_MINUTES = 30;
 
-/** True once a customer can no longer book this class themselves. */
+/** True once the last-minute window has begun (start − BOOKING_CUTOFF_MINUTES). */
 export function isPastBookingCutoff(startsAt: Date, now: Date = new Date()): boolean {
   return startsAt.getTime() - now.getTime() < BOOKING_CUTOFF_MINUTES * 60_000;
+}
+
+/** A customer can't self-book: inside the last-minute window AND nobody booked yet. */
+export function isTooLateToSelfBook(startsAt: Date, bookedCount: number, now: Date = new Date()): boolean {
+  return bookedCount === 0 && isPastBookingCutoff(startsAt, now);
 }
 
 /** Waitlist confirm hold, in minutes, once a freed seat is offered. */

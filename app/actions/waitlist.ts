@@ -20,9 +20,10 @@ import { gateBookingTerms } from "@/lib/settings/terms";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/client";
+import { liveBookingCount } from "@/lib/bookings/live-count";
 import { bookings, classInstances, waitlist } from "@/lib/db/schema";
 import type { ClassType } from "@/lib/domain/types";
-import { effectiveCapacity, isCustomerBookable, isPastBookingCutoff } from "@/lib/domain/types";
+import { effectiveCapacity, isCustomerBookable, isTooLateToSelfBook } from "@/lib/domain/types";
 import { bookClassWithDebit, type BookFailureCode } from "@/lib/credits/debit";
 import { selectUsablePackage } from "@/lib/credits/selectPackage";
 import { creditCostForClassType } from "@/lib/credits/cost";
@@ -314,7 +315,9 @@ export async function confirmWaitlistOffer(
   });
 
   if (!gate.ok) return { ok: false, code: gate.code };
-  if (isPastBookingCutoff(gate.startsAt)) return { ok: false, code: "TOO_LATE_TO_BOOK" };
+  if (isTooLateToSelfBook(gate.startsAt, await liveBookingCount(gate.classInstanceId))) {
+    return { ok: false, code: "TOO_LATE_TO_BOOK" };
+  }
 
   // 2) Pick the package to debit — cost-aware, never client-supplied. (CLAUDE.md §8)
   const packageId = await selectUsablePackage(

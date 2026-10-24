@@ -15,7 +15,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ClassDetail, PositionAvailability } from "@/lib/schedule/queries";
 import type { RentalPartySize, ReformerPosition } from "@/lib/domain/types";
-import { BOOKING_CUTOFF_MINUTES, isCustomerBookable, isPastBookingCutoff } from "@/lib/domain/types";
+import { BOOKING_CUTOFF_MINUTES, isCustomerBookable, isTooLateToSelfBook } from "@/lib/domain/types";
 import { bookClass, type BookActionFailureCode } from "@/app/actions/booking";
 import {
   joinWaitlist,
@@ -217,9 +217,10 @@ export function BookingPanel({
   // (and any waitlist) is replaced with a "contact front desk" notice. Single source
   // of truth: CUSTOMER_BOOKABLE_TYPES (lib/domain/types).
   const adminOnly = !isCustomerBookable(detail.type);
-  // Within BOOKING_CUTOFF_MINUTES of the start (2026-10-23): no self-booking — the
-  // same contact-admin notice, with the reason. The server enforces it either way.
-  const tooLate = isPastBookingCutoff(new Date(detail.startsAt));
+  // Within BOOKING_CUTOFF_MINUTES of the start AND nobody booked yet (2026-10-24):
+  // no self-booking — the contact-admin notice, with the reason. A class someone is
+  // already in stays bookable. The server enforces it either way.
+  const tooLate = isTooLateToSelfBook(new Date(detail.startsAt), detail.booked);
   // A rental whose monthly booking window hasn't opened yet: the server sends the ISO
   // instant it opens, so the CTA is a disabled "not open yet" state showing that date.
   const rentalLocked = detail.rentalOpensAt !== null;
