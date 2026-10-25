@@ -13,6 +13,7 @@
 import { listPackageCatalog } from "@/lib/catalog/packages";
 import {
   countPurchasesByItem,
+  foldLimitGroups,
   hasEverPurchased,
   withinPurchaseLimit,
 } from "@/lib/catalog/eligibility";
@@ -43,9 +44,14 @@ export default async function BuyCreditsPage() {
   // Which LIMITED items this customer has already taken, so the card can say so
   // instead of letting them get as far as the QR. createCheckout re-checks it.
   const limited = catalog.flatMap((c) => c.items.filter((i) => i.maxPerCustomer !== undefined));
-  const counts = await countPurchasesByItem(
-    viewer.id,
-    limited.map((i) => i.id),
+  // Items in a limit group (all trial packs) share one allowance, so each carries
+  // the group's total — buying the group trial marks the 1:1 trial as taken too.
+  const counts = foldLimitGroups(
+    limited,
+    await countPurchasesByItem(
+      viewer.id,
+      limited.map((i) => i.id),
+    ),
   );
   const soldOutForYou = limited
     .filter((i) => !withinPurchaseLimit(i, counts.get(i.id) ?? 0))

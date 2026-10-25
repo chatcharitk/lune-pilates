@@ -39,7 +39,7 @@ import { termsSnapshotFor } from "@/lib/catalog/chargeTerms";
 import { expiryFromFixedDay, isOnSale } from "@/lib/catalog/validity";
 import { componentsForItem, isBundle, totalHours } from "@/lib/catalog/components";
 import {
-  countPurchasesOf,
+  countTowardLimit,
   hasEverPurchased,
   isItemPurchasableBy,
   withinPurchaseLimit,
@@ -60,7 +60,7 @@ import { getSlipStorage } from "@/lib/storage";
 import type { Bilingual } from "@/lib/i18n";
 import { emit } from "@/lib/events/bus";
 import { registerNotificationHandlers } from "@/lib/events/notifications";
-import { and, eq, ne } from "drizzle-orm";
+import { and, desc, eq, isNull, ne } from "drizzle-orm";
 import { mockDataMode } from "@/lib/mock-mode";
 
 // ───────────────────────── create checkout ─────────────────────────
@@ -200,7 +200,7 @@ export async function createCheckout(raw: CreateCheckoutInput): Promise<CreateCh
   // such an item as bought; this is the rule that actually enforces it.
   if (
     item.maxPerCustomer !== undefined &&
-    !withinPurchaseLimit(item, await countPurchasesOf(viewer.id, item.id))
+    !withinPurchaseLimit(item, await countTowardLimit(viewer.id, item))
   ) {
     return { ok: false, code: "LIMIT_REACHED" };
   }
@@ -248,10 +248,46 @@ export async function createCheckout(raw: CreateCheckoutInput): Promise<CreateCh
   // the catalog — the client never gets to set what is charged.
   const reference = `pkg_${item.id}_u_${viewer.id}_${Date.now()}`;
 
-  const charge = await getPaymentProvider().createPromptPayCharge({
-    amount: chargeAmount,
-    reference,
-  });
+  // ONE OPEN CHECKOUT PER LIMITED ITEM (2026-10-25). A customer who goes back and
+  // taps "buy" again on a once-per-customer pack used to get a SECOND unpaid charge;
+  // paying both was then refused at slip upload — after the money had moved. Instead
+  // they are taken back to the checkout already open for it (same price, same code).
+  // Nothing is lost: the PromptPay QR depends only on the studio's account and the
+  // amount, so the QR shown is the very one they may already have paid.
+  const reusable =
+    item.maxPerCustomer !== undefined && !mockDataMode()
+      ? (
+          await getDb()
+            .select({ chargeId: charges.chargeId, reference: charges.reference })
+            .from(charges)
+            .where(
+              and(
+                eq(charges.userId, viewer.id),
+                eq(charges.packageId, item.id),
+                eq(charges.status, "pending"),
+                eq(charges.amount, chargeAmount),
+                promo ? eq(charges.promoCode, promo.code.code) : isNull(charges.promoCode),
+              ),
+            )
+            .orderBy(desc(charges.createdAt))
+            .limit(1)
+        )[0]
+      : undefined;
+
+  const charge = reusable
+    ? {
+        ...(await getPaymentProvider().createPromptPayCharge({
+          amount: chargeAmount,
+          reference: reusable.reference,
+        })),
+        // Keep the open charge's identity; only the (identical) QR is re-made.
+        chargeId: reusable.chargeId,
+        reference: reusable.reference,
+      }
+    : await getPaymentProvider().createPromptPayCharge({
+        amount: chargeAmount,
+        reference,
+      });
 
   // Persist the server-derived intent BEFORE returning the QR: this binds the
   // provider's chargeId to exactly { packageId, userId, amount } as resolved from
@@ -260,7 +296,7 @@ export async function createCheckout(raw: CreateCheckoutInput): Promise<CreateCh
   // owner and recipient are all server-derived; the client never gets to set them.
   // (No-DB dev path: skip persisting — the mock provider's QR still renders, so the
   // whole checkout UI is exercisable without a database.)
-  if (!mockDataMode()) {
+  if (!mockDataMode() && !reusable) {
     await getDb()
       .insert(charges)
       .values({
@@ -444,7 +480,7 @@ export async function uploadPaymentSlip(
   // the gap where two checkouts were opened side by side and both were paid.
   const limitedItem = await getCatalogItem(intent.packageId);
   if (limitedItem?.maxPerCustomer !== undefined) {
-    const already = await countPurchasesOf(viewer.id, intent.packageId);
+    const already = await countTowardLimit(viewer.id, limitedItem);
     // This charge counts itself once it reaches awaiting_review, so a RE-upload for
     // the same charge must not be read as a second purchase.
     const mine = intent.status === "awaiting_review" ? 1 : 0;

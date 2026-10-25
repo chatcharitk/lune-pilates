@@ -215,6 +215,9 @@ export const catalogItems = pgTable(
     // is every ordinary package. 1 is what makes "buy one get one" an introduction
     // rather than a permanent half-price tariff.
     maxPerCustomer: integer("max_per_customer"),
+    // Items sharing a limit_group share ONE max_per_customer allowance (2026-10-25):
+    // every trial pack is "trial", so a customer gets one trial of any type.
+    limitGroup: text("limit_group"),
     // EVENT DAYS (2026-09-12): the Bangkok days ("YYYY-MM-DD") whose classes this
     // package's credits may be booked into. NULL = any day, which is every ordinary
     // package. A special-priced opening class is sold as its own item with the event

@@ -157,6 +157,11 @@ export interface CatalogItem {
   /** How many times one customer may buy this, ever. Absent = unlimited. */
   maxPerCustomer?: number;
   /**
+   * Items with the same limit group share that allowance (2026-10-25): all trial
+   * packs are "trial", so the limit is one trial of ANY type, not one of each.
+   */
+  limitGroup?: string;
+  /**
    * STUDIO RENTAL head-count (2026-09-29): the credit this item grants hires the whole
    * studio for exactly this many people, and cannot be used for any other size.
    * Absent on every non-rental item.
@@ -450,6 +455,7 @@ interface CatalogRow {
   classDays: string[] | null;
   promoShelf: boolean;
   maxPerCustomer: number | null;
+  limitGroup: string | null;
   partySize: number | null;
   saleStartsOn: string | null;
   saleEndsOn: string | null;
@@ -483,6 +489,7 @@ function rowToAdminItem(r: CatalogRow): AdminCatalogItem {
     ...(r.classDays && r.classDays.length > 0 ? { classDays: r.classDays } : {}),
     ...(r.promoShelf ? { promoShelf: true } : {}),
     ...(r.maxPerCustomer !== null ? { maxPerCustomer: r.maxPerCustomer } : {}),
+    ...(r.limitGroup ? { limitGroup: r.limitGroup } : {}),
     ...(r.partySize !== null ? { partySize: r.partySize } : {}),
     ...(r.saleStartsOn ? { saleStartsOn: r.saleStartsOn } : {}),
     ...(r.saleEndsOn ? { saleEndsOn: r.saleEndsOn } : {}),
@@ -514,6 +521,7 @@ const SELECT_COLUMNS = {
   classDays: catalogItems.classDays,
   promoShelf: catalogItems.promoShelf,
   maxPerCustomer: catalogItems.maxPerCustomer,
+  limitGroup: catalogItems.limitGroup,
   partySize: catalogItems.partySize,
   saleStartsOn: catalogItems.saleStartsOn,
   saleEndsOn: catalogItems.saleEndsOn,
@@ -637,6 +645,7 @@ export async function listPackageCatalog(
     ...(i.classDays && i.classDays.length > 0 ? { classDays: i.classDays } : {}),
     ...(i.promoShelf ? { promoShelf: true } : {}),
     ...(i.maxPerCustomer !== undefined ? { maxPerCustomer: i.maxPerCustomer } : {}),
+    ...(i.limitGroup ? { limitGroup: i.limitGroup } : {}),
     ...(i.partySize !== undefined ? { partySize: i.partySize } : {}),
     ...(i.saleEndsOn ? { saleEndsOn: i.saleEndsOn } : {}),
     ...(i.expiresOn ? { expiresOn: i.expiresOn } : {}),

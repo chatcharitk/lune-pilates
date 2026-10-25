@@ -15,7 +15,7 @@
 
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
-import { charges } from "@/lib/db/schema";
+import { catalogItems, charges } from "@/lib/db/schema";
 import { mockDataMode } from "@/lib/mock-mode";
 import type { CatalogItem } from "./packages";
 
@@ -101,6 +101,48 @@ export async function countPurchasesByItem(
 export async function countPurchasesOf(userId: string, itemId: string): Promise<number> {
   const counts = await countPurchasesByItem(userId, [itemId]);
   return counts.get(itemId) ?? 0;
+}
+
+/**
+ * How many purchases count against `item`'s per-customer limit: its own, or — for an
+ * item in a limit group (2026-10-25) — every item of that group together, so "one
+ * trial per customer" means one trial of ANY type. Live charges only, as above.
+ */
+export async function countTowardLimit(
+  userId: string,
+  item: Pick<CatalogItem, "id" | "limitGroup">,
+): Promise<number> {
+  if (!item.limitGroup) return countPurchasesOf(userId, item.id);
+  if (mockDataMode()) return 0;
+  const [row] = await getDb()
+    .select({ n: sql<number>`count(*)::int` })
+    .from(charges)
+    .where(
+      and(
+        eq(charges.userId, userId),
+        inArray(
+          charges.packageId,
+          getDb().select({ id: catalogItems.id }).from(catalogItems).where(eq(catalogItems.limitGroup, item.limitGroup)),
+        ),
+        inArray(charges.status, [...LIVE_CHARGE_STATUSES]),
+      ),
+    );
+  return row?.n ?? 0;
+}
+
+/**
+ * Per-item counts for the buy screen with limit groups folded in: an item in a
+ * group carries the whole group's total. Pure over the per-item counts.
+ */
+export function foldLimitGroups(
+  items: readonly Pick<CatalogItem, "id" | "limitGroup">[],
+  perItem: ReadonlyMap<string, number>,
+): Map<string, number> {
+  const byGroup = new Map<string, number>();
+  for (const i of items) {
+    if (i.limitGroup) byGroup.set(i.limitGroup, (byGroup.get(i.limitGroup) ?? 0) + (perItem.get(i.id) ?? 0));
+  }
+  return new Map(items.map((i) => [i.id, i.limitGroup ? (byGroup.get(i.limitGroup) ?? 0) : (perItem.get(i.id) ?? 0)]));
 }
 
 /** Whether `item`'s per-customer limit still leaves room for one more purchase. */
