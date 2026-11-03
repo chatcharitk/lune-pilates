@@ -45,13 +45,19 @@ export function ClassPicker({
   }, [classes]);
 
   const days = useMemo(() => [...byDay.keys()], [byDay]);
-  const [day, setDay] = useState<string | null>(days[0] ?? null);
+  // Open on today (or the next day with classes), not on the backdated past days
+  // that lead the strip — those are there for the occasional after-the-fact booking.
+  const defaultDay = useMemo(() => {
+    const today = studioYmd(new Date());
+    return days.find((d) => d >= today) ?? days[days.length - 1] ?? null;
+  }, [days]);
+  const [day, setDay] = useState<string | null>(defaultDay);
   const [type, setType] = useState<TypeFilter>("all");
 
   // If the class list changes under us (a refresh after booking), keep a valid day.
   useEffect(() => {
-    if (day === null || !byDay.has(day)) setDay(days[0] ?? null);
-  }, [byDay, days, day]);
+    if (day === null || !byDay.has(day)) setDay(defaultDay);
+  }, [byDay, defaultDay, day]);
 
   const onDay = day ? (byDay.get(day) ?? []) : [];
   const typesOnDay = useMemo(
@@ -170,6 +176,11 @@ export function ClassPicker({
                   c.full ? "text-[#a56a52]" : "text-sage-deep"
                 }`}
               >
+                {new Date(c.startsAt).getTime() <= Date.now() && (
+                  <span className="mr-1.5 rounded-full bg-cream-2 px-2 py-0.5 text-[10.5px] text-taupe-deep">
+                    {t("class_started")}
+                  </span>
+                )}
                 {c.full ? t("full") : `${c.seatsLeft} ${c.seatsLeft === 1 ? t("spot_left") : t("spots_left")}`}
               </span>
             </button>

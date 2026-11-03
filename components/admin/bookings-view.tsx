@@ -462,6 +462,8 @@ function BookingDrawer({
         (c) =>
           c.type === booking.class.type &&
           !c.full &&
+          // Backdating is for NEW bookings only; a move goes to a class still ahead.
+          new Date(c.startsAt).getTime() > Date.now() &&
           c.id !== booking.class.classInstanceId,
       )
     : [];

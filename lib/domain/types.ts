@@ -101,6 +101,19 @@ export function isTooLateToSelfBook(startsAt: Date, bookedCount: number, now: Da
   return bookedCount === 0 && isPastBookingCutoff(startsAt, now);
 }
 
+/**
+ * Front-desk BACKDATING (owner, 2026-11-03): a customer phones in, comes to class,
+ * and only pays afterwards — the instructor is paid for the hour, so the class can't
+ * be moved. The front desk may therefore book a customer into a class that has
+ * ALREADY STARTED, up to this many days back. Customers never can.
+ */
+export const ADMIN_BACKDATE_DAYS = 7;
+
+/** True when the front desk may still book into a class that started at `startsAt`. */
+export function isWithinAdminBackdate(startsAt: Date, now: Date = new Date()): boolean {
+  return startsAt.getTime() >= now.getTime() - ADMIN_BACKDATE_DAYS * 24 * 3_600_000;
+}
+
 /** Waitlist confirm hold, in minutes, once a freed seat is offered. */
 export const WAITLIST_HOLD_MINUTES = 30;
 

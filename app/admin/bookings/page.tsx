@@ -3,6 +3,7 @@ import { listBookableClasses } from "@/lib/schedule/queries";
 import { listCustomers } from "@/lib/admin/members";
 import { currentWeekStart } from "@/components/customer/schedule-helpers";
 import { addDays } from "@/lib/time";
+import { ADMIN_BACKDATE_DAYS } from "@/lib/domain/types";
 import { requireOwner } from "@/lib/auth/admin";
 import { BookingsView } from "@/components/admin/bookings-view";
 import { AdminForbidden } from "@/components/admin/admin-forbidden";
@@ -30,11 +31,14 @@ export default async function AdminBookingsPage() {
   // sees with full ("member") visibility — the tiered gate is a customer browsing
   // restriction, not an admin one. The action re-validates everything server-side;
   // this only populates the pickers.
-  const weekStarts = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => addDays(currentWeekStart(now), i * 7));
+  // Week −1 too: the desk may BACKDATE a booking into a class that started within
+  // the last ADMIN_BACKDATE_DAYS (a customer who came, then paid afterwards).
+  const weekStarts = [-1, 0, 1, 2, 3, 4, 5, 6, 7].map((i) => addDays(currentWeekStart(now), i * 7));
+  const startedSince = new Date(now.getTime() - ADMIN_BACKDATE_DAYS * 24 * 3_600_000);
   const [overview, customers, ...bookableWeeks] = await Promise.all([
     getAdminBookingsOverview(),
     listCustomers({}, now),
-    ...weekStarts.map((weekStart) => listBookableClasses({ viewer: { tier: "member" }, weekStart, now })),
+    ...weekStarts.map((weekStart) => listBookableClasses({ viewer: { tier: "member" }, weekStart, now, includeStartedSince: startedSince })),
   ]);
   // Dedupe by class id — distinct across weeks on the real DB (no-op), but the
   // no-DB mock returns the same synthetic ids per week, so collapse those.

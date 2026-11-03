@@ -253,6 +253,11 @@ export interface ListBookableArgs {
   weekStart: Date;
   /** Injectable clock for tests / SSR determinism. */
   now?: Date;
+  /**
+   * FRONT DESK ONLY: also list published classes that already started at or after
+   * this instant (backdated bookings — ADMIN_BACKDATE_DAYS). Never pass for a customer.
+   */
+  includeStartedSince?: Date;
 }
 
 /**
@@ -305,8 +310,12 @@ export async function listBookableClasses(args: ListBookableArgs): Promise<Booka
     )
     .orderBy(asc(classInstances.startsAt));
 
+  const since = args.includeStartedSince;
   return rows
     .filter((r) =>
+      (since !== undefined &&
+        r.startsAt.getTime() <= now.getTime() &&
+        r.startsAt.getTime() >= since.getTime()) ||
       isBookableForViewer(
         {
           status: r.status,

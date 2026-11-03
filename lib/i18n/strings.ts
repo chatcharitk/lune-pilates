@@ -82,6 +82,7 @@ export const STR = {
   spots_left: { en: "spots left", th: "ที่ว่าง" },
   spot_left: { en: "spot left", th: "ที่ว่าง" },
   full: { en: "Full", th: "เต็ม" },
+  class_started: { en: "Started", th: "เริ่มไปแล้ว" },
   waitlist: { en: "Waitlist", th: "จองคิว" },
   morning: { en: "Morning", th: "ช่วงเช้า" },
   afternoon: { en: "Afternoon", th: "ช่วงบ่าย" },

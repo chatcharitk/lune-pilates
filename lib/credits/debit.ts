@@ -11,7 +11,7 @@ import { z } from "zod";
 import { getDb, type Database } from "@/lib/db/client";
 import { bookings, classInstances, creditLedger, packages, users } from "@/lib/db/schema";
 import type { ReformerPosition } from "@/lib/domain/types";
-import { effectiveCapacity, FREE_CANCEL_HOURS, isCustomerBookable } from "@/lib/domain/types";
+import { effectiveCapacity, FREE_CANCEL_HOURS, isCustomerBookable, isWithinAdminBackdate } from "@/lib/domain/types";
 import { positionsForCapacity } from "@/lib/schedule/queries";
 import { isBookableForViewer } from "@/lib/schedule/visibility";
 import { hasRoomConflict, isRentalBookingOpen } from "@/lib/schedule/rental";
@@ -164,7 +164,14 @@ export async function bookClassWithDebit(
       .where(eq(classInstances.id, input.classInstanceId))
       .for("update");
 
-    if (!cls || cls.status !== "published" || cls.startsAt.getTime() <= now.getTime()) {
+    // A started class is closed to customers. The front desk may still book into one
+    // that started within ADMIN_BACKDATE_DAYS — a customer who came and paid after.
+    const started = cls ? cls.startsAt.getTime() <= now.getTime() : false;
+    if (
+      !cls ||
+      cls.status !== "published" ||
+      (started && !(input.bookedByAdmin && isWithinAdminBackdate(cls.startsAt, now)))
+    ) {
       return { ok: false, code: "NOT_BOOKABLE" } as const;
     }
 
@@ -200,8 +207,10 @@ export async function bookClassWithDebit(
     // (it's in the /schedule/[id] URL) must not be able to book a class still in
     // its members-only window. Re-use the single pure predicate so the rule stays
     // single-sourced; viewerTier is resolved server-side by the caller, not the
-    // client. (status/startsAt are already re-validated just above.)
+    // client. (status/startsAt are already re-validated just above.) Skipped for a
+    // backdated front-desk booking: the class is over, a browsing window is moot.
     if (
+      !started &&
       !isBookableForViewer(
         {
           status: cls.status,
